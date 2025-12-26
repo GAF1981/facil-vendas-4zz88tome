@@ -21,13 +21,17 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Search, Bell, Settings, LogOut } from 'lucide-react'
 import { useLocation, Link } from 'react-router-dom'
+import { useAuth } from '@/hooks/use-auth'
 
 export function Header() {
   const location = useLocation()
   const pathnames = location.pathname.split('/').filter((x) => x)
+  const { signOut } = useAuth()
 
   const getBreadcrumbName = (path: string) => {
     switch (path) {
+      case 'dashboard':
+        return 'Dashboard'
       case 'clientes':
         return 'Clientes'
       case 'novo':
@@ -48,14 +52,14 @@ export function Header() {
           <BreadcrumbList>
             <BreadcrumbItem>
               <BreadcrumbLink asChild>
-                <Link to="/">Dashboard</Link>
+                <Link to="/">Início</Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
             {pathnames.map((value, index) => {
               const to = `/${pathnames.slice(0, index + 1).join('/')}`
               const isLast = index === pathnames.length - 1
               const name = getBreadcrumbName(value)
-              const isId = value.length > 20 // Assuming IDs are long UUIDs
+              const isId = value.length > 20 || !isNaN(Number(value))
               const displayName = isId ? 'Detalhes' : name
 
               return (
@@ -63,10 +67,14 @@ export function Header() {
                   <BreadcrumbSeparator />
                   <BreadcrumbItem>
                     {isLast ? (
-                      <BreadcrumbPage>{displayName}</BreadcrumbPage>
+                      <BreadcrumbPage className="capitalize">
+                        {displayName}
+                      </BreadcrumbPage>
                     ) : (
                       <BreadcrumbLink asChild>
-                        <Link to={to}>{displayName}</Link>
+                        <Link to={to} className="capitalize">
+                          {displayName}
+                        </Link>
                       </BreadcrumbLink>
                     )}
                   </BreadcrumbItem>
@@ -115,7 +123,10 @@ export function Header() {
               <Settings className="mr-2 h-4 w-4" />
               <span>Configurações</span>
             </DropdownMenuItem>
-            <DropdownMenuItem className="text-destructive focus:text-destructive">
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onClick={signOut}
+            >
               <LogOut className="mr-2 h-4 w-4" />
               <span>Sair</span>
             </DropdownMenuItem>

@@ -11,9 +11,8 @@ import {
   SidebarRail,
   useSidebar,
 } from '@/components/ui/sidebar'
-import { LayoutDashboard, Users, ShoppingCart, LogOut } from 'lucide-react'
+import { LayoutDashboard, Users, ShoppingCart } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
-import { cn } from '@/lib/utils'
 
 export function AppSidebar() {
   const location = useLocation()
@@ -22,7 +21,7 @@ export function AppSidebar() {
   const items = [
     {
       title: 'Dashboard',
-      url: '/',
+      url: '/dashboard',
       icon: LayoutDashboard,
     },
     {

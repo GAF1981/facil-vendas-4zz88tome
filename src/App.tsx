@@ -10,6 +10,7 @@ import { Toaster as Sonner } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import GlobalLayout from '@/components/layout/GlobalLayout'
 import Index from '@/pages/Index'
+import DashboardPage from '@/pages/dashboard/DashboardPage'
 import NotFound from '@/pages/NotFound'
 import ClientsPage from '@/pages/clients/ClientsPage'
 import ClientFormPage from '@/pages/clients/ClientFormPage'
@@ -50,6 +51,7 @@ const App = () => (
           <Route element={<ProtectedRoute />}>
             <Route element={<GlobalLayout />}>
               <Route path="/" element={<Index />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/clientes" element={<ClientsPage />} />
               <Route path="/clientes/novo" element={<ClientFormPage />} />
               <Route path="/clientes/:id" element={<ClientFormPage />} />
