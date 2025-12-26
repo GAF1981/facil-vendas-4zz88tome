@@ -1,12 +1,24 @@
 import { Database } from '@/lib/supabase/types'
 import { z } from 'zod'
 
-// Type definition derived from Supabase Row
-export type ClientRow = Database['public']['Tables']['CLIENTES']['Row']
-export type ClientInsert = Database['public']['Tables']['CLIENTES']['Insert']
-export type ClientUpdate = Database['public']['Tables']['CLIENTES']['Update']
+// Manually extending types since we can't regenerate supabase types in this environment
+// We are adding the new columns that are created via migration
+interface AdditionalFields {
+  'DESCONTO ACESSORIO CELULAR'?: string | null
+  'DESCONTO BRINQUEDO'?: string | null
+  'DESCONTO ACESSORIO'?: string | null
+  'DESCONTO OUTROS'?: string | null
+}
 
-// Zod Schema for validation - covering all 22 columns
+// Type definition derived from Supabase Row with manual extension
+export type ClientRow = Database['public']['Tables']['CLIENTES']['Row'] &
+  AdditionalFields
+export type ClientInsert = Database['public']['Tables']['CLIENTES']['Insert'] &
+  AdditionalFields
+export type ClientUpdate = Database['public']['Tables']['CLIENTES']['Update'] &
+  AdditionalFields
+
+// Zod Schema for validation - covering all columns including new ones
 export const clientSchema = z.object({
   CODIGO: z.coerce
     .number({ required_error: 'Código é obrigatório' })
@@ -35,6 +47,12 @@ export const clientSchema = z.object({
   'NOTA FISCAL': z.string().optional().nullable(),
   EXPOSITOR: z.string().optional().nullable(),
   Desconto: z.string().optional().nullable(),
+  // New discount fields
+  'DESCONTO ACESSORIO CELULAR': z.string().optional().nullable(),
+  'DESCONTO BRINQUEDO': z.string().optional().nullable(),
+  'DESCONTO ACESSORIO': z.string().optional().nullable(),
+  'DESCONTO OUTROS': z.string().optional().nullable(),
+
   'OBSERVAÇÃO FIXA': z.string().optional().nullable(),
   'ALTERAÇÃO CLIENTE': z.string().optional().nullable(),
 })

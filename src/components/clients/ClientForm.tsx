@@ -68,6 +68,10 @@ export function ClientForm({
           'NOTA FISCAL': '',
           EXPOSITOR: '',
           Desconto: '',
+          'DESCONTO ACESSORIO CELULAR': '',
+          'DESCONTO BRINQUEDO': '',
+          'DESCONTO ACESSORIO': '',
+          'DESCONTO OUTROS': '',
           'OBSERVAÇÃO FIXA': '',
           'ALTERAÇÃO CLIENTE': '',
         },
@@ -529,6 +533,87 @@ export function ClientForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Desconto Padrão</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="%"
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* New Discount Fields */}
+            <div className="md:col-span-3">
+              <FormField
+                control={form.control}
+                name="DESCONTO ACESSORIO CELULAR"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Desconto Acessório Celular</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="%"
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="md:col-span-3">
+              <FormField
+                control={form.control}
+                name="DESCONTO BRINQUEDO"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Desconto Brinquedo</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="%"
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="md:col-span-3">
+              <FormField
+                control={form.control}
+                name="DESCONTO ACESSORIO"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Desconto Acessório</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="%"
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="md:col-span-3">
+              <FormField
+                control={form.control}
+                name="DESCONTO OUTROS"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Desconto Outros</FormLabel>
                     <FormControl>
                       <Input
                         placeholder="%"
