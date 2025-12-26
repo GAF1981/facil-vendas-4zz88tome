@@ -59,7 +59,7 @@ export default function ProductsPage() {
       console.error(error)
       toast({
         title: 'Erro ao carregar produtos',
-        description: 'Tente novamente.',
+        description: 'Verifique sua conexão e tente novamente.',
         variant: 'destructive',
       })
     } finally {
@@ -75,7 +75,7 @@ export default function ProductsPage() {
     setSearchTerm(code)
     toast({
       title: 'Código escaneado',
-      description: `Buscando por: ${code}`,
+      description: `Filtrando por: ${code}`,
     })
   }
 
@@ -98,7 +98,7 @@ export default function ProductsPage() {
           </div>
           <h1 className="text-3xl font-bold tracking-tight">Produtos</h1>
           <p className="text-muted-foreground mt-1">
-            Catálogo de produtos ({totalCount} registros)
+            Gerencie seu catálogo de produtos ({totalCount} registros)
           </p>
         </div>
         <Button asChild>
@@ -110,7 +110,7 @@ export default function ProductsPage() {
       </div>
 
       <div className="flex items-center bg-card p-4 rounded-lg border shadow-sm">
-        <div className="relative w-full max-w-sm flex gap-2">
+        <div className="relative w-full max-w-lg flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
@@ -124,7 +124,8 @@ export default function ProductsPage() {
             variant="outline"
             size="icon"
             onClick={() => setScannerOpen(true)}
-            title="Escanear"
+            title="Escanear Código de Barras"
+            className="shrink-0"
           >
             <ScanBarcode className="h-4 w-4" />
           </Button>
@@ -189,7 +190,7 @@ export default function ProductsPage() {
         </Card>
       )}
 
-      {/* Barcode Scanner */}
+      {/* Barcode Scanner Dialog */}
       <BarcodeScannerDialog
         open={scannerOpen}
         onOpenChange={setScannerOpen}

@@ -10,6 +10,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Loader2 } from 'lucide-react'
@@ -39,12 +40,11 @@ export function ProductForm({
         }
       : {
           CODIGO: 0,
-          'CÓDIGO BARRAS': null,
+          'CÓDIGO BARRAS': undefined, // undefined allows placeholder to show
           PRODUTOS: '',
           'DESCRIÇÃO RESUMIDA': '',
           GRUPO: '',
           PREÇO: '',
-          'PRODUTOS CONCATENADOS': '',
           TIPO: '',
         },
   })
@@ -52,7 +52,14 @@ export function ProductForm({
   const onSubmit = async (data: ProductFormData) => {
     setLoading(true)
     try {
-      const payload = { ...data, CODIGO: Number(data.CODIGO) }
+      // Ensure numeric type safety
+      const payload = {
+        ...data,
+        CODIGO: Number(data.CODIGO),
+        'CÓDIGO BARRAS': data['CÓDIGO BARRAS']
+          ? Number(data['CÓDIGO BARRAS'])
+          : 0, // Default to 0 if not provided, per likely DB schema
+      }
 
       if (initialData) {
         await productsService.update(initialData.CODIGO, payload)
@@ -85,7 +92,7 @@ export function ProductForm({
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        {/* Identificação */}
+        {/* Dados Principais */}
         <div className="space-y-4">
           <h3 className="text-lg font-medium">Dados do Produto</h3>
           <Separator />
@@ -123,9 +130,10 @@ export function ProductForm({
                         type="number"
                         placeholder="EAN-13"
                         {...field}
-                        value={field.value || ''}
+                        value={field.value ?? ''}
                       />
                     </FormControl>
+                    <FormDescription>Somente números.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -138,7 +146,7 @@ export function ProductForm({
                 name="PREÇO"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Preço</FormLabel>
+                    <FormLabel>Preço de Venda</FormLabel>
                     <FormControl>
                       <Input
                         placeholder="R$ 0,00"
@@ -158,9 +166,12 @@ export function ProductForm({
                 name="PRODUTOS"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Produto *</FormLabel>
+                    <FormLabel>Nome do Produto *</FormLabel>
                     <FormControl>
-                      <Input placeholder="Nome do produto" {...field} />
+                      <Input
+                        placeholder="Descrição completa do produto"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -177,7 +188,7 @@ export function ProductForm({
                     <FormLabel>Descrição Resumida</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="Descrição curta"
+                        placeholder="Para etiquetas ou cupons"
                         {...field}
                         value={field.value || ''}
                       />
@@ -197,7 +208,7 @@ export function ProductForm({
                     <FormLabel>Grupo</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="Grupo"
+                        placeholder="Categoria"
                         {...field}
                         value={field.value || ''}
                       />
@@ -217,7 +228,7 @@ export function ProductForm({
                     <FormLabel>Tipo</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="Tipo"
+                        placeholder="UN, KG, etc"
                         {...field}
                         value={field.value || ''}
                       />
@@ -227,8 +238,6 @@ export function ProductForm({
                 )}
               />
             </div>
-
-            {/* Removed PRODUTOS CONCATENADOS to cleanup UI as per requirements */}
           </div>
         </div>
 

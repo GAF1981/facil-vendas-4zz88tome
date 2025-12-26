@@ -11,7 +11,8 @@ export const productsService = {
       const isNumeric = /^\d+$/.test(searchTerm)
 
       if (isNumeric) {
-        // If numeric, search in CODIGO, CÓDIGO BARRAS (exact) and PRODUTOS (partial)
+        // If numeric, search in CODIGO (exact), CÓDIGO BARRAS (exact) or PRODUTOS (partial)
+        // Note: We use quotes for "CÓDIGO BARRAS" to handle the space in column name
         query = query.or(
           `CODIGO.eq.${searchTerm},"CÓDIGO BARRAS".eq.${searchTerm},PRODUTOS.ilike.%${searchTerm}%`,
         )
@@ -46,17 +47,6 @@ export const productsService = {
       .single()
 
     if (error) throw error
-    return data as Product
-  },
-
-  async getByBarcode(barcode: number) {
-    const { data, error } = await supabase
-      .from('PRODUTOS')
-      .select('*')
-      .eq('CÓDIGO BARRAS', barcode)
-      .single()
-
-    if (error) return null
     return data as Product
   },
 

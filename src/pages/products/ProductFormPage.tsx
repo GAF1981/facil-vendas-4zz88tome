@@ -62,7 +62,7 @@ const ProductFormPage = () => {
           <p className="text-muted-foreground">
             {id
               ? `Editando produto código ${id}`
-              : 'Preencha os dados completos para cadastrar um novo produto.'}
+              : 'Preencha os dados completos para cadastrar um novo produto no catálogo.'}
           </p>
         </div>
       </div>

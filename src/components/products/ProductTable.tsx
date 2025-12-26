@@ -53,7 +53,8 @@ export function ProductTable({ products, onUpdate }: ProductTableProps) {
       } catch (error) {
         toast({
           title: 'Erro ao excluir',
-          description: 'Não foi possível excluir o produto.',
+          description:
+            'Não foi possível excluir o produto. Verifique se existem dependências.',
           variant: 'destructive',
         })
       } finally {
@@ -64,7 +65,7 @@ export function ProductTable({ products, onUpdate }: ProductTableProps) {
 
   return (
     <>
-      <div className="rounded-md border bg-card">
+      <div className="rounded-md border bg-card shadow-sm">
         <Table>
           <TableHeader>
             <TableRow>
@@ -81,19 +82,25 @@ export function ProductTable({ products, onUpdate }: ProductTableProps) {
                 key={product.CODIGO}
                 className="group hover:bg-muted/50 transition-colors"
               >
-                <TableCell className="font-medium">{product.CODIGO}</TableCell>
+                <TableCell className="font-medium text-muted-foreground">
+                  {product.CODIGO}
+                </TableCell>
                 <TableCell>
                   <div className="flex flex-col">
-                    <span className="font-medium">{product.PRODUTOS}</span>
-                    <span className="text-xs text-muted-foreground md:hidden">
-                      {product.GRUPO || '-'}
+                    <span className="font-medium text-foreground">
+                      {product.PRODUTOS}
                     </span>
+                    {product['DESCRIÇÃO RESUMIDA'] && (
+                      <span className="text-xs text-muted-foreground md:hidden truncate max-w-[150px]">
+                        {product['DESCRIÇÃO RESUMIDA']}
+                      </span>
+                    )}
                   </div>
                 </TableCell>
-                <TableCell className="hidden md:table-cell">
+                <TableCell className="hidden md:table-cell text-muted-foreground">
                   {product.GRUPO || '-'}
                 </TableCell>
-                <TableCell className="text-right font-bold">
+                <TableCell className="text-right font-semibold">
                   {formatPrice(product.PREÇO)}
                 </TableCell>
                 <TableCell>
@@ -136,7 +143,7 @@ export function ProductTable({ products, onUpdate }: ProductTableProps) {
             <AlertDialogTitle>Tem certeza absoluta?</AlertDialogTitle>
             <AlertDialogDescription>
               Essa ação não pode ser desfeita. Isso excluirá permanentemente o
-              produto.
+              produto do catálogo.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
