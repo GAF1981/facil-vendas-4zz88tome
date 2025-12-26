@@ -138,6 +138,39 @@ export type Database = {
         }
         Relationships: []
       }
+      PRODUTOS: {
+        Row: {
+          CODIGO: number | null
+          'CÓDIGO BARRAS': number | null
+          'DESCRIÇÃO RESUMIDA': string | null
+          GRUPO: string | null
+          ID: number
+          PREÇO: string | null
+          PRODUTO: string | null
+          TIPO: string | null
+        }
+        Insert: {
+          CODIGO?: number | null
+          'CÓDIGO BARRAS'?: number | null
+          'DESCRIÇÃO RESUMIDA'?: string | null
+          GRUPO?: string | null
+          ID: number
+          PREÇO?: string | null
+          PRODUTO?: string | null
+          TIPO?: string | null
+        }
+        Update: {
+          CODIGO?: number | null
+          'CÓDIGO BARRAS'?: number | null
+          'DESCRIÇÃO RESUMIDA'?: string | null
+          GRUPO?: string | null
+          ID?: number
+          PREÇO?: string | null
+          PRODUTO?: string | null
+          TIPO?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
