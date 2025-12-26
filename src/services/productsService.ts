@@ -68,10 +68,23 @@ export const productsService = {
       throw error
     }
 
-    // If table is empty, maxId is 0, so next ID is 1
-    // If table has max ID 100, next ID is 101
     const maxId = data?.ID || 0
-    return maxId + 1
+    // Smart suggestion: If maxId < 105, start at 105. Otherwise, increment.
+    return maxId < 105 ? 105 : maxId + 1
+  },
+
+  async checkIdExists(id: number) {
+    const { count, error } = await supabase
+      .from('PRODUTOS')
+      .select('ID', { count: 'exact', head: true })
+      .eq('ID', id)
+
+    if (error) {
+      console.error('Error checking ID existence:', error)
+      throw error
+    }
+
+    return (count || 0) > 0
   },
 
   async create(product: ProductInsert) {

@@ -59,12 +59,15 @@ export function ProductForm({
   // Auto-generate ID for new products
   useEffect(() => {
     // Only fetch next ID if we are creating a new product (no initialData)
-    // and we haven't set an ID yet (or if we want to ensure freshness)
     if (!initialData) {
       const loadNextId = async () => {
         try {
           const nextId = await productsService.getNextId()
-          form.setValue('ID', nextId)
+          // Only set ID if the field hasn't been modified by the user
+          const { isDirty } = form.getFieldState('ID')
+          if (!isDirty) {
+            form.setValue('ID', nextId)
+          }
         } catch (err) {
           console.error('Failed to fetch next ID', err)
           toast({
@@ -81,12 +84,25 @@ export function ProductForm({
   const onSubmit = async (data: ProductFormData) => {
     setLoading(true)
     try {
-      // Ensure ID is present
+      // Validate that ID is present (schema handles this, but safe check)
       if (!data.ID) {
         throw new Error('ID do produto não definido')
       }
 
-      // Explicitly construct payload to ensure correct types
+      // Check for duplicate ID if creating a new product
+      if (!initialData) {
+        const exists = await productsService.checkIdExists(data.ID)
+        if (exists) {
+          form.setError('ID', {
+            type: 'manual',
+            message: 'Este ID já está em uso.',
+          })
+          setLoading(false)
+          return
+        }
+      }
+
+      // Explicitly construct payload
       const payload = {
         ...data,
         ID: data.ID,
@@ -130,20 +146,30 @@ export function ProductForm({
           <Separator />
 
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-            {/* ID Field - Read Only */}
+            {/* ID Field */}
             <div className="md:col-span-2">
               <FormField
                 control={form.control}
                 name="ID"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>ID (Automático)</FormLabel>
+                    <FormLabel>
+                      ID {initialData ? '(Fixo)' : '(Sugerido)'}
+                    </FormLabel>
                     <FormControl>
                       <Input
+                        type="number"
+                        placeholder="105"
                         {...field}
-                        disabled
-                        value={field.value || 'Carregando...'}
-                        className="bg-muted font-mono"
+                        // Use string value to allow empty state while typing
+                        value={field.value || ''}
+                        // Allow typing string, Zod will coerce to number
+                        onChange={(e) => field.onChange(e.target.value)}
+                        // Read-only in edit mode to prevent primary key issues
+                        disabled={!!initialData}
+                        className={
+                          initialData ? 'bg-muted font-mono' : 'font-mono'
+                        }
                       />
                     </FormControl>
                     <FormMessage />

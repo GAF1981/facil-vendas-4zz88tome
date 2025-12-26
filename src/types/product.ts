@@ -13,7 +13,10 @@ const numberOrNull = z.preprocess(
 )
 
 export const productSchema = z.object({
-  ID: z.number().optional(), // Calculated automatically but required for payload
+  ID: z.coerce
+    .number()
+    .int('O ID deve ser um número inteiro')
+    .min(1, 'O ID é obrigatório e deve ser positivo'),
   PRODUTO: z
     .string()
     .min(2, 'Nome do produto deve ter no mínimo 2 caracteres')
