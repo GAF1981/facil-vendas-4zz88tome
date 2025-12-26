@@ -15,16 +15,8 @@ import { Link } from 'react-router-dom'
 import { productsService } from '@/services/productsService'
 import { Product } from '@/types/product'
 import { ProductTable } from '@/components/products/ProductTable'
-import { ProductForm } from '@/components/products/ProductForm'
 import { useToast } from '@/hooks/use-toast'
 import { Card, CardContent } from '@/components/ui/card'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog'
 import { BarcodeScannerDialog } from '@/components/products/BarcodeScannerDialog'
 
 export default function ProductsPage() {
@@ -37,8 +29,6 @@ export default function ProductsPage() {
   const { toast } = useToast()
 
   // Modal states
-  const [isCreateOpen, setIsCreateOpen] = useState(false)
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [scannerOpen, setScannerOpen] = useState(false)
 
   // Debounce search
@@ -111,9 +101,11 @@ export default function ProductsPage() {
             Catálogo de produtos ({totalCount} registros)
           </p>
         </div>
-        <Button onClick={() => setIsCreateOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Novo Produto
+        <Button asChild>
+          <Link to="/produtos/novo">
+            <Plus className="mr-2 h-4 w-4" />
+            Novo Produto
+          </Link>
         </Button>
       </div>
 
@@ -145,11 +137,7 @@ export default function ProductsPage() {
         </div>
       ) : products.length > 0 ? (
         <div className="space-y-4">
-          <ProductTable
-            products={products}
-            onUpdate={fetchProducts}
-            onEdit={setEditingProduct}
-          />
+          <ProductTable products={products} onUpdate={fetchProducts} />
 
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
@@ -200,50 +188,6 @@ export default function ProductsPage() {
           </CardContent>
         </Card>
       )}
-
-      {/* Create Dialog */}
-      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Novo Produto</DialogTitle>
-            <DialogDescription>
-              Preencha os dados para cadastrar um novo produto.
-            </DialogDescription>
-          </DialogHeader>
-          <ProductForm
-            onSuccess={() => {
-              setIsCreateOpen(false)
-              fetchProducts()
-            }}
-            onCancel={() => setIsCreateOpen(false)}
-          />
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Dialog */}
-      <Dialog
-        open={!!editingProduct}
-        onOpenChange={(open) => !open && setEditingProduct(null)}
-      >
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Editar Produto</DialogTitle>
-            <DialogDescription>
-              Atualize as informações do produto.
-            </DialogDescription>
-          </DialogHeader>
-          {editingProduct && (
-            <ProductForm
-              initialData={editingProduct}
-              onSuccess={() => {
-                setEditingProduct(null)
-                fetchProducts()
-              }}
-              onCancel={() => setEditingProduct(null)}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
 
       {/* Barcode Scanner */}
       <BarcodeScannerDialog

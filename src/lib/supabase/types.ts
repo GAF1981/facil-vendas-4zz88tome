@@ -146,7 +146,6 @@ export type Database = {
           GRUPO: string | null
           PREÇO: string | null
           PRODUTOS: string | null
-          'PRODUTOS CONCATENADOS': string | null
           TIPO: string | null
         }
         Insert: {
@@ -156,7 +155,6 @@ export type Database = {
           GRUPO?: string | null
           PREÇO?: string | null
           PRODUTOS?: string | null
-          'PRODUTOS CONCATENADOS'?: string | null
           TIPO?: string | null
         }
         Update: {
@@ -166,7 +164,6 @@ export type Database = {
           GRUPO?: string | null
           PREÇO?: string | null
           PRODUTOS?: string | null
-          'PRODUTOS CONCATENADOS'?: string | null
           TIPO?: string | null
         }
         Relationships: []

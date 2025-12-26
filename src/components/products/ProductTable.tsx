@@ -30,18 +30,14 @@ import {
 import { useState } from 'react'
 import { productsService } from '@/services/productsService'
 import { useToast } from '@/hooks/use-toast'
+import { Link } from 'react-router-dom'
 
 interface ProductTableProps {
   products: Product[]
   onUpdate: () => void
-  onEdit: (product: Product) => void
 }
 
-export function ProductTable({
-  products,
-  onUpdate,
-  onEdit,
-}: ProductTableProps) {
+export function ProductTable({ products, onUpdate }: ProductTableProps) {
   const { toast } = useToast()
   const [productToDelete, setProductToDelete] = useState<number | null>(null)
 
@@ -110,8 +106,10 @@ export function ProductTable({
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                      <DropdownMenuItem onClick={() => onEdit(product)}>
-                        <Edit className="mr-2 h-4 w-4" /> Editar
+                      <DropdownMenuItem asChild>
+                        <Link to={`/produtos/${product.CODIGO}`}>
+                          <Edit className="mr-2 h-4 w-4" /> Editar
+                        </Link>
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem

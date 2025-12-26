@@ -228,25 +228,7 @@ export function ProductForm({
               />
             </div>
 
-            <div className="md:col-span-12">
-              <FormField
-                control={form.control}
-                name="PRODUTOS CONCATENADOS"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Produtos Concatenados</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Informações adicionais"
-                        {...field}
-                        value={field.value || ''}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            {/* Removed PRODUTOS CONCATENADOS to cleanup UI as per requirements */}
           </div>
         </div>
 
