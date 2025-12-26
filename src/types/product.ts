@@ -6,7 +6,7 @@ export type ProductInsert = Database['public']['Tables']['PRODUTOS']['Insert']
 export type ProductUpdate = Database['public']['Tables']['PRODUTOS']['Update']
 
 export const productSchema = z.object({
-  ID: z.number().optional(), // Calculated automatically
+  ID: z.number().optional(), // Calculated automatically but required for payload
   PRODUTO: z
     .string()
     .min(2, 'Nome do produto deve ter no mínimo 2 caracteres')

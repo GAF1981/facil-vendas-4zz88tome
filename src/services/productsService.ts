@@ -14,7 +14,11 @@ export const productsService = {
       const isNumber = !isNaN(Number(searchTerm)) && searchTerm !== ''
 
       if (isNumber) {
-        query = query.or(`ID.eq.${searchTerm},CODIGO.eq.${searchTerm}`)
+        // Search by ID, Internal Code (CODIGO), or Barcode (CÓDIGO BARRAS)
+        // Using quotes for column names with spaces
+        query = query.or(
+          `ID.eq.${searchTerm},CODIGO.eq.${searchTerm},"CÓDIGO BARRAS".eq.${searchTerm}`,
+        )
       } else {
         query = query.ilike('PRODUTO', `%${searchTerm}%`)
       }
@@ -54,7 +58,7 @@ export const productsService = {
       .limit(1)
       .single()
 
-    // PGRST116: The result contains 0 rows
+    // PGRST116: The result contains 0 rows (table is empty)
     if (error && error.code !== 'PGRST116') throw error
 
     const maxId = data?.ID || 0

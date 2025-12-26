@@ -82,7 +82,7 @@ const ProductsPage = () => {
           </div>
           <h1 className="text-3xl font-bold tracking-tight">Produtos</h1>
           <p className="text-muted-foreground mt-1">
-            Gerencie seu catálogo de produtos ({totalCount} itens).
+            Gerencie seu catálogo de produtos ({totalCount} itens encontrados).
           </p>
         </div>
         <Button asChild>
@@ -94,10 +94,10 @@ const ProductsPage = () => {
       </div>
 
       <div className="flex items-center bg-card p-4 rounded-lg border shadow-sm">
-        <div className="relative w-full max-w-sm">
+        <div className="relative w-full max-w-md">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por nome, código ou ID..."
+            placeholder="Buscar por nome, ID ou código de barras..."
             className="pl-8"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}

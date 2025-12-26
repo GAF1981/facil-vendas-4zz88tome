@@ -68,10 +68,13 @@ export function ProductTable({ products, onUpdate }: ProductTableProps) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[80px]">ID</TableHead>
-              <TableHead>Produto</TableHead>
-              <TableHead className="hidden md:table-cell">Código</TableHead>
-              <TableHead className="hidden md:table-cell">Grupo</TableHead>
+              <TableHead className="w-[70px]">ID</TableHead>
+              <TableHead className="min-w-[200px]">Produto</TableHead>
+              <TableHead className="hidden md:table-cell">
+                Cód. Barras
+              </TableHead>
+              <TableHead className="hidden lg:table-cell">Grupo</TableHead>
+              <TableHead className="hidden sm:table-cell">Tipo</TableHead>
               <TableHead>Preço</TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
@@ -82,22 +85,37 @@ export function ProductTable({ products, onUpdate }: ProductTableProps) {
                 key={product.ID}
                 className="group hover:bg-muted/50 transition-colors"
               >
-                <TableCell className="font-medium">{product.ID}</TableCell>
+                <TableCell className="font-medium font-mono text-xs">
+                  {product.ID}
+                </TableCell>
                 <TableCell>
                   <div className="flex flex-col">
                     <span className="font-medium">{product.PRODUTO}</span>
                     <span className="text-xs text-muted-foreground md:hidden">
-                      {product['DESCRIÇÃO RESUMIDA']}
+                      {product['CÓDIGO BARRAS']
+                        ? `EAN: ${product['CÓDIGO BARRAS']}`
+                        : product['DESCRIÇÃO RESUMIDA']}
                     </span>
                   </div>
                 </TableCell>
-                <TableCell className="hidden md:table-cell">
-                  {product.CODIGO || '-'}
+                <TableCell className="hidden md:table-cell font-mono text-xs">
+                  {product['CÓDIGO BARRAS'] || '-'}
                 </TableCell>
-                <TableCell className="hidden md:table-cell">
+                <TableCell className="hidden lg:table-cell text-muted-foreground">
                   {product.GRUPO || '-'}
                 </TableCell>
-                <TableCell>{product.PREÇO || '-'}</TableCell>
+                <TableCell className="hidden sm:table-cell">
+                  {product.TIPO || '-'}
+                </TableCell>
+                <TableCell className="font-medium">
+                  {product.PREÇO ? (
+                    <span className="text-green-600">
+                      R$ {product.PREÇO.replace('.', ',')}
+                    </span>
+                  ) : (
+                    '-'
+                  )}
+                </TableCell>
                 <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>

@@ -16,8 +16,6 @@ import {
 } from 'lucide-react'
 
 const Index = () => {
-  // Navigation Hub for all devices
-
   const modules = [
     {
       title: 'Clientes',
