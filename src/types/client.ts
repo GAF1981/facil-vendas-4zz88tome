@@ -6,7 +6,7 @@ export type ClientRow = Database['public']['Tables']['CLIENTES']['Row']
 export type ClientInsert = Database['public']['Tables']['CLIENTES']['Insert']
 export type ClientUpdate = Database['public']['Tables']['CLIENTES']['Update']
 
-// Zod Schema for validation
+// Zod Schema for validation - covering all 22 columns
 export const clientSchema = z.object({
   CODIGO: z.coerce
     .number({ required_error: 'Código é obrigatório' })

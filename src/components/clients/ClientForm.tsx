@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Loader2, Save } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Separator } from '@/components/ui/separator'
 import { maskCPF, maskCNPJ, maskPhone, maskCEP, unmask } from '@/lib/masks'
 import { clientsService } from '@/services/clientsService'
 import { useToast } from '@/hooks/use-toast'
@@ -66,7 +67,7 @@ export function ClientForm({
           'FORMA DE PAGAMENTO': '',
           'NOTA FISCAL': '',
           EXPOSITOR: '',
-          Desconto: '0',
+          Desconto: '',
           'OBSERVAÇÃO FIXA': '',
           'ALTERAÇÃO CLIENTE': '',
         },
@@ -75,7 +76,6 @@ export function ClientForm({
   const onSubmit = async (data: ClientFormData) => {
     setLoading(true)
     try {
-      // Ensure numeric CODIGO
       const payload = { ...data, CODIGO: Number(data.CODIGO) }
 
       if (initialData) {
@@ -108,313 +108,513 @@ export function ClientForm({
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-          <div className="md:col-span-2">
-            <FormField
-              control={form.control}
-              name="CODIGO"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Código *</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      placeholder="Auto"
-                      {...field}
-                      disabled={!!initialData}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-
-          <div className="md:col-span-5">
-            <FormField
-              control={form.control}
-              name="NOME CLIENTE"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nome Fantasia *</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="Nome do cliente"
-                      {...field}
-                      value={field.value || ''}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-
-          <div className="md:col-span-5">
-            <FormField
-              control={form.control}
-              name="RAZÃO SOCIAL"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Razão Social</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="Razão Social"
-                      {...field}
-                      value={field.value || ''}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-
-          <div className="md:col-span-4">
-            <FormField
-              control={form.control}
-              name="CNPJ"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>CPF / CNPJ</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="Documento"
-                      {...field}
-                      value={field.value || ''}
-                      onChange={(e) => {
-                        const v = e.target.value
-                        if (unmask(v).length > 11) {
-                          field.onChange(maskCNPJ(v))
-                        } else {
-                          field.onChange(maskCPF(v))
-                        }
-                      }}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-
-          <div className="md:col-span-4">
-            <FormField
-              control={form.control}
-              name="IE"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Inscrição Estadual</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="IE"
-                      {...field}
-                      value={field.value || ''}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-
-          <div className="md:col-span-4">
-            <FormField
-              control={form.control}
-              name="TIPO"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Tipo</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value || 'Fisica'}
-                  >
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        {/* Identificação */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium">Identificação</h3>
+          <Separator />
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+            <div className="md:col-span-2">
+              <FormField
+                control={form.control}
+                name="CODIGO"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Código *</FormLabel>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione" />
-                      </SelectTrigger>
+                      <Input
+                        type="number"
+                        placeholder="Ex: 100"
+                        {...field}
+                        disabled={!!initialData}
+                      />
                     </FormControl>
-                    <SelectContent>
-                      <SelectItem value="Fisica">Pessoa Física</SelectItem>
-                      <SelectItem value="Juridica">Pessoa Jurídica</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
-          <div className="md:col-span-3">
-            <FormField
-              control={form.control}
-              name="CEP OFICIO"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>CEP</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="00000-000"
-                      {...field}
-                      value={field.value || ''}
-                      onChange={(e) => field.onChange(maskCEP(e.target.value))}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
+            <div className="md:col-span-3">
+              <FormField
+                control={form.control}
+                name="TIPO"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tipo</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value || 'Fisica'}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Fisica">Pessoa Física</SelectItem>
+                        <SelectItem value="Juridica">
+                          Pessoa Jurídica
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
-          <div className="md:col-span-5">
-            <FormField
-              control={form.control}
-              name="ENDEREÇO"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Endereço</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="Rua, Número"
-                      {...field}
-                      value={field.value || ''}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
+            <div className="md:col-span-3">
+              <FormField
+                control={form.control}
+                name="TIPO DE CLIENTE"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tipo de Cliente</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Ex: Consumidor Final"
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
-          <div className="md:col-span-4">
-            <FormField
-              control={form.control}
-              name="BAIRRO"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Bairro</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="Bairro"
-                      {...field}
-                      value={field.value || ''}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
+            <div className="md:col-span-4">
+              <FormField
+                control={form.control}
+                name="CNPJ"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>CPF / CNPJ</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="000.000.000-00"
+                        {...field}
+                        value={field.value || ''}
+                        onChange={(e) => {
+                          const v = e.target.value
+                          if (unmask(v).length > 11) {
+                            field.onChange(maskCNPJ(v))
+                          } else {
+                            field.onChange(maskCPF(v))
+                          }
+                        }}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
-          <div className="md:col-span-4">
-            <FormField
-              control={form.control}
-              name="MUNICÍPIO"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Município</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="Cidade - UF"
-                      {...field}
-                      value={field.value || ''}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
+            <div className="md:col-span-4">
+              <FormField
+                control={form.control}
+                name="NOME CLIENTE"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nome Fantasia *</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Nome Completo"
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
-          <div className="md:col-span-4">
-            <FormField
-              control={form.control}
-              name="EMAIL"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="email"
-                      placeholder="cliente@email.com"
-                      {...field}
-                      value={field.value || ''}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
+            <div className="md:col-span-4">
+              <FormField
+                control={form.control}
+                name="RAZÃO SOCIAL"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Razão Social</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Razão Social"
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
-          <div className="md:col-span-4">
-            <FormField
-              control={form.control}
-              name="FONE 1"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Telefone 1</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="(00) 0000-0000"
-                      {...field}
-                      value={field.value || ''}
-                      onChange={(e) =>
-                        field.onChange(maskPhone(e.target.value))
-                      }
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-
-          <div className="md:col-span-6">
-            <FormField
-              control={form.control}
-              name="OBSERVAÇÃO FIXA"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Observações</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Observações gerais"
-                      className="resize-none"
-                      {...field}
-                      value={field.value || ''}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-
-          <div className="md:col-span-6">
-            <FormField
-              control={form.control}
-              name="NOTA FISCAL"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Info Nota Fiscal</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Dados para NF"
-                      className="resize-none"
-                      {...field}
-                      value={field.value || ''}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="md:col-span-4">
+              <FormField
+                control={form.control}
+                name="IE"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Inscrição Estadual</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="IE"
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 pt-4">
+        {/* Contato */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium">Contato</h3>
+          <Separator />
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+            <div className="md:col-span-4">
+              <FormField
+                control={form.control}
+                name="EMAIL"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="email"
+                        placeholder="cliente@email.com"
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <FormField
+                control={form.control}
+                name="FONE 1"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Telefone 1</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="(00) 0000-0000"
+                        {...field}
+                        value={field.value || ''}
+                        onChange={(e) =>
+                          field.onChange(maskPhone(e.target.value))
+                        }
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <FormField
+                control={form.control}
+                name="FONE 2"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Telefone 2</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="(00) 0000-0000"
+                        {...field}
+                        value={field.value || ''}
+                        onChange={(e) =>
+                          field.onChange(maskPhone(e.target.value))
+                        }
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <FormField
+                control={form.control}
+                name="CONTATO 1"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Contato 1</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Nome contato"
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <FormField
+                control={form.control}
+                name="CONTATO 2"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Contato 2</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Nome contato"
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Endereço */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium">Endereço</h3>
+          <Separator />
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+            <div className="md:col-span-2">
+              <FormField
+                control={form.control}
+                name="CEP OFICIO"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>CEP</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="00000-000"
+                        {...field}
+                        value={field.value || ''}
+                        onChange={(e) =>
+                          field.onChange(maskCEP(e.target.value))
+                        }
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="md:col-span-5">
+              <FormField
+                control={form.control}
+                name="ENDEREÇO"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Endereço Completo</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Rua, Número, Comp."
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="md:col-span-3">
+              <FormField
+                control={form.control}
+                name="BAIRRO"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Bairro</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Bairro"
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <FormField
+                control={form.control}
+                name="MUNICÍPIO"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Município - UF</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Cidade - UF"
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Comercial / Financeiro */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium">Comercial</h3>
+          <Separator />
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+            <div className="md:col-span-4">
+              <FormField
+                control={form.control}
+                name="FORMA DE PAGAMENTO"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Forma de Pagamento</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Ex: 30 dias"
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="md:col-span-4">
+              <FormField
+                control={form.control}
+                name="EXPOSITOR"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Expositor</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Info expositor"
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="md:col-span-4">
+              <FormField
+                control={form.control}
+                name="Desconto"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Desconto Padrão</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="%"
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Observações */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium">Observações</h3>
+          <Separator />
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+            <div className="md:col-span-6">
+              <FormField
+                control={form.control}
+                name="NOTA FISCAL"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Info Nota Fiscal</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Dados específicos para NF"
+                        className="resize-none h-20"
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="md:col-span-6">
+              <FormField
+                control={form.control}
+                name="OBSERVAÇÃO FIXA"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Observações Gerais</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Anotações internas"
+                        className="resize-none h-20"
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="md:col-span-12">
+              <FormField
+                control={form.control}
+                name="ALTERAÇÃO CLIENTE"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Histórico de Alterações</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Registro de alterações"
+                        className="resize-none h-20"
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-6">
           {onCancel && (
             <Button type="button" variant="outline" onClick={onCancel}>
               Cancelar
@@ -422,7 +622,7 @@ export function ClientForm({
           )}
           <Button type="submit" disabled={loading}>
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {initialData ? 'Atualizar' : 'Cadastrar'}
+            {initialData ? 'Salvar Alterações' : 'Cadastrar Cliente'}
           </Button>
         </div>
       </form>

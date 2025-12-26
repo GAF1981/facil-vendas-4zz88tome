@@ -46,7 +46,7 @@ const ClientFormPage = () => {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in-up max-w-4xl mx-auto pb-10">
+    <div className="space-y-6 animate-fade-in-up max-w-5xl mx-auto pb-10">
       <div className="flex items-center gap-4">
         <Button
           variant="outline"
@@ -62,7 +62,7 @@ const ClientFormPage = () => {
           <p className="text-muted-foreground">
             {id
               ? `Editando cliente código ${id}`
-              : 'Preencha os dados para cadastrar um novo cliente.'}
+              : 'Preencha os dados completos para cadastrar um novo cliente.'}
           </p>
         </div>
       </div>
