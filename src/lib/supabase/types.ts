@@ -146,6 +146,8 @@ export type Database = {
       verify_employee_credentials: {
         Args: { p_email: string; p_senha: string }
         Returns: {
+          apelido: string
+          cpf: string
           email: string
           foto_url: string
           id: number

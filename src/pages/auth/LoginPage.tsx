@@ -24,7 +24,8 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { authService } from '@/services/authService'
 import { useUserStore } from '@/stores/useUserStore'
-import { Loader2, Lock, Mail } from 'lucide-react'
+import { Loader2, Lock, Mail, AlertCircle } from 'lucide-react'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -35,6 +36,7 @@ type LoginFormData = z.infer<typeof loginSchema>
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const navigate = useNavigate()
   const location = useLocation()
   const { toast } = useToast()
@@ -50,6 +52,8 @@ export default function LoginPage() {
 
   const onSubmit = async (data: LoginFormData) => {
     setLoading(true)
+    setErrorMsg(null)
+
     try {
       const employee = await authService.verifyCredentials(
         data.email,
@@ -69,19 +73,21 @@ export default function LoginPage() {
         // Use replace to prevent going back to login
         navigate(from, { replace: true })
       } else {
+        setErrorMsg('E-mail ou senha incorretos.')
         toast({
           title: 'Credenciais inválidas',
-          description: 'E-mail ou senha incorretos. Tente novamente.',
+          description: 'Verifique seus dados e tente novamente.',
           variant: 'destructive',
         })
         form.setValue('password', '')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(error)
+      const message = error.message || 'Erro de conexão com o servidor.'
+      setErrorMsg(message)
       toast({
         title: 'Erro no sistema',
-        description:
-          'Não foi possível conectar ao servidor. Verifique sua internet.',
+        description: message,
         variant: 'destructive',
       })
     } finally {
@@ -91,7 +97,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/20 p-4">
-      <Card className="w-full max-w-md shadow-lg border-t-4 border-t-primary">
+      <Card className="w-full max-w-md shadow-lg border-t-4 border-t-primary animate-fade-in-up">
         <CardHeader className="space-y-1 text-center">
           <CardTitle className="text-2xl font-bold text-primary">
             FACIL VENDAS
@@ -101,6 +107,14 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {errorMsg && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Erro</AlertTitle>
+              <AlertDescription>{errorMsg}</AlertDescription>
+            </Alert>
+          )}
+
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField

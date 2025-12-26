@@ -188,6 +188,7 @@ export function Header() {
                     {initials || <User className="h-5 w-5" />}
                   </AvatarFallback>
                 </Avatar>
+                {/* If photo exists, show initials below it as requested */}
                 {hasPhoto && initials && (
                   <span className="text-[10px] font-bold leading-none text-muted-foreground uppercase">
                     {initials}
@@ -215,7 +216,7 @@ export function Header() {
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={handleSignOut}
-              className="cursor-pointer"
+              className="cursor-pointer text-destructive focus:text-destructive"
             >
               <LogOut className="mr-2 h-4 w-4" />
               <span>Sair do App</span>
