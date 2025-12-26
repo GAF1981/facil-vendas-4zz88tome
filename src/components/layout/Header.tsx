@@ -18,18 +18,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Bell, ArrowLeft, Home, User, LogOut, UserCircle } from 'lucide-react'
+import { Bell, ArrowLeft, Home, User, LogOut } from 'lucide-react'
 import { useLocation, Link, useNavigate } from 'react-router-dom'
 import { useUserStore } from '@/stores/useUserStore'
-import { useAuth } from '@/hooks/use-auth'
 import { cn } from '@/lib/utils'
 
 export function Header() {
   const location = useLocation()
   const navigate = useNavigate()
   const pathnames = location.pathname.split('/').filter((x) => x)
-  const { employee } = useUserStore()
-  const { signOut } = useAuth()
+  const { employee, clearEmployee } = useUserStore()
 
   const getBreadcrumbName = (path: string) => {
     switch (path) {
@@ -81,9 +79,9 @@ export function Header() {
     return (firstInitial + lastInitial).toUpperCase()
   }
 
-  const handleSignOut = async () => {
-    await signOut()
-    navigate('/')
+  const handleSignOut = () => {
+    clearEmployee()
+    navigate('/login')
   }
 
   const initials = employee?.nome_completo
@@ -221,13 +219,6 @@ export function Header() {
             >
               <LogOut className="mr-2 h-4 w-4" />
               <span>Sair do App</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={handleSignOut}
-              className="cursor-pointer"
-            >
-              <UserCircle className="mr-2 h-4 w-4" />
-              <span>Fazer login com outro usuário</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist, createJSONStorage } from 'zustand/middleware'
 import { Employee } from '@/types/employee'
 
 interface UserState {
@@ -7,8 +8,16 @@ interface UserState {
   clearEmployee: () => void
 }
 
-export const useUserStore = create<UserState>((set) => ({
-  employee: null,
-  setEmployee: (employee) => set({ employee }),
-  clearEmployee: () => set({ employee: null }),
-}))
+export const useUserStore = create<UserState>()(
+  persist(
+    (set) => ({
+      employee: null,
+      setEmployee: (employee) => set({ employee }),
+      clearEmployee: () => set({ employee: null }),
+    }),
+    {
+      name: 'facil-vendas-user-storage',
+      storage: createJSONStorage(() => localStorage),
+    },
+  ),
+)
