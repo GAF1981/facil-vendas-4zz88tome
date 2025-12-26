@@ -18,36 +18,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import {
-  Bell,
-  Settings,
-  LogOut,
-  UserCircle,
-  ArrowLeft,
-  Home,
-} from 'lucide-react'
+import { Bell, Settings, ArrowLeft, Home, User } from 'lucide-react'
 import { useLocation, Link, useNavigate } from 'react-router-dom'
-import { useAuth } from '@/hooks/use-auth'
 import { useUserStore } from '@/stores/useUserStore'
 
 export function Header() {
   const location = useLocation()
   const navigate = useNavigate()
   const pathnames = location.pathname.split('/').filter((x) => x)
-  const { signOut } = useAuth()
-  const { employee, clearEmployee } = useUserStore()
-
-  const handleSignOut = async () => {
-    await signOut()
-    clearEmployee()
-    navigate('/login')
-  }
-
-  const handleSwitchUser = async () => {
-    await signOut()
-    clearEmployee()
-    navigate('/login')
-  }
+  const { employee } = useUserStore()
 
   const getBreadcrumbName = (path: string) => {
     switch (path) {
@@ -162,9 +141,11 @@ export function Header() {
                   className="object-cover"
                 />
                 <AvatarFallback className="text-[10px] font-bold bg-primary/10 text-primary">
-                  {employee?.nome_completo
-                    ? getInitials(employee.nome_completo)
-                    : 'Foto'}
+                  {employee?.nome_completo ? (
+                    getInitials(employee.nome_completo)
+                  ) : (
+                    <User className="h-5 w-5" />
+                  )}
                 </AvatarFallback>
               </Avatar>
             </Button>
@@ -173,37 +154,20 @@ export function Header() {
             <DropdownMenuLabel className="font-normal p-3">
               <div className="flex flex-col space-y-1">
                 <p className="text-sm font-medium leading-none truncate">
-                  {employee?.nome_completo || 'Usuário'}
+                  {employee?.nome_completo || 'Usuário Local'}
                 </p>
                 <p className="text-xs leading-none text-muted-foreground truncate">
-                  {employee?.email || 'email@exemplo.com'}
+                  {employee?.email || 'admin@facilvendas.com'}
                 </p>
-                {employee?.setor && (
-                  <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80 w-fit mt-1">
-                    {employee.setor}
-                  </span>
-                )}
+                <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80 w-fit mt-1">
+                  {employee?.setor || 'Desenvolvimento'}
+                </span>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="cursor-pointer">
               <Settings className="mr-2 h-4 w-4" />
               <span>Configurações</span>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="text-destructive focus:text-destructive cursor-pointer"
-              onClick={handleSwitchUser}
-            >
-              <UserCircle className="mr-2 h-4 w-4" />
-              <span>Fazer login com outro usuário</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="text-destructive focus:text-destructive cursor-pointer"
-              onClick={handleSignOut}
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              <span>Sair do app</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
