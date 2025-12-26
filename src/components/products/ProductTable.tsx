@@ -51,6 +51,7 @@ export function ProductTable({ products, onUpdate }: ProductTableProps) {
         })
         onUpdate()
       } catch (error) {
+        console.error(error)
         toast({
           title: 'Erro ao excluir',
           description: 'Não foi possível excluir o produto.',
@@ -74,6 +75,7 @@ export function ProductTable({ products, onUpdate }: ProductTableProps) {
                 Cód. Barras
               </TableHead>
               <TableHead className="hidden lg:table-cell">Grupo</TableHead>
+              <TableHead className="hidden xl:table-cell">Descrição</TableHead>
               <TableHead className="hidden sm:table-cell">Tipo</TableHead>
               <TableHead>Preço</TableHead>
               <TableHead className="w-[50px]"></TableHead>
@@ -103,6 +105,9 @@ export function ProductTable({ products, onUpdate }: ProductTableProps) {
                 </TableCell>
                 <TableCell className="hidden lg:table-cell text-muted-foreground">
                   {product.GRUPO || '-'}
+                </TableCell>
+                <TableCell className="hidden xl:table-cell text-muted-foreground text-xs truncate max-w-[200px]">
+                  {product['DESCRIÇÃO RESUMIDA'] || '-'}
                 </TableCell>
                 <TableCell className="hidden sm:table-cell">
                   {product.TIPO || '-'}

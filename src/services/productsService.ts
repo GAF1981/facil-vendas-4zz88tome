@@ -14,10 +14,10 @@ export const productsService = {
       const isNumber = !isNaN(Number(searchTerm)) && searchTerm !== ''
 
       if (isNumber) {
-        // Search by ID, Internal Code (CODIGO), or Barcode (CÓDIGO BARRAS)
-        // Using quotes for column names with spaces
+        // Search by ID, Internal Code (CODIGO), Barcode (CÓDIGO BARRAS) OR Name (PRODUTO)
+        // Even if it's a number, it might be part of the product name
         query = query.or(
-          `ID.eq.${searchTerm},CODIGO.eq.${searchTerm},"CÓDIGO BARRAS".eq.${searchTerm}`,
+          `ID.eq.${searchTerm},CODIGO.eq.${searchTerm},"CÓDIGO BARRAS".eq.${searchTerm},PRODUTO.ilike.%${searchTerm}%`,
         )
       } else {
         query = query.ilike('PRODUTO', `%${searchTerm}%`)
@@ -31,10 +31,13 @@ export const productsService = {
       .order('ID', { ascending: false })
       .range(from, to)
 
-    if (error) throw error
+    if (error) {
+      console.error('Error fetching products:', error)
+      throw error
+    }
 
     return {
-      data: data as ProductRow[],
+      data: (data as ProductRow[]) || [],
       count: count || 0,
     }
   },
@@ -59,7 +62,10 @@ export const productsService = {
       .single()
 
     // PGRST116: The result contains 0 rows (table is empty)
-    if (error && error.code !== 'PGRST116') throw error
+    if (error && error.code !== 'PGRST116') {
+      console.error('Error fetching next ID:', error)
+      throw error
+    }
 
     const maxId = data?.ID || 0
     return maxId + 1

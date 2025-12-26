@@ -23,6 +23,7 @@ const ProductFormPage = () => {
         const data = await productsService.getById(Number(id))
         setProduct(data)
       } catch (error) {
+        console.error(error)
         toast({
           title: 'Erro ao carregar',
           description: 'Não foi possível carregar os dados do produto.',

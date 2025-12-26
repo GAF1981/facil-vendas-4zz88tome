@@ -49,6 +49,7 @@ const ProductsPage = () => {
       setProducts(data)
       setTotalCount(count)
     } catch (error) {
+      console.error(error)
       toast({
         title: 'Erro ao carregar produtos',
         description: 'Verifique sua conexão e tente novamente.',

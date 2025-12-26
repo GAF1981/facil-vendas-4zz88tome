@@ -58,6 +58,8 @@ export function ProductForm({
 
   // Auto-generate ID for new products
   useEffect(() => {
+    // Only fetch next ID if we are creating a new product (no initialData)
+    // and we haven't set an ID yet (or if we want to ensure freshness)
     if (!initialData) {
       const loadNextId = async () => {
         try {
