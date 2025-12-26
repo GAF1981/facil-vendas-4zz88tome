@@ -20,6 +20,7 @@ export const productsService = {
           `ID.eq.${searchTerm},CODIGO.eq.${searchTerm},"CÓDIGO BARRAS".eq.${searchTerm},PRODUTO.ilike.%${searchTerm}%`,
         )
       } else {
+        // Search specifically by name (PRODUTO) for text queries
         query = query.ilike('PRODUTO', `%${searchTerm}%`)
       }
     }
