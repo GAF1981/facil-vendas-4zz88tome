@@ -24,12 +24,11 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { authService } from '@/services/authService'
 import { useUserStore } from '@/stores/useUserStore'
-import { Loader2, Lock, Mail, AlertCircle } from 'lucide-react'
+import { Loader2, Mail, AlertCircle } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
-  password: z.string().min(1, 'Senha é obrigatória'),
 })
 
 type LoginFormData = z.infer<typeof loginSchema>
@@ -46,7 +45,6 @@ export default function LoginPage() {
     resolver: zodResolver(loginSchema),
     defaultValues: {
       email: '',
-      password: '',
     },
   })
 
@@ -55,10 +53,7 @@ export default function LoginPage() {
     setErrorMsg(null)
 
     try {
-      const employee = await authService.verifyCredentials(
-        data.email,
-        data.password,
-      )
+      const employee = await authService.loginByEmail(data.email)
 
       if (employee) {
         setEmployee(employee)
@@ -73,13 +68,12 @@ export default function LoginPage() {
         // Use replace to prevent going back to login
         navigate(from, { replace: true })
       } else {
-        setErrorMsg('E-mail ou senha incorretos.')
+        setErrorMsg('E-mail não encontrado.')
         toast({
-          title: 'Credenciais inválidas',
-          description: 'Verifique seus dados e tente novamente.',
+          title: 'Acesso negado',
+          description: 'O e-mail informado não consta na base de funcionários.',
           variant: 'destructive',
         })
-        form.setValue('password', '')
       }
     } catch (error: any) {
       console.error(error)
@@ -103,7 +97,7 @@ export default function LoginPage() {
             FACIL VENDAS
           </CardTitle>
           <CardDescription>
-            Entre com suas credenciais para acessar o sistema.
+            Entre com seu e-mail para acessar o sistema.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -130,28 +124,6 @@ export default function LoginPage() {
                           className="pl-9"
                           placeholder="nome@exemplo.com"
                           autoComplete="email"
-                          {...field}
-                        />
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Senha</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Lock className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          type="password"
-                          className="pl-9"
-                          placeholder="••••"
-                          autoComplete="current-password"
                           {...field}
                         />
                       </div>

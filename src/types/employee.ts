@@ -43,10 +43,6 @@ export const employeeSchema = z.object({
 // Schema for login
 export const loginSchema = z.object({
   email: z.string().email('Insira um email válido'),
-  password: z
-    .string()
-    .length(4, 'A senha deve ter 4 dígitos')
-    .regex(/^\d+$/, 'A senha deve conter apenas números'),
 })
 
 export type EmployeeFormData = z.infer<typeof employeeSchema>

@@ -4,13 +4,13 @@ import { Employee } from '@/types/employee'
 export const authService = {
   /**
    * Verifies employee credentials against the FUNCIONARIOS table using a secure RPC call.
+   * Now only checks for email existence.
    */
-  async verifyCredentials(email: string, password: string) {
-    // Calling the RPC function that checks credentials in the FUNCIONARIOS table
+  async loginByEmail(email: string) {
+    // Calling the RPC function that checks email in the FUNCIONARIOS table
     // This bypasses standard Supabase Auth for a custom "App Level" authentication
-    const { data, error } = await supabase.rpc('verify_employee_credentials', {
+    const { data, error } = await supabase.rpc('login_by_email', {
       p_email: email.trim(),
-      p_senha: password.trim(),
     })
 
     if (error) {
