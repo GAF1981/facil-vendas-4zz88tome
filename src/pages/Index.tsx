@@ -2,7 +2,6 @@ import { MobileNavCard } from '@/components/home/MobileNavCard'
 import {
   Users,
   Briefcase,
-  Package,
   Scale,
   PlusCircle,
   ArrowDownCircle,
@@ -32,13 +31,6 @@ const Index = () => {
       icon: Briefcase,
       to: '/funcionarios',
       color: 'text-indigo-600',
-    },
-    {
-      title: 'Produtos',
-      description: 'Catálogo de produtos',
-      icon: Package,
-      to: '/produtos',
-      color: 'text-orange-600',
     },
     {
       title: 'Acerto',

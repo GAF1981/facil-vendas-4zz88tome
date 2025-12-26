@@ -41,8 +41,6 @@ export function Header() {
         return 'Novo'
       case 'vendas':
         return 'Vendas'
-      case 'produtos':
-        return 'Produtos'
       case 'acerto':
         return 'Acerto'
       case 'complemento':

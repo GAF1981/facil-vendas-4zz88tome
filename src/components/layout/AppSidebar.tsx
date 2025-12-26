@@ -15,7 +15,6 @@ import {
   LayoutDashboard,
   Users,
   Briefcase,
-  Package,
   Scale,
   PlusCircle,
   ArrowDownCircle,
@@ -48,11 +47,6 @@ export function AppSidebar() {
       title: 'Funcionários',
       url: '/funcionarios',
       icon: Briefcase,
-    },
-    {
-      title: 'Produtos',
-      url: '/produtos',
-      icon: Package,
     },
     {
       title: 'Acerto',
