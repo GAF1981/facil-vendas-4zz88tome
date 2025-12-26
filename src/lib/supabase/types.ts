@@ -108,6 +108,7 @@ export type Database = {
           cpf: string | null
           created_at: string
           email: string
+          foto_url: string | null
           id: number
           nome_completo: string
           senha: string
@@ -118,6 +119,7 @@ export type Database = {
           cpf?: string | null
           created_at?: string
           email: string
+          foto_url?: string | null
           id?: number
           nome_completo: string
           senha?: string
@@ -128,6 +130,7 @@ export type Database = {
           cpf?: string | null
           created_at?: string
           email?: string
+          foto_url?: string | null
           id?: number
           nome_completo?: string
           senha?: string
@@ -144,6 +147,7 @@ export type Database = {
         Args: { p_email: string; p_senha: string }
         Returns: {
           email: string
+          foto_url: string
           id: number
           nome_completo: string
           setor: string

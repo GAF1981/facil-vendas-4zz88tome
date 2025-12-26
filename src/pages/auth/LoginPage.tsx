@@ -44,45 +44,57 @@ export default function LoginPage() {
 
   const onSubmit = async (data: LoginFormData) => {
     setLoading(true)
+    const email = data.email.toLowerCase().trim()
+
     try {
       // 1. Verify credentials against FUNCIONARIOS table first (Business Rule)
-      const employee = await authService.verifyCredentials(
-        data.email,
-        data.password,
-      )
+      // This validates the 4-digit PIN/Password
+      const employee = await authService.verifyCredentials(email, data.password)
 
       if (!employee) {
         throw new Error('Email ou senha incorretos.')
       }
 
-      // 2. If valid in FUNCIONARIOS, attempt Supabase Auth (Session Management)
-      const { error: signInError } = await signIn(data.email, data.password)
+      // 2. If valid in FUNCIONARIOS, establish Supabase Auth Session
+      // We use a deterministic "Shadow Password" because Supabase Auth requires min 6 chars,
+      // but our business rule is 4 digits. The user never sees this password.
+      // This decouples the "Business Access" (PIN) from "Session Access" (Auth Provider).
+      const shadowPassword = `fv-auth-${email}-secure-access`
 
-      if (signInError) {
-        // If login fails, check if it's because user doesn't exist (Invalid login credentials)
+      // Try to sign in with the shadow password
+      let { error: authError } = await signIn(email, shadowPassword)
+
+      // If sign in fails, it might be because the user doesn't exist in Auth Provider yet
+      if (authError) {
         if (
-          signInError.message.includes('Invalid login credentials') ||
-          signInError.message.includes('not found')
+          authError.message.includes('Invalid login credentials') ||
+          authError.message.includes('not found')
         ) {
-          console.log(
-            'User verified in DB but not in Auth. Attempting auto-signup...',
-          )
-          const { error: signUpError } = await signUp(data.email, data.password)
+          // Attempt to register the user transparently
+          const { error: signUpError } = await signUp(email, shadowPassword)
 
           if (signUpError) {
+            // If signup fails but verifyCredentials passed, we have a sync issue
             console.error('Auto-signup failed:', signUpError)
-            throw new Error(
-              'Erro ao estabelecer sessão segura. Contate o suporte.',
-            )
+
+            // If error is "User already registered", it means the password didn't match (shadow password changed?)
+            // In a real app we'd need a reset flow, but for this closed system we assume consistency.
+            if (signUpError.message.includes('already registered')) {
+              throw new Error(
+                'Erro de sincronização de credenciais. Contate o suporte.',
+              )
+            }
+
+            throw new Error('Erro ao criar sessão segura.')
           }
 
-          // Let's try sign in again to be sure
-          const { error: retryError } = await signIn(data.email, data.password)
-          if (retryError) {
-            throw retryError
-          }
+          // Signup successful, try sign in again to ensure session is active
+          // (Sometimes signUp doesn't auto-login depending on config)
+          const { error: retryError } = await signIn(email, shadowPassword)
+          if (retryError) throw retryError
         } else {
-          throw signInError
+          // Real error (network, ban, etc)
+          throw authError
         }
       }
 
@@ -93,14 +105,18 @@ export default function LoginPage() {
         title: 'Bem-vindo(a)',
         description: `Login realizado com sucesso. Olá, ${employee.nome_completo}!`,
       })
-      navigate('/dashboard')
+
+      // Small delay to ensure state is propagated
+      setTimeout(() => {
+        navigate('/dashboard')
+      }, 100)
     } catch (error: any) {
-      console.error(error)
+      console.error('Login error:', error)
       let message = error.message || 'Ocorreu um erro ao tentar entrar.'
 
-      if (message.includes('Password should be at least')) {
+      if (message.includes('Email not confirmed')) {
         message =
-          'Erro de configuração: A senha no sistema Auth precisa ser maior (min 6). Contate o admin.'
+          'Seu email ainda não foi confirmado. Verifique sua caixa de entrada.'
       }
 
       toast({
@@ -115,7 +131,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
-      <Card className="w-full max-w-md shadow-lg border-t-4 border-t-primary">
+      <Card className="w-full max-w-md shadow-lg border-t-4 border-t-primary animate-fade-in-up">
         <CardHeader className="text-center space-y-2">
           <div className="mx-auto bg-primary/10 p-3 rounded-full w-fit mb-2">
             <Lock className="w-8 h-8 text-primary" />
@@ -157,7 +173,7 @@ export default function LoginPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Senha</FormLabel>
+                    <FormLabel>Senha (4 dígitos)</FormLabel>
                     <FormControl>
                       <div className="relative">
                         <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -165,7 +181,7 @@ export default function LoginPage() {
                           type="password"
                           placeholder="••••"
                           maxLength={4}
-                          className="pl-9 tracking-widest"
+                          className="pl-9 tracking-widest font-mono"
                           {...field}
                           onChange={(e) => {
                             // Ensure only numbers
@@ -182,16 +198,16 @@ export default function LoginPage() {
 
               <Button
                 type="submit"
-                className="w-full h-11 text-base"
+                className="w-full h-11 text-base font-semibold"
                 disabled={loading}
               >
                 {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Autenticando...
+                    Validando acesso...
                   </>
                 ) : (
-                  'Entrar'
+                  'Entrar no Sistema'
                 )}
               </Button>
             </form>
@@ -199,7 +215,7 @@ export default function LoginPage() {
         </CardContent>
         <CardFooter className="flex flex-col items-center justify-center text-xs text-muted-foreground gap-1">
           <p>Acesso restrito a funcionários autorizados.</p>
-          <p>© 2025 Facil Vendas v1.0</p>
+          <p>© 2025 Facil Vendas v1.0.1</p>
         </CardFooter>
       </Card>
     </div>
