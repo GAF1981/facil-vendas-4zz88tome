@@ -7,17 +7,29 @@ export const productsService = {
 
     if (search) {
       const searchTerm = search.trim()
-      const isNumeric = !isNaN(Number(searchTerm)) && searchTerm !== ''
+      // Check if the search term matches a strictly numeric pattern (digits only)
+      const isNumeric = /^\d+$/.test(searchTerm)
 
       if (isNumeric) {
-        // Search in CODIGO (numeric) or CÓDIGO BARRAS (numeric)
-        // We use explicit OR syntax compatible with PostgREST for numeric columns
-        query = query.or(
-          `CODIGO.eq.${searchTerm},"CÓDIGO BARRAS".eq.${searchTerm}`,
-        )
+        const numValue = Number(searchTerm)
+        // PostgreSQL integer max value is 2,147,483,647.
+        // If the number is larger (like a barcode), we shouldn't search in the integer CODIGO column
+        // to avoid "value out of range" errors, unless CODIGO is BigInt (but types say number).
+        // We assume CODIGO is standard integer (Serial).
+        const isIntSafe = numValue <= 2147483647
+
+        const conditions = []
+        if (isIntSafe) {
+          conditions.push(`CODIGO.eq.${searchTerm}`)
+        }
+        // CÓDIGO BARRAS typically handles larger numbers (EAN-13), assuming it's BigInt or Numeric in DB
+        conditions.push(`"CÓDIGO BARRAS".eq.${searchTerm}`)
+        // Always allow searching by name even if it looks like a number (e.g. "123" in "Product 123")
+        conditions.push(`MERCADORIA.ilike.%${searchTerm}%`)
+
+        query = query.or(conditions.join(','))
       } else {
-        // Search text in MERCADORIA or DESCRIÇÃO RESUMIDA
-        // We use ilike for case-insensitive partial match
+        // Text search: name or description
         query = query.or(
           `MERCADORIA.ilike.%${searchTerm}%, "DESCRIÇÃO RESUMIDA".ilike.%${searchTerm}%`,
         )

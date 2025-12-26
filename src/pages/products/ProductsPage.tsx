@@ -1,16 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import { Badge } from '@/components/ui/badge'
+import { Card, CardContent } from '@/components/ui/card'
 import {
   Search,
   Loader2,
@@ -18,10 +9,13 @@ import {
   ChevronLeft,
   ChevronRight,
   PackageX,
+  X,
 } from 'lucide-react'
 import { productsService } from '@/services/productsService'
-import { Product, formatPrice } from '@/types/product'
+import { Product } from '@/types/product'
 import { BarcodeScannerDialog } from '@/components/products/BarcodeScannerDialog'
+import { ProductTable } from '@/components/products/ProductTable'
+import { ProductCardItem } from '@/components/products/ProductCardItem'
 import { useToast } from '@/hooks/use-toast'
 
 export default function ProductsPage() {
@@ -59,6 +53,7 @@ export default function ProductsPage() {
       setProducts(data)
       setTotalCount(count)
     } catch (error) {
+      console.error(error)
       toast({
         title: 'Erro ao carregar produtos',
         description: 'Tente novamente.',
@@ -81,6 +76,10 @@ export default function ProductsPage() {
     })
   }
 
+  const handleClearSearch = () => {
+    setSearchTerm('')
+  }
+
   const totalPages = Math.ceil(totalCount / pageSize)
 
   return (
@@ -99,10 +98,21 @@ export default function ProductsPage() {
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Buscar por nome, código ou código de barras..."
-            className="pl-8"
+            className="pl-8 pr-8"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
+          {searchTerm && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-0 top-0 h-10 w-10 text-muted-foreground hover:text-foreground"
+              onClick={handleClearSearch}
+            >
+              <X className="h-4 w-4" />
+              <span className="sr-only">Limpar busca</span>
+            </Button>
+          )}
         </div>
         <Button
           variant="outline"
@@ -129,88 +139,15 @@ export default function ProductsPage() {
           {/* Mobile View - Cards */}
           <div className="grid grid-cols-1 gap-4 sm:hidden">
             {products.map((product) => (
-              <Card key={product.CODIGO} className="overflow-hidden">
-                <CardHeader className="p-4 pb-2">
-                  <div className="flex justify-between items-start">
-                    <Badge variant="outline" className="mb-2">
-                      #{product.CODIGO}
-                    </Badge>
-                    <span className="font-bold text-green-700">
-                      {formatPrice(product.PREÇO)}
-                    </span>
-                  </div>
-                  <CardTitle className="text-base line-clamp-2">
-                    {product.MERCADORIA}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-4 pt-2 text-sm text-muted-foreground space-y-2">
-                  {product['CÓDIGO BARRAS'] && (
-                    <div className="flex items-center gap-1">
-                      <ScanBarcode className="h-3 w-3" />
-                      <span>{product['CÓDIGO BARRAS']}</span>
-                    </div>
-                  )}
-                  {product.GRUPO && (
-                    <div className="flex items-center gap-1">
-                      <span className="font-semibold text-foreground/80">
-                        Grupo:
-                      </span>
-                      <span>{product.GRUPO}</span>
-                    </div>
-                  )}
-                  {product['DESCRIÇÃO RESUMIDA'] && (
-                    <div className="bg-muted p-2 rounded text-xs mt-2">
-                      {product['DESCRIÇÃO RESUMIDA']}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              <ProductCardItem key={product.CODIGO} product={product} />
             ))}
           </div>
 
           {/* Desktop View - Table */}
-          <div className="hidden sm:block rounded-md border bg-card">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[80px]">Código</TableHead>
-                  <TableHead>Produto</TableHead>
-                  <TableHead>Grupo</TableHead>
-                  <TableHead>Cód. Barras</TableHead>
-                  <TableHead className="text-right">Preço</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {products.map((product) => (
-                  <TableRow key={product.CODIGO}>
-                    <TableCell className="font-medium">
-                      {product.CODIGO}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="font-medium">
-                          {product.MERCADORIA}
-                        </span>
-                        {product['DESCRIÇÃO RESUMIDA'] && (
-                          <span className="text-xs text-muted-foreground">
-                            {product['DESCRIÇÃO RESUMIDA']}
-                          </span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>{product.GRUPO || '-'}</TableCell>
-                    <TableCell>{product['CÓDIGO BARRAS'] || '-'}</TableCell>
-                    <TableCell className="text-right font-bold">
-                      {formatPrice(product.PREÇO)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <ProductTable products={products} />
 
           {/* Pagination */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between pt-4">
             <p className="text-sm text-muted-foreground">
               Página {page} de {totalPages || 1}
             </p>
@@ -250,7 +187,7 @@ export default function ProductsPage() {
             {searchTerm && (
               <Button
                 variant="link"
-                onClick={() => setSearchTerm('')}
+                onClick={handleClearSearch}
                 className="mt-2"
               >
                 Limpar busca
