@@ -1,26 +1,36 @@
-/* Main App Component - Handles routing (using react-router-dom), query client and other providers - use this file to add all routes */
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from '@/components/ui/toaster'
 import { Toaster as Sonner } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import Index from './pages/Index'
-import NotFound from './pages/NotFound'
-import Layout from './components/Layout'
-
-// ONLY IMPORT AND RENDER WORKING PAGES, NEVER ADD PLACEHOLDER COMPONENTS OR PAGES IN THIS FILE
-// AVOID REMOVING ANY CONTEXT PROVIDERS FROM THIS FILE (e.g. TooltipProvider, Toaster, Sonner)
+import GlobalLayout from '@/components/layout/GlobalLayout'
+import Index from '@/pages/Index'
+import NotFound from '@/pages/NotFound'
+import ClientsPage from '@/pages/clients/ClientsPage'
+import ClientFormPage from '@/pages/clients/ClientFormPage'
 
 const App = () => (
   <BrowserRouter
-    future={{ v7_startTransition: false, v7_relativeSplatPath: false }}
+    future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
   >
     <TooltipProvider>
       <Toaster />
       <Sonner />
       <Routes>
-        <Route element={<Layout />}>
+        <Route element={<GlobalLayout />}>
           <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES MUST BE ADDED HERE */}
+          <Route path="/clientes" element={<ClientsPage />} />
+          <Route path="/clientes/novo" element={<ClientFormPage />} />
+          <Route path="/clientes/:id" element={<ClientFormPage />} />
+
+          {/* Redirect generic routes to 404 or specific pages if needed, for now Vendas is just a placeholder route */}
+          <Route
+            path="/vendas"
+            element={
+              <div className="flex items-center justify-center h-[50vh] text-muted-foreground">
+                Módulo de Vendas em desenvolvimento.
+              </div>
+            }
+          />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>
