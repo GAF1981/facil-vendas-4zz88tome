@@ -15,7 +15,7 @@ export const productsService = {
 
       if (isNumber) {
         // Search by ID, Internal Code (CODIGO), Barcode (CÓDIGO BARRAS) OR Name (PRODUTO)
-        // Even if it's a number, it might be part of the product name
+        // Using quotes for columns with spaces
         query = query.or(
           `ID.eq.${searchTerm},CODIGO.eq.${searchTerm},"CÓDIGO BARRAS".eq.${searchTerm},PRODUTO.ilike.%${searchTerm}%`,
         )
@@ -67,6 +67,8 @@ export const productsService = {
       throw error
     }
 
+    // If table is empty, maxId is 0, so next ID is 1
+    // If table has max ID 100, next ID is 101
     const maxId = data?.ID || 0
     return maxId + 1
   },
