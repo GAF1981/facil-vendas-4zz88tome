@@ -138,11 +138,56 @@ export type Database = {
         }
         Relationships: []
       }
+      PRODUTOS: {
+        Row: {
+          CODIGO: number
+          'CÓDIGO BARRAS': number
+          'DESCRIÇÃO RESUMIDA': string | null
+          GRUPO: string | null
+          MERCADORIA: string | null
+          PREÇO: string | null
+          'PRODUTOS CONCATENADOS': string | null
+          TIPO: string | null
+        }
+        Insert: {
+          CODIGO: number
+          'CÓDIGO BARRAS': number
+          'DESCRIÇÃO RESUMIDA'?: string | null
+          GRUPO?: string | null
+          MERCADORIA?: string | null
+          PREÇO?: string | null
+          'PRODUTOS CONCATENADOS'?: string | null
+          TIPO?: string | null
+        }
+        Update: {
+          CODIGO?: number
+          'CÓDIGO BARRAS'?: number
+          'DESCRIÇÃO RESUMIDA'?: string | null
+          GRUPO?: string | null
+          MERCADORIA?: string | null
+          PREÇO?: string | null
+          'PRODUTOS CONCATENADOS'?: string | null
+          TIPO?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      login_by_email: {
+        Args: { p_email: string }
+        Returns: {
+          apelido: string
+          cpf: string
+          email: string
+          foto_url: string
+          id: number
+          nome_completo: string
+          setor: string
+        }[]
+      }
       verify_employee_credentials: {
         Args: { p_email: string; p_senha: string }
         Returns: {
