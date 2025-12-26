@@ -70,6 +70,9 @@ export function ProductTable({ products, onUpdate }: ProductTableProps) {
             <TableRow>
               <TableHead className="w-[80px]">Código</TableHead>
               <TableHead>Produto</TableHead>
+              <TableHead className="hidden lg:table-cell">
+                Cód. Barras
+              </TableHead>
               <TableHead className="hidden md:table-cell">Grupo</TableHead>
               <TableHead className="hidden sm:table-cell text-right">
                 Preço
@@ -83,22 +86,34 @@ export function ProductTable({ products, onUpdate }: ProductTableProps) {
                 key={product.CODIGO}
                 className="group hover:bg-muted/50 transition-colors"
               >
-                <TableCell className="font-medium">{product.CODIGO}</TableCell>
-                <TableCell>
-                  <div className="flex flex-col">
-                    <span className="font-medium">{product.PRODUTOS}</span>
-                    <span className="text-xs text-muted-foreground md:hidden">
-                      {product['CÓDIGO BARRAS']}
+                <TableCell className="font-medium align-top">
+                  {product.CODIGO}
+                </TableCell>
+                <TableCell className="align-top">
+                  <div className="flex flex-col gap-1">
+                    <span className="font-medium leading-none">
+                      {product.PRODUTOS}
+                    </span>
+                    {product['DESCRIÇÃO RESUMIDA'] && (
+                      <span className="text-xs text-muted-foreground line-clamp-2">
+                        {product['DESCRIÇÃO RESUMIDA']}
+                      </span>
+                    )}
+                    <span className="text-xs text-muted-foreground lg:hidden pt-1">
+                      CB: {product['CÓDIGO BARRAS']}
                     </span>
                   </div>
                 </TableCell>
-                <TableCell className="hidden md:table-cell">
+                <TableCell className="hidden lg:table-cell align-top">
+                  {product['CÓDIGO BARRAS']}
+                </TableCell>
+                <TableCell className="hidden md:table-cell align-top">
                   {product.GRUPO || '-'}
                 </TableCell>
-                <TableCell className="hidden sm:table-cell text-right">
+                <TableCell className="hidden sm:table-cell text-right align-top font-medium">
                   {product.PREÇO ? `R$ ${product.PREÇO}` : '-'}
                 </TableCell>
-                <TableCell>
+                <TableCell className="align-top">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" className="h-8 w-8 p-0">

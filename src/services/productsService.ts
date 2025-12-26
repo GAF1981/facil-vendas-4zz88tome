@@ -14,12 +14,13 @@ export const productsService = {
       const isNumber = !isNaN(Number(searchTerm)) && searchTerm !== ''
 
       if (isNumber) {
-        // Search by exact CODIGO or CÓDIGO BARRAS, or partial name
+        // Search by exact CODIGO or CÓDIGO BARRAS, or partial name in PRODUTOS column
+        // PRODUTOS column is the Product Name
         query = query.or(
           `CODIGO.eq.${searchTerm},"CÓDIGO BARRAS".eq.${searchTerm},PRODUTOS.ilike.%${searchTerm}%`,
         )
       } else {
-        // Search by partial name
+        // Search by partial name in PRODUTOS column
         query = query.ilike('PRODUTOS', `%${searchTerm}%`)
       }
     }

@@ -135,7 +135,7 @@ export function ProductForm({
                 name="PRODUTOS"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Nome do Produto *</FormLabel>
+                    <FormLabel>Nome do Produto (PRODUTOS) *</FormLabel>
                     <FormControl>
                       <Input placeholder="Nome do produto" {...field} />
                     </FormControl>
