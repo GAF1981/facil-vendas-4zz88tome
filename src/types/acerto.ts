@@ -3,6 +3,7 @@ import { ProductRow } from './product'
 export interface AcertoItem {
   uid: string // Temporary ID for UI handling
   produtoId: number
+  produtoCodigo?: number | null
   produtoNome: string
   tipo: string | null
   precoUnitario: number

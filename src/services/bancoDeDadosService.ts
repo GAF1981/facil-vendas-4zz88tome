@@ -159,7 +159,7 @@ export const bancoDeDadosService = {
 
         'DESCONTO POR GRUPO': client.Desconto,
 
-        'COD. PRODUTO': item.produtoId,
+        'COD. PRODUTO': item.produtoCodigo ?? null, // Map to CODIGO, fallback to null if missing
         MERCADORIA: item.produtoNome,
         TIPO: item.tipo,
         'SALDO INICIAL': item.saldoInicial,

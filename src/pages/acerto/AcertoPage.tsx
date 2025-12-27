@@ -157,6 +157,7 @@ export default function AcertoPage() {
     const newItem: AcertoItem = {
       uid: Math.random().toString(36).substr(2, 9),
       produtoId: product.ID,
+      produtoCodigo: product.CODIGO,
       produtoNome: product.PRODUTO || 'Sem nome',
       tipo: product.TIPO || '',
       precoUnitario: price,

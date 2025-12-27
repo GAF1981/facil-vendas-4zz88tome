@@ -139,7 +139,7 @@ export function AcertoTable({
                   {item.idVendaItens || '-'}
                 </TableCell>
                 <TableCell className="font-mono text-xs text-center">
-                  {item.produtoId}
+                  {item.produtoCodigo || '-'}
                 </TableCell>
                 <TableCell className="font-medium">
                   {item.produtoNome}
