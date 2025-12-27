@@ -162,7 +162,12 @@ export const bancoDeDadosService = {
         'COD. PRODUTO': item.produtoCodigo ?? null,
         MERCADORIA: item.produtoNome,
 
-        TIPO: acertoTipo, // Using the selected acerto type
+        // Mapped TIPO from item (Resumo da Contagem)
+        TIPO: item.tipo,
+
+        // Mapped FORMA from ACERTO TIPO (Dropdown)
+        FORMA: acertoTipo,
+
         'SALDO INICIAL': item.saldoInicial,
         CONTAGEM: contagem,
 
