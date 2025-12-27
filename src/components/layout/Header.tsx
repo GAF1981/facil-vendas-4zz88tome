@@ -32,7 +32,7 @@ export function Header() {
   const getBreadcrumbName = (path: string) => {
     switch (path) {
       case 'dashboard':
-        return 'Menu Principal'
+        return 'Dashboard'
       case 'clientes':
         return 'Clientes'
       case 'funcionarios':
@@ -108,7 +108,7 @@ export function Header() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate('/')}
             title="Tela Inicial"
             className="h-8 w-8"
           >

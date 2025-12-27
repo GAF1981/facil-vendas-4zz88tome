@@ -36,7 +36,7 @@ export function AppSidebar() {
   const items = [
     {
       title: 'Menu Principal',
-      url: '/dashboard',
+      url: '/',
       icon: LayoutDashboard,
     },
     {

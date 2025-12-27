@@ -74,7 +74,7 @@ const ClientsPage = () => {
           <div className="flex items-center gap-2 mb-2">
             <Button variant="ghost" size="sm" asChild className="-ml-2">
               <Link
-                to="/dashboard"
+                to="/"
                 className="text-muted-foreground hover:text-foreground"
               >
                 <ArrowLeft className="mr-1 h-4 w-4" />

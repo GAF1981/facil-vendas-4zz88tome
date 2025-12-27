@@ -240,7 +240,7 @@ export default function AcertoPage() {
       setClient(null)
       setIsClientConfirmed(false)
       setLastAcertoDate(null)
-      navigate('/dashboard')
+      navigate('/')
     } catch (error) {
       console.error(error)
       toast({
@@ -258,7 +258,7 @@ export default function AcertoPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="outline" size="icon" asChild>
-            <Link to="/dashboard">
+            <Link to="/">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
