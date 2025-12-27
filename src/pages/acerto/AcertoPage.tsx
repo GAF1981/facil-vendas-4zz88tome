@@ -36,6 +36,8 @@ export default function AcertoPage() {
 
   const [mode, setMode] = useState<'ACERTO' | 'CAPTACAO'>('ACERTO')
   const [loadingStatus, setLoadingStatus] = useState(false)
+
+  // State for automatic order number
   const [nextOrderNumber, setNextOrderNumber] = useState<number | null>(null)
 
   useEffect(() => {
@@ -43,6 +45,7 @@ export default function AcertoPage() {
     return () => clearInterval(timer)
   }, [])
 
+  // Effect to fetch next order number when client is confirmed
   useEffect(() => {
     if (isClientConfirmed) {
       setNextOrderNumber(null)
@@ -307,6 +310,7 @@ export default function AcertoPage() {
 
       {isClientConfirmed && (
         <div className="space-y-4 animate-fade-in pt-4 border-t">
+          {/* Automatic Order Number Field - Directly above Resumo da Contagem */}
           <div className="flex items-center gap-3 pb-2">
             <Label className="text-sm font-bold text-muted-foreground uppercase">
               Número de Pedido

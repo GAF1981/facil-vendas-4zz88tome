@@ -22,14 +22,15 @@ export const bancoDeDadosService = {
   },
 
   async getMaxNumeroPedido() {
+    // Using quotes for column with spaces to be safe
     const { data, error } = await supabase
       .from('BANCO_DE_DADOS')
-      .select('NÚMERO DO PEDIDO')
-      .order('NÚMERO DO PEDIDO', { ascending: false })
+      .select('"NÚMERO DO PEDIDO"')
+      .order('"NÚMERO DO PEDIDO"', { ascending: false })
       .limit(1)
-      .single()
+      .maybeSingle()
 
-    if (error && error.code !== 'PGRST116') throw error
+    if (error) throw error
     return (data?.['NÚMERO DO PEDIDO'] || 0) as number
   },
 
@@ -45,7 +46,7 @@ export const bancoDeDadosService = {
     date: Date,
   ) {
     // 1. Get Context (Order Number)
-    // ID VENDA ITENS is now handled automatically by the database (Identity)
+    // We calculate it again here to ensure sequence integrity at the moment of saving
     const nextPedido = await this.getNextNumeroPedido()
 
     const dataAcertoStr = format(date, 'yyyy-MM-dd')
