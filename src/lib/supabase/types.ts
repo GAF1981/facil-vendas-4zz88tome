@@ -15,6 +15,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      acertos: {
+        Row: {
+          cliente_id: number
+          created_at: string | null
+          data_acerto: string | null
+          funcionario_id: number
+          id: number
+          observacoes: string | null
+          valor_total: number | null
+        }
+        Insert: {
+          cliente_id: number
+          created_at?: string | null
+          data_acerto?: string | null
+          funcionario_id: number
+          id?: number
+          observacoes?: string | null
+          valor_total?: number | null
+        }
+        Update: {
+          cliente_id?: number
+          created_at?: string | null
+          data_acerto?: string | null
+          funcionario_id?: number
+          id?: number
+          observacoes?: string | null
+          valor_total?: number | null
+        }
+        Relationships: []
+      }
       CLIENTES: {
         Row: {
           'ALTERAÇÃO CLIENTE': string | null
@@ -137,6 +167,50 @@ export type Database = {
           setor?: string | null
         }
         Relationships: []
+      }
+      itens_acerto: {
+        Row: {
+          acerto_id: number | null
+          contagem: number | null
+          id: number
+          preco_unitario: number | null
+          produto_id: number
+          quant_vendida: number | null
+          saldo_final: number | null
+          saldo_inicial: number | null
+          valor_vendido: number | null
+        }
+        Insert: {
+          acerto_id?: number | null
+          contagem?: number | null
+          id?: number
+          preco_unitario?: number | null
+          produto_id: number
+          quant_vendida?: number | null
+          saldo_final?: number | null
+          saldo_inicial?: number | null
+          valor_vendido?: number | null
+        }
+        Update: {
+          acerto_id?: number | null
+          contagem?: number | null
+          id?: number
+          preco_unitario?: number | null
+          produto_id?: number
+          quant_vendida?: number | null
+          saldo_final?: number | null
+          saldo_inicial?: number | null
+          valor_vendido?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'itens_acerto_acerto_id_fkey'
+            columns: ['acerto_id']
+            isOneToOne: false
+            referencedRelation: 'acertos'
+            referencedColumns: ['id']
+          },
+        ]
       }
       PRODUTOS: {
         Row: {
