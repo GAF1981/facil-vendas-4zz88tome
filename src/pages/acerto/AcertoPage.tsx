@@ -1,15 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useUserStore } from '@/stores/useUserStore'
 import { Card, CardContent } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
-import { Loader2, Calendar, Clock, Save, ArrowLeft, Search } from 'lucide-react'
+import { Loader2, Calendar, Clock, Save, ArrowLeft, Check } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Link, useNavigate } from 'react-router-dom'
-import { clientsService } from '@/services/clientsService'
 import { acertoService } from '@/services/acertoService'
 import { ClientRow } from '@/types/client'
 import { ProductRow } from '@/types/product'
@@ -17,6 +14,8 @@ import { AcertoItem } from '@/types/acerto'
 import { useToast } from '@/hooks/use-toast'
 import { ProductSelector } from '@/components/acerto/ProductSelector'
 import { AcertoTable } from '@/components/acerto/AcertoTable'
+import { ClientSearch } from '@/components/acerto/ClientSearch'
+import { ClientDetails } from '@/components/acerto/ClientDetails'
 
 export default function AcertoPage() {
   const { employee } = useUserStore()
@@ -24,9 +23,8 @@ export default function AcertoPage() {
   const navigate = useNavigate()
 
   // State
-  const [clientCode, setClientCode] = useState('')
   const [client, setClient] = useState<ClientRow | null>(null)
-  const [loadingClient, setLoadingClient] = useState(false)
+  const [isClientConfirmed, setIsClientConfirmed] = useState(false)
   const [lastAcertoDate, setLastAcertoDate] = useState<string | null>(null)
   const [currentTime, setCurrentTime] = useState(new Date())
   const [items, setItems] = useState<AcertoItem[]>([])
@@ -38,45 +36,41 @@ export default function AcertoPage() {
     return () => clearInterval(timer)
   }, [])
 
-  // Fetch Client
-  const handleClientSearch = async () => {
-    if (!clientCode) return
-
-    setLoadingClient(true)
-    setClient(null)
+  // Handle Client Selection
+  const handleClientSelect = async (selectedClient: ClientRow) => {
+    setClient(selectedClient)
     setLastAcertoDate(null)
 
     try {
-      const data = await clientsService.getById(Number(clientCode))
-      if (data) {
-        setClient(data)
-        // Fetch last acerto
-        const lastDate = await acertoService.getLastAcertoDate(data.CODIGO)
-        setLastAcertoDate(lastDate)
-      } else {
-        toast({
-          title: 'Cliente não encontrado',
-          description: 'Verifique o código e tente novamente.',
-          variant: 'destructive',
-        })
-      }
+      // Fetch last acerto
+      const lastDate = await acertoService.getLastAcertoDate(
+        selectedClient.CODIGO,
+      )
+      setLastAcertoDate(lastDate)
     } catch (error) {
       console.error(error)
-      toast({
-        title: 'Erro',
-        description: 'Erro ao buscar cliente.',
-        variant: 'destructive',
-      })
-    } finally {
-      setLoadingClient(false)
+      // Non-blocking error
     }
   }
 
-  // Handle Enter key in client input
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleClientSearch()
+  // Handle Confirmation
+  const handleConfirmClient = () => {
+    if (!client) return
+    setIsClientConfirmed(true)
+  }
+
+  // Handle Change Client
+  const handleChangeClient = () => {
+    if (items.length > 0) {
+      const confirmChange = window.confirm(
+        'Trocar de cliente irá limpar a lista de produtos. Deseja continuar?',
+      )
+      if (!confirmChange) return
     }
+    setClient(null)
+    setIsClientConfirmed(false)
+    setItems([])
+    setLastAcertoDate(null)
   }
 
   // Add Product
@@ -177,10 +171,10 @@ export default function AcertoPage() {
         className: 'bg-green-50 border-green-200 text-green-900',
       })
 
-      // Reset or Navigate
+      // Reset
       setItems([])
       setClient(null)
-      setClientCode('')
+      setIsClientConfirmed(false)
       setLastAcertoDate(null)
       navigate('/dashboard')
     } catch (error) {
@@ -239,140 +233,99 @@ export default function AcertoPage() {
               {employee?.nome_completo || 'Não identificado'}
             </span>
           </div>
-          {lastAcertoDate && (
-            <div className="text-sm">
-              <span className="font-semibold text-muted-foreground mr-2">
-                Último Acerto:
-              </span>
-              <span>
-                {format(new Date(lastAcertoDate), 'dd/MM/yyyy HH:mm')}
-              </span>
-            </div>
-          )}
         </CardContent>
       </Card>
 
-      {/* Client Selection */}
-      <Card>
-        <CardContent className="p-6 space-y-4">
-          <div className="flex items-end gap-4">
-            <div className="space-y-2 w-full max-w-[200px]">
-              <Label htmlFor="clientCode">Código do Cliente</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="clientCode"
-                  placeholder="Cód."
-                  value={clientCode}
-                  onChange={(e) => setClientCode(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  className="font-mono"
-                  autoFocus
-                />
-                <Button
-                  size="icon"
-                  onClick={handleClientSearch}
-                  disabled={loadingClient}
-                >
-                  {loadingClient ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Search className="h-4 w-4" />
-                  )}
+      {/* Client Selection Section */}
+      <div className="space-y-4">
+        {!isClientConfirmed && <ClientSearch onSelect={handleClientSelect} />}
+
+        {client && (
+          <div className="space-y-4 animate-fade-in-up">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Cliente Selecionado</h2>
+              {isClientConfirmed && (
+                <Button variant="ghost" size="sm" onClick={handleChangeClient}>
+                  Trocar Cliente
                 </Button>
-              </div>
+              )}
             </div>
 
-            {client && (
-              <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 bg-muted/30 p-3 rounded-lg border">
-                <div>
-                  <Label className="text-xs text-muted-foreground">Nome</Label>
-                  <p className="font-medium truncate">
-                    {client['NOME CLIENTE']}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">
-                    Endereço
-                  </Label>
-                  <p className="font-medium truncate">
-                    {client.ENDEREÇO || '-'}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">
-                    Cidade
-                  </Label>
-                  <p className="font-medium truncate">
-                    {client.MUNICÍPIO || '-'}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">
-                    Bairro
-                  </Label>
-                  <p className="font-medium truncate">{client.BAIRRO || '-'}</p>
-                </div>
+            <ClientDetails client={client} lastAcertoDate={lastAcertoDate} />
+
+            {!isClientConfirmed && (
+              <div className="flex justify-start pt-2">
+                <Button
+                  onClick={handleConfirmClient}
+                  className="w-full sm:w-auto bg-green-600 hover:bg-green-700"
+                  size="lg"
+                >
+                  <Check className="mr-2 h-5 w-5" />
+                  ACERTO CLIENTE
+                </Button>
               </div>
             )}
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Table Section */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            Resumo da Contagem
-            <span className="text-sm font-normal text-muted-foreground ml-2">
-              ({items.length} itens)
-            </span>
-          </h2>
-          <ProductSelector onSelect={handleAddProduct} />
-        </div>
-
-        <AcertoTable
-          items={items}
-          onUpdateCount={handleUpdateCount}
-          onRemoveItem={handleRemoveItem}
-        />
-
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-card border p-4 rounded-lg shadow-sm">
-          <div className="text-sm text-muted-foreground">
-            * Saldo Inicial padrão é 0 para novos itens nesta sessão.
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="text-sm text-muted-foreground">
-                Valor Total Vendido
-              </p>
-              <p className="text-2xl font-bold text-green-600">
-                R${' '}
-                {items
-                  .reduce((acc, item) => acc + item.valorVendido, 0)
-                  .toFixed(2)
-                  .replace('.', ',')}
-              </p>
-            </div>
-            <Separator
-              orientation="vertical"
-              className="h-10 hidden sm:block"
-            />
-            <Button
-              size="lg"
-              className="w-full sm:w-auto"
-              onClick={handleSave}
-              disabled={saving || items.length === 0 || !client}
-            >
-              {saving ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="mr-2 h-4 w-4" />
-              )}
-              Finalizar Acerto
-            </Button>
-          </div>
-        </div>
+        )}
       </div>
+
+      {/* Product Section (Only visible when confirmed) */}
+      {isClientConfirmed && (
+        <div className="space-y-4 animate-fade-in pt-4 border-t">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              Resumo da Contagem
+              <span className="text-sm font-normal text-muted-foreground ml-2">
+                ({items.length} itens)
+              </span>
+            </h2>
+            <ProductSelector onSelect={handleAddProduct} />
+          </div>
+
+          <AcertoTable
+            items={items}
+            onUpdateCount={handleUpdateCount}
+            onRemoveItem={handleRemoveItem}
+          />
+
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-card border p-4 rounded-lg shadow-sm">
+            <div className="text-sm text-muted-foreground">
+              * Saldo Inicial padrão é 0 para novos itens.
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <p className="text-sm text-muted-foreground">
+                  Valor Total Vendido
+                </p>
+                <p className="text-2xl font-bold text-green-600">
+                  R${' '}
+                  {items
+                    .reduce((acc, item) => acc + item.valorVendido, 0)
+                    .toFixed(2)
+                    .replace('.', ',')}
+                </p>
+              </div>
+              <Separator
+                orientation="vertical"
+                className="h-10 hidden sm:block"
+              />
+              <Button
+                size="lg"
+                className="w-full sm:w-auto"
+                onClick={handleSave}
+                disabled={saving || items.length === 0}
+              >
+                {saving ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="mr-2 h-4 w-4" />
+                )}
+                Finalizar Acerto
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
