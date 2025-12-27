@@ -82,6 +82,7 @@ export const bancoDeDadosService = {
     employee: Employee,
     items: AcertoItem[],
     date: Date,
+    acertoTipo: string,
   ) {
     // 1. Get Context (Order Number)
     // We calculate it again here to ensure sequence integrity at the moment of saving
@@ -161,7 +162,7 @@ export const bancoDeDadosService = {
 
         'COD. PRODUTO': item.produtoCodigo ?? null, // Map to CODIGO, fallback to null if missing
         MERCADORIA: item.produtoNome,
-        TIPO: item.tipo,
+        TIPO: acertoTipo, // Using the selected acerto type
         'SALDO INICIAL': item.saldoInicial,
         CONTAGEM: contagem,
 

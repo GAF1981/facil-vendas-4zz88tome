@@ -5,6 +5,13 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Loader2, Calendar, Clock, Save, ArrowLeft, Check } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -35,6 +42,7 @@ export default function AcertoPage() {
   const [saving, setSaving] = useState(false)
 
   const [mode, setMode] = useState<'ACERTO' | 'CAPTACAO'>('ACERTO')
+  const [acertoTipo, setAcertoTipo] = useState<string>('ACERTO')
   const [loadingStatus, setLoadingStatus] = useState(false)
 
   // State for automatic order number
@@ -106,6 +114,7 @@ export default function AcertoPage() {
   const handleConfirmClient = (selectedMode: 'ACERTO' | 'CAPTACAO') => {
     if (!client) return
     setMode(selectedMode)
+    setAcertoTipo(selectedMode === 'CAPTACAO' ? 'CAPTAÇÃO' : 'ACERTO')
     setIsClientConfirmed(true)
   }
 
@@ -121,6 +130,17 @@ export default function AcertoPage() {
     setItems([])
     setLastAcertoDate(null)
     setMode('ACERTO')
+    setAcertoTipo('ACERTO')
+  }
+
+  const handleAcertoTipoChange = (value: string) => {
+    setAcertoTipo(value)
+    // Automatically switch mode if needed for consistency, but keep as ACERTO for COMPLEMENTO
+    if (value === 'CAPTAÇÃO') {
+      setMode('CAPTACAO')
+    } else {
+      setMode('ACERTO')
+    }
   }
 
   const handleAddProduct = async (product: ProductRow) => {
@@ -229,7 +249,13 @@ export default function AcertoPage() {
     setSaving(true)
     try {
       const now = new Date()
-      await bancoDeDadosService.saveTransaction(client, employee, items, now)
+      await bancoDeDadosService.saveTransaction(
+        client,
+        employee,
+        items,
+        now,
+        acertoTipo,
+      )
 
       toast({
         title: 'Sucesso',
@@ -349,15 +375,33 @@ export default function AcertoPage() {
       {isClientConfirmed && (
         <div className="space-y-4 animate-fade-in pt-4 border-t">
           {/* Automatic Order Number Field - Directly above Resumo da Contagem */}
-          <div className="flex items-center gap-3 pb-2">
-            <Label className="text-sm font-bold text-muted-foreground uppercase">
-              Número de Pedido
-            </Label>
-            <Input
-              value={nextOrderNumber !== null ? nextOrderNumber : '...'}
-              readOnly
-              className="w-24 h-9 font-mono text-center font-bold bg-muted"
-            />
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-3 pb-2">
+              <Label className="text-sm font-bold text-muted-foreground uppercase w-32">
+                Número de Pedido
+              </Label>
+              <Input
+                value={nextOrderNumber !== null ? nextOrderNumber : '...'}
+                readOnly
+                className="w-24 h-9 font-mono text-center font-bold bg-muted"
+              />
+            </div>
+
+            <div className="flex items-center gap-3 pb-2">
+              <Label className="text-sm font-bold text-muted-foreground uppercase w-32">
+                Acerto Tipo
+              </Label>
+              <Select value={acertoTipo} onValueChange={handleAcertoTipoChange}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ACERTO">ACERTO</SelectItem>
+                  <SelectItem value="CAPTAÇÃO">CAPTAÇÃO</SelectItem>
+                  <SelectItem value="COMPLEMENTO">COMPLEMENTO</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="flex items-center justify-between">
