@@ -3,6 +3,7 @@ import { AcertoItem } from '@/types/acerto'
 import { ClientRow } from '@/types/client'
 import { Employee } from '@/types/employee'
 import { parseCurrency, formatCurrency } from '@/lib/formatters'
+import { format } from 'date-fns'
 
 export const bancoDeDadosService = {
   async hasOutstandingBalance(clienteId: number): Promise<boolean> {
@@ -50,29 +51,60 @@ export const bancoDeDadosService = {
     items: AcertoItem[],
     date: Date,
   ) {
+    // 1. Get IDs and Context
     const currentMaxId = await this.getMaxIdVendaItens()
     const currentMaxPedido = await this.getMaxNumeroPedido()
     const nextPedido = currentMaxPedido + 1
     let nextId = currentMaxId + 1
 
-    const dataAcertoStr = date.toLocaleDateString('pt-BR')
-    const horaAcerto = date.toLocaleTimeString('pt-BR', { hour12: false })
+    const dataAcertoStr = format(date, 'yyyy-MM-dd')
+    const horaAcerto = format(date, 'HH:mm:ss')
 
+    // 2. Fetch current product prices for VALENTIA
+    const productIds = items.map((i) => i.produtoId)
+    const { data: productsData, error: productsError } = await supabase
+      .from('PRODUTOS')
+      .select('ID, PREÇO')
+      .in('ID', productIds)
+
+    if (productsError) throw productsError
+
+    const priceMap = new Map<number, number>()
+    productsData?.forEach((p) => {
+      priceMap.set(p.ID, parseCurrency(p.PREÇO))
+    })
+
+    // 3. Prepare rows
     const rowsToInsert = items.map((item) => {
-      const valentiaVal = item.precoUnitario
-      const valorVendidoVal = item.valorVendido
+      // Get current price from DB (Valentia)
+      const currentPrice = priceMap.get(item.produtoId) || item.precoUnitario
+      const valentiaVal = currentPrice
+
+      // Recalculate Sales Value based on current price
+      const valorVendidoVal = currentPrice * item.quantVendida
 
       const saldoFinal = item.saldoFinal
       const contagem = item.contagem
 
+      // Consignment Logic: Saldo Final - Contagem
       const diff = saldoFinal - contagem
-      const novasConsignacoesVal = diff > 0 ? diff : 0
-      const recolhidoVal = diff < 0 ? Math.abs(diff) : 0
+      let novasConsignacoesVal = 0
+      let recolhidoVal = 0
 
+      if (diff > 0) {
+        novasConsignacoesVal = diff
+        recolhidoVal = 0
+      } else if (diff < 0) {
+        novasConsignacoesVal = 0
+        recolhidoVal = Math.abs(diff) // Storing magnitude of collected items
+      }
+
+      // Discount Logic
       const descontoStr = client.Desconto || '0'
-      const descontoVal = parseCurrency(descontoStr)
+      const descontoVal = parseCurrency(descontoStr.replace('%', ''))
       const discountFactor = descontoVal > 1 ? descontoVal / 100 : descontoVal
 
+      // Consigned Values Calculation
       const valorConsignadoVendaVal = saldoFinal * valentiaVal
       const valorConsignadoCustoVal =
         valorConsignadoVendaVal - valorConsignadoVendaVal * discountFactor
@@ -117,6 +149,7 @@ export const bancoDeDadosService = {
       }
     })
 
+    // 4. Insert into DB
     const { error } = await supabase
       .from('BANCO_DE_DADOS')
       .insert(rowsToInsert as any)
