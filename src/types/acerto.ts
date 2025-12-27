@@ -11,6 +11,7 @@ export interface AcertoItem {
   quantVendida: number
   valorVendido: number
   saldoFinal: number
+  idVendaItens?: number | null
 }
 
 export interface Acerto {

@@ -103,6 +103,7 @@ export function AcertoTable({
       <Table>
         <TableHeader className="bg-muted/30">
           <TableRow>
+            <VerticalHeader className="w-[50px]">ID VENDA ITENS</VerticalHeader>
             <VerticalHeader className="w-[50px]">CÓDIGO</VerticalHeader>
             <VerticalHeader className="w-[300px] items-start justify-start">
               PRODUTO
@@ -124,7 +125,7 @@ export function AcertoTable({
           {items.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={9}
+                colSpan={10}
                 className="h-24 text-center text-muted-foreground"
               >
                 Nenhum produto adicionado. Clique em "Inserir Produto" para
@@ -134,6 +135,9 @@ export function AcertoTable({
           ) : (
             items.map((item) => (
               <TableRow key={item.uid} className="hover:bg-muted/50">
+                <TableCell className="font-mono text-xs text-center text-muted-foreground">
+                  {item.idVendaItens || '-'}
+                </TableCell>
                 <TableCell className="font-mono text-xs text-center">
                   {item.produtoId}
                 </TableCell>

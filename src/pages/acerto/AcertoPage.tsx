@@ -102,7 +102,7 @@ export default function AcertoPage() {
     setMode('ACERTO')
   }
 
-  const handleAddProduct = (product: ProductRow) => {
+  const handleAddProduct = async (product: ProductRow) => {
     if (items.some((i) => i.produtoId === product.ID)) {
       toast({
         title: 'Produto já adicionado',
@@ -110,6 +110,19 @@ export default function AcertoPage() {
         variant: 'destructive',
       })
       return
+    }
+
+    // Fetch the last ID VENDA ITENS for this product/client to show context
+    let idVendaItens: number | null = null
+    if (client) {
+      try {
+        idVendaItens = await bancoDeDadosService.getLastIdVendaItens(
+          client.CODIGO,
+          product.ID,
+        )
+      } catch (e) {
+        console.error('Error fetching last ID VENDA ITENS', e)
+      }
     }
 
     const price = parseCurrency(product.PREÇO)
@@ -129,6 +142,7 @@ export default function AcertoPage() {
       quantVendida: quantVendida,
       valorVendido: valorVendido,
       saldoFinal: 0,
+      idVendaItens: idVendaItens,
     }
 
     setItems((prev) => [...prev, newItem])

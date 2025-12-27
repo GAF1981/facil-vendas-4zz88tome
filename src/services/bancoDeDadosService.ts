@@ -21,6 +21,27 @@ export const bancoDeDadosService = {
     return (count || 0) > 0
   },
 
+  async getLastIdVendaItens(
+    clienteId: number,
+    produtoId: number,
+  ): Promise<number | null> {
+    const { data, error } = await supabase
+      .from('BANCO_DE_DADOS')
+      .select('"ID VENDA ITENS"')
+      .eq('COD. CLIENTE', clienteId)
+      .eq('COD. PRODUTO', produtoId)
+      .order('ID VENDA ITENS', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (error) {
+      console.error('Error fetching last ID VENDA ITENS:', error)
+      return null
+    }
+
+    return data?.['ID VENDA ITENS'] || null
+  },
+
   async getMaxNumeroPedido() {
     // Using quotes for column with spaces to be safe
     const { data, error } = await supabase
