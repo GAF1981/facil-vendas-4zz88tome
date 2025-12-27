@@ -26,6 +26,7 @@ export type Database = {
           'DESCONTO POR GRUPO': string | null
           FORMA: string | null
           FUNCIONÁRIO: string | null
+          'HORA DO ACERTO': string | null
           'ID VENDA ITENS': number
           MERCADORIA: string | null
           'NOVAS CONSIGNAÇÕES': string | null
@@ -35,6 +36,7 @@ export type Database = {
           'SALDO FINAL': number | null
           'SALDO INICIAL': number | null
           TIPO: string | null
+          VALENTIA: string | null
           VALOR: string | null
           'VALOR CONSIGNADO TOTAL (Custo)': string | null
           'VALOR CONSIGNADO TOTAL (Preço Venda)': string | null
@@ -51,6 +53,7 @@ export type Database = {
           'DESCONTO POR GRUPO'?: string | null
           FORMA?: string | null
           FUNCIONÁRIO?: string | null
+          'HORA DO ACERTO'?: string | null
           'ID VENDA ITENS': number
           MERCADORIA?: string | null
           'NOVAS CONSIGNAÇÕES'?: string | null
@@ -60,6 +63,7 @@ export type Database = {
           'SALDO FINAL'?: number | null
           'SALDO INICIAL'?: number | null
           TIPO?: string | null
+          VALENTIA?: string | null
           VALOR?: string | null
           'VALOR CONSIGNADO TOTAL (Custo)'?: string | null
           'VALOR CONSIGNADO TOTAL (Preço Venda)'?: string | null
@@ -76,6 +80,7 @@ export type Database = {
           'DESCONTO POR GRUPO'?: string | null
           FORMA?: string | null
           FUNCIONÁRIO?: string | null
+          'HORA DO ACERTO'?: string | null
           'ID VENDA ITENS'?: number
           MERCADORIA?: string | null
           'NOVAS CONSIGNAÇÕES'?: string | null
@@ -85,6 +90,7 @@ export type Database = {
           'SALDO FINAL'?: number | null
           'SALDO INICIAL'?: number | null
           TIPO?: string | null
+          VALENTIA?: string | null
           VALOR?: string | null
           'VALOR CONSIGNADO TOTAL (Custo)'?: string | null
           'VALOR CONSIGNADO TOTAL (Preço Venda)'?: string | null

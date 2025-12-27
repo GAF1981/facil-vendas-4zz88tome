@@ -33,7 +33,7 @@ export default function AcertoPage() {
   const [items, setItems] = useState<AcertoItem[]>([])
   const [saving, setSaving] = useState(false)
 
-  // New State for Mode
+  // New State for Mode (Dynamic Settlement Action Logic)
   const [mode, setMode] = useState<'ACERTO' | 'CAPTACAO'>('ACERTO')
   const [loadingStatus, setLoadingStatus] = useState(false)
 
@@ -43,7 +43,7 @@ export default function AcertoPage() {
     return () => clearInterval(timer)
   }, [])
 
-  // Handle Client Selection
+  // Handle Client Selection with Real-time Database Verification
   const handleClientSelect = async (selectedClient: ClientRow) => {
     setClient(selectedClient)
     setLastAcertoDate(null)
@@ -57,6 +57,7 @@ export default function AcertoPage() {
       setLastAcertoDate(lastDate)
 
       // Determine Mode based on DB history
+      // This implements the requirement: queries the database immediately after a client is selected
       const status = await bancoDeDadosService.getClientStatus(
         selectedClient.CODIGO,
       )
@@ -295,6 +296,7 @@ export default function AcertoPage() {
 
             <ClientDetails client={client} lastAcertoDate={lastAcertoDate} />
 
+            {/* Conditional Button Rendering based on Mode */}
             {!isClientConfirmed && !loadingStatus && (
               <div className="flex justify-start pt-2">
                 <Button

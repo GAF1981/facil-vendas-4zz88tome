@@ -7,8 +7,8 @@ import { parseCurrency, formatCurrency } from '@/lib/formatters'
 export const bancoDeDadosService = {
   // Check client status for button logic
   async getClientStatus(clienteId: number): Promise<'ACERTO' | 'CAPTACAO'> {
-    // Check if there is at least one record for the client with SALDO FINAL > 0
-    // We check count of records matching the criteria
+    // We check count of records matching the criteria:
+    // Client exists (COD. CLIENTE match) AND has at least one record with SALDO FINAL > 0
     const { count, error } = await supabase
       .from('BANCO_DE_DADOS')
       .select('*', { count: 'exact', head: true })
@@ -20,6 +20,8 @@ export const bancoDeDadosService = {
       return 'ACERTO' // Default to ACERTO on error
     }
 
+    // If count > 0, it means the client exists and has outstanding balance -> CAPTACAO
+    // If count == 0, it means either client doesn't exist OR has no outstanding balance -> ACERTO
     return (count || 0) > 0 ? 'CAPTACAO' : 'ACERTO'
   },
 
