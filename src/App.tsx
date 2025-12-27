@@ -14,6 +14,7 @@ import ProductsPage from '@/pages/products/ProductsPage'
 import ProductFormPage from '@/pages/products/ProductFormPage'
 import PlaceholderModule from '@/pages/PlaceholderModule'
 import LoginPage from '@/pages/auth/LoginPage'
+import AcertoPage from '@/pages/acerto/AcertoPage'
 import { AuthProvider } from '@/hooks/use-auth'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 
@@ -45,8 +46,10 @@ const App = () => (
               <Route path="/produtos/novo" element={<ProductFormPage />} />
               <Route path="/produtos/:id" element={<ProductFormPage />} />
 
+              {/* Acerto Module */}
+              <Route path="/acerto" element={<AcertoPage />} />
+
               {/* New Modules Routes */}
-              <Route path="/acerto" element={<PlaceholderModule />} />
               <Route path="/complemento" element={<PlaceholderModule />} />
               <Route path="/recebimento" element={<PlaceholderModule />} />
               <Route path="/nota-fiscal" element={<PlaceholderModule />} />
