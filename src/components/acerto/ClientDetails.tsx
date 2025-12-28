@@ -65,7 +65,7 @@ export function ClientDetails({ client, lastAcerto }: ClientDetailsProps) {
           </div>
         </div>
 
-        <div className="mt-4 pt-4 border-t grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="mt-4 pt-4 border-t grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <Label className="text-xs text-muted-foreground font-semibold block mb-1">
               Data do último Acerto:
@@ -80,6 +80,14 @@ export function ClientDetails({ client, lastAcerto }: ClientDetailsProps) {
             </Label>
             <span className="text-sm font-medium">
               {lastAcerto?.hora || 'N/A'}
+            </span>
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground font-semibold block mb-1">
+              Data da Captação:
+            </Label>
+            <span className="text-sm font-medium">
+              {lastAcerto?.captacao ? formatDate(lastAcerto.captacao) : 'N/A'}
             </span>
           </div>
         </div>

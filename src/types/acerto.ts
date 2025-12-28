@@ -28,4 +28,5 @@ export interface Acerto {
 export interface LastAcertoInfo {
   data: string | null
   hora: string | null
+  captacao?: string | null
 }

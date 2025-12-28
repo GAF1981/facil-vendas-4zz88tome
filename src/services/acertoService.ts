@@ -3,25 +3,41 @@ import { Acerto, LastAcertoInfo } from '@/types/acerto'
 
 export const acertoService = {
   async getLastAcerto(clienteId: number): Promise<LastAcertoInfo | null> {
-    const { data, error } = await supabase
-      .from('BANCO_DE_DADOS')
-      .select('"DATA DO ACERTO", "HORA DO ACERTO"')
-      .eq('COD. CLIENTE', clienteId)
-      .order('DATA DO ACERTO', { ascending: false })
-      .order('HORA DO ACERTO', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+    const [lastAcertoResult, lastCaptacaoResult] = await Promise.all([
+      supabase
+        .from('BANCO_DE_DADOS')
+        .select('"DATA DO ACERTO", "HORA DO ACERTO"')
+        .eq('COD. CLIENTE', clienteId)
+        .order('DATA DO ACERTO', { ascending: false })
+        .order('HORA DO ACERTO', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from('BANCO_DE_DADOS')
+        .select('"DATA DO ACERTO"')
+        .eq('COD. CLIENTE', clienteId)
+        .eq('FORMA', 'CAPTAÇÃO')
+        .order('DATA DO ACERTO', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ])
 
-    if (error) {
-      console.error('Error fetching last acerto:', error)
+    if (lastAcertoResult.error) {
+      console.error('Error fetching last acerto:', lastAcertoResult.error)
       return null
     }
 
-    if (!data) return null
+    if (lastCaptacaoResult.error) {
+      console.error('Error fetching last captacao:', lastCaptacaoResult.error)
+      // We continue even if captacao fails, treating it as not found
+    }
+
+    if (!lastAcertoResult.data) return null
 
     return {
-      data: data['DATA DO ACERTO'] || null,
-      hora: data['HORA DO ACERTO'] || null,
+      data: lastAcertoResult.data['DATA DO ACERTO'] || null,
+      hora: lastAcertoResult.data['HORA DO ACERTO'] || null,
+      captacao: lastCaptacaoResult.data?.['DATA DO ACERTO'] || null,
     }
   },
 
