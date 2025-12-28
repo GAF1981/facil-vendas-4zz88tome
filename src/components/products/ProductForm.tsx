@@ -12,6 +12,13 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Loader2, Save, X } from 'lucide-react'
 import { Separator } from '@/components/ui/separator'
 import { productsService } from '@/services/productsService'
@@ -43,6 +50,7 @@ export function ProductForm({
           GRUPO: initialData.GRUPO,
           PREÇO: initialData.PREÇO,
           TIPO: initialData.TIPO,
+          FREQUENTES: initialData.FREQUENTES ?? 'NÃO',
         }
       : {
           ID: undefined, // Will be set by useEffect
@@ -53,6 +61,7 @@ export function ProductForm({
           GRUPO: '',
           PREÇO: '',
           TIPO: '',
+          FREQUENTES: 'NÃO',
         },
   })
 
@@ -286,7 +295,7 @@ export function ProductForm({
             </div>
 
             {/* Group */}
-            <div className="md:col-span-6">
+            <div className="md:col-span-5">
               <FormField
                 control={form.control}
                 name="GRUPO"
@@ -306,8 +315,37 @@ export function ProductForm({
               />
             </div>
 
+            {/* Frequentes */}
+            <div className="md:col-span-2">
+              <FormField
+                control={form.control}
+                name="FREQUENTES"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Frequentes</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value || 'NÃO'}
+                      value={field.value || 'NÃO'}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="SIM">SIM</SelectItem>
+                        <SelectItem value="NÃO">NÃO</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
             {/* Summary Description */}
-            <div className="md:col-span-6">
+            <div className="md:col-span-5">
               <FormField
                 control={form.control}
                 name="DESCRIÇÃO RESUMIDA"

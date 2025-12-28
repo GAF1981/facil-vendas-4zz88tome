@@ -224,6 +224,7 @@ export type Database = {
           CODIGO: number | null
           'CÓDIGO BARRAS': number | null
           'DESCRIÇÃO RESUMIDA': string | null
+          FREQUENTES: string | null
           GRUPO: string | null
           ID: number
           PREÇO: string | null
@@ -234,6 +235,7 @@ export type Database = {
           CODIGO?: number | null
           'CÓDIGO BARRAS'?: number | null
           'DESCRIÇÃO RESUMIDA'?: string | null
+          FREQUENTES?: string | null
           GRUPO?: string | null
           ID: number
           PREÇO?: string | null
@@ -244,6 +246,7 @@ export type Database = {
           CODIGO?: number | null
           'CÓDIGO BARRAS'?: number | null
           'DESCRIÇÃO RESUMIDA'?: string | null
+          FREQUENTES?: string | null
           GRUPO?: string | null
           ID?: number
           PREÇO?: string | null
