@@ -36,8 +36,15 @@ export const acertoService = {
       // We continue even if captacao fails, treating it as not found
     }
 
-    // If no records found for this client at all
-    if (!lastAcertoResult.data) return null
+    // If no records found for this client at all, we return an object with nulls
+    // so the UI can display "Nenhum acerto encontrado" instead of crashing or showing nothing
+    if (!lastAcertoResult.data) {
+      return {
+        data: null,
+        hora: null,
+        captacao: null,
+      }
+    }
 
     return {
       data: lastAcertoResult.data['DATA DO ACERTO'] || null,

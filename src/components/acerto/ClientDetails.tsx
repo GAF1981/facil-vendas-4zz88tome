@@ -3,13 +3,20 @@ import { LastAcertoInfo } from '@/types/acerto'
 import { Card, CardContent } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { format, parseISO } from 'date-fns'
+import { Skeleton } from '@/components/ui/skeleton'
+import { cn } from '@/lib/utils'
 
 interface ClientDetailsProps {
   client: ClientRow
   lastAcerto?: LastAcertoInfo | null
+  loading?: boolean
 }
 
-export function ClientDetails({ client, lastAcerto }: ClientDetailsProps) {
+export function ClientDetails({
+  client,
+  lastAcerto,
+  loading = false,
+}: ClientDetailsProps) {
   // Helper to format date string yyyy-MM-dd to dd/MM/yyyy safely
   const formatDate = (dateString: string | null | undefined) => {
     if (!dateString) return 'N/A'
@@ -70,25 +77,44 @@ export function ClientDetails({ client, lastAcerto }: ClientDetailsProps) {
             <Label className="text-xs text-muted-foreground font-semibold block mb-1">
               Data do último Acerto:
             </Label>
-            <span className="text-sm font-medium">
-              {lastAcerto?.data ? formatDate(lastAcerto.data) : 'N/A'}
-            </span>
+            {loading ? (
+              <Skeleton className="h-5 w-32" />
+            ) : (
+              <span
+                className={cn(
+                  'text-sm font-medium',
+                  !lastAcerto?.data && 'text-muted-foreground italic text-xs',
+                )}
+              >
+                {lastAcerto?.data
+                  ? formatDate(lastAcerto.data)
+                  : 'Nenhum acerto encontrado'}
+              </span>
+            )}
           </div>
           <div>
             <Label className="text-xs text-muted-foreground font-semibold block mb-1">
               Hora do último Acerto:
             </Label>
-            <span className="text-sm font-medium">
-              {lastAcerto?.hora || 'N/A'}
-            </span>
+            {loading ? (
+              <Skeleton className="h-5 w-20" />
+            ) : (
+              <span className="text-sm font-medium">
+                {lastAcerto?.hora || '-'}
+              </span>
+            )}
           </div>
           <div>
             <Label className="text-xs text-muted-foreground font-semibold block mb-1">
               Data da Captação:
             </Label>
-            <span className="text-sm font-medium">
-              {lastAcerto?.captacao ? formatDate(lastAcerto.captacao) : 'N/A'}
-            </span>
+            {loading ? (
+              <Skeleton className="h-5 w-32" />
+            ) : (
+              <span className="text-sm font-medium">
+                {lastAcerto?.captacao ? formatDate(lastAcerto.captacao) : 'N/A'}
+              </span>
+            )}
           </div>
         </div>
       </CardContent>

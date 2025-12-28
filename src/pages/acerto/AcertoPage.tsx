@@ -383,7 +383,11 @@ export default function AcertoPage() {
               )}
             </div>
 
-            <ClientDetails client={client} lastAcerto={lastAcerto} />
+            <ClientDetails
+              client={client}
+              lastAcerto={lastAcerto}
+              loading={loadingStatus}
+            />
 
             {!isClientConfirmed && !loadingStatus && (
               <div className="flex flex-col sm:flex-row gap-4 pt-2">
