@@ -198,6 +198,9 @@ export default function AcertoPage() {
 
       setMode(selectedMode)
       setAcertoTipo(selectedMode === 'CAPTACAO' ? 'CAPTAÇÃO' : 'ACERTO')
+      if (selectedMode === 'CAPTACAO') {
+        setPayments([])
+      }
       setIsClientConfirmed(true)
     } catch (error) {
       console.error('Error confirming client:', error)
@@ -231,6 +234,7 @@ export default function AcertoPage() {
     // Automatically switch mode if needed for consistency, but keep as ACERTO for COMPLEMENTO
     if (value === 'CAPTAÇÃO') {
       setMode('CAPTACAO')
+      setPayments([]) // Clear payments when switching to Captação
     } else {
       setMode('ACERTO')
     }
@@ -364,8 +368,10 @@ export default function AcertoPage() {
     }
 
     // STRICT VALIDATION
-    // 1. Mandatory Payment
-    if (payments.length === 0) {
+    // 1. Mandatory Payment (Skipped for CAPTAÇÃO)
+    const isCaptacao = acertoTipo === 'CAPTAÇÃO' || mode === 'CAPTACAO'
+
+    if (!isCaptacao && payments.length === 0) {
       toast({
         title: 'Pagamento Obrigatório',
         description:
@@ -376,6 +382,7 @@ export default function AcertoPage() {
     }
 
     // 2. Negative Debt Check (Overpayment)
+    // Only applied if payments exist (which is 0 for Captação, so safe)
     if (totalPaid > valorAcerto + 0.01) {
       toast({
         title: 'Débito Negativo',
@@ -697,6 +704,7 @@ export default function AcertoPage() {
             saldoAPagar={valorAcerto}
             payments={payments}
             onPaymentsChange={setPayments}
+            disabled={acertoTipo === 'CAPTAÇÃO' || mode === 'CAPTACAO'}
           />
 
           {/* New History Table (Replacing Settlement Summary) */}

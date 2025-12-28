@@ -31,12 +31,14 @@ interface AcertoPaymentSummaryProps {
   saldoAPagar: number
   payments: PaymentEntry[]
   onPaymentsChange: (payments: PaymentEntry[]) => void
+  disabled?: boolean
 }
 
 export function AcertoPaymentSummary({
   saldoAPagar,
   payments,
   onPaymentsChange,
+  disabled = false,
 }: AcertoPaymentSummaryProps) {
   const totalPaid = payments.reduce((acc, p) => acc + p.value, 0)
   const remaining = saldoAPagar - totalPaid
@@ -48,6 +50,8 @@ export function AcertoPaymentSummary({
   }, [])
 
   const handleToggleMethod = (method: PaymentMethodType, checked: boolean) => {
+    if (disabled) return
+
     if (checked) {
       // Add method
       // Default value is remaining balance (or 0 if negative)
@@ -84,6 +88,8 @@ export function AcertoPaymentSummary({
     field: keyof PaymentEntry,
     value: any,
   ) => {
+    if (disabled) return
+
     onPaymentsChange(
       payments.map((p) => {
         if (p.method !== method) return p
@@ -120,6 +126,8 @@ export function AcertoPaymentSummary({
     field: keyof PaymentInstallment,
     value: any,
   ) => {
+    if (disabled) return
+
     onPaymentsChange(
       payments.map((p) => {
         if (p.method !== method || !p.details) return p
@@ -162,9 +170,11 @@ export function AcertoPaymentSummary({
           <div
             className={cn(
               'flex flex-col space-y-1 p-3 rounded-lg border shadow-sm',
-              isComplete
-                ? 'bg-green-50 border-green-200 text-green-900'
-                : 'bg-yellow-50 border-yellow-200 text-yellow-900',
+              disabled
+                ? 'bg-gray-100 border-gray-200 text-gray-500 opacity-70'
+                : isComplete
+                  ? 'bg-green-50 border-green-200 text-green-900'
+                  : 'bg-yellow-50 border-yellow-200 text-yellow-900',
             )}
           >
             <span className="text-sm font-medium flex items-center gap-1">
@@ -174,9 +184,14 @@ export function AcertoPaymentSummary({
               <span className="text-3xl font-bold">
                 R$ {formatCurrency(totalPaid)}
               </span>
-              {!isComplete && (
+              {!isComplete && !disabled && (
                 <span className="text-sm font-medium mb-1">
                   (Restante: R$ {formatCurrency(remaining)})
+                </span>
+              )}
+              {disabled && (
+                <span className="text-sm font-medium mb-1 italic">
+                  (Pagamento Desabilitado)
                 </span>
               )}
             </div>
@@ -194,8 +209,11 @@ export function AcertoPaymentSummary({
                 <div
                   key={method}
                   className={cn(
-                    'flex items-center space-x-2 border rounded-md p-3 transition-colors cursor-pointer hover:bg-muted',
-                    isSelected
+                    'flex items-center space-x-2 border rounded-md p-3 transition-colors',
+                    disabled
+                      ? 'cursor-not-allowed opacity-50 bg-muted/50'
+                      : 'cursor-pointer hover:bg-muted',
+                    isSelected && !disabled
                       ? 'bg-primary/5 border-primary shadow-sm'
                       : 'bg-card',
                   )}
@@ -204,13 +222,17 @@ export function AcertoPaymentSummary({
                   <Checkbox
                     id={`chk-${method}`}
                     checked={isSelected}
+                    disabled={disabled}
                     onCheckedChange={(c) =>
                       handleToggleMethod(method, c as boolean)
                     }
                   />
                   <Label
                     htmlFor={`chk-${method}`}
-                    className="cursor-pointer font-medium text-sm"
+                    className={cn(
+                      'font-medium text-sm',
+                      disabled ? 'cursor-not-allowed' : 'cursor-pointer',
+                    )}
                   >
                     {method}
                   </Label>
@@ -230,10 +252,13 @@ export function AcertoPaymentSummary({
               {payments.map((entry) => (
                 <div
                   key={entry.method}
-                  className="bg-card border rounded-lg p-4 shadow-sm animate-slide-up space-y-4"
+                  className={cn(
+                    'bg-card border rounded-lg p-4 shadow-sm animate-slide-up space-y-4',
+                    disabled && 'opacity-60 pointer-events-none',
+                  )}
                 >
                   <div className="flex flex-col md:flex-row gap-4 items-start md:items-end">
-                    {/* Method Column - Decreased Width */}
+                    {/* Method Column */}
                     <div className="w-full md:w-32 shrink-0">
                       <Label className="text-xs text-muted-foreground font-bold uppercase mb-1.5 block">
                         Método
@@ -243,7 +268,7 @@ export function AcertoPaymentSummary({
                       </div>
                     </div>
 
-                    {/* Value Column - Increased Width (flex-1) */}
+                    {/* Value Column */}
                     <div className="w-full md:flex-1">
                       <Label className="text-xs font-medium mb-1.5 block">
                         Valor Total Pago
@@ -258,6 +283,7 @@ export function AcertoPaymentSummary({
                           min="0"
                           className="pl-9 font-bold text-lg h-10"
                           value={entry.value}
+                          disabled={disabled}
                           onChange={(e) =>
                             handleUpdateEntry(
                               entry.method,
@@ -275,6 +301,7 @@ export function AcertoPaymentSummary({
                       </Label>
                       <Select
                         value={entry.installments.toString()}
+                        disabled={disabled}
                         onValueChange={(val) =>
                           handleUpdateEntry(
                             entry.method,
@@ -307,6 +334,7 @@ export function AcertoPaymentSummary({
                           type="date"
                           className="h-10"
                           value={entry.dueDate}
+                          disabled={disabled}
                           onChange={(e) =>
                             handleUpdateEntry(
                               entry.method,
@@ -343,6 +371,7 @@ export function AcertoPaymentSummary({
                                 step="0.01"
                                 className="h-8 pl-7 text-sm"
                                 value={inst.value}
+                                disabled={disabled}
                                 onChange={(e) =>
                                   handleUpdateInstallment(
                                     entry.method,
@@ -358,6 +387,7 @@ export function AcertoPaymentSummary({
                                 type="date"
                                 className="h-8 text-sm"
                                 value={inst.dueDate}
+                                disabled={disabled}
                                 onChange={(e) =>
                                   handleUpdateInstallment(
                                     entry.method,
@@ -376,7 +406,7 @@ export function AcertoPaymentSummary({
                 </div>
               ))}
             </div>
-            {!isComplete && (
+            {!isComplete && !disabled && (
               <div className="flex items-center gap-2 text-yellow-600 bg-yellow-50 p-3 rounded-md border border-yellow-200 text-sm">
                 <AlertTriangle className="h-4 w-4" />
                 <span>
