@@ -28,6 +28,7 @@ import { ClientSearch } from '@/components/acerto/ClientSearch'
 import { ClientDetails } from '@/components/acerto/ClientDetails'
 import { cn } from '@/lib/utils'
 import { parseCurrency } from '@/lib/formatters'
+import { Skeleton } from '@/components/ui/skeleton'
 
 export default function AcertoPage() {
   const { employee } = useUserStore()
@@ -389,23 +390,38 @@ export default function AcertoPage() {
 
             {!isClientConfirmed && (
               <div className="flex flex-col sm:flex-row gap-4 pt-2">
-                <Button
-                  onClick={() => handleConfirmClient('ACERTO')}
-                  className="bg-green-600 hover:bg-green-700 text-white min-w-[160px]"
-                  size="lg"
-                >
-                  <Check className="mr-2 h-5 w-5" />
-                  ACERTO CLIENTE
-                </Button>
-
-                <Button
-                  onClick={() => handleConfirmClient('CAPTACAO')}
-                  className="bg-gray-200 hover:bg-gray-300 text-gray-900 min-w-[160px]"
-                  size="lg"
-                >
-                  <Check className="mr-2 h-5 w-5" />
-                  CAPTAÇÃO
-                </Button>
+                {loadingLastAcerto ? (
+                  <>
+                    <Skeleton className="h-11 w-[160px] rounded-md" />
+                  </>
+                ) : (
+                  <>
+                    {/* 
+                      Visibility Logic:
+                      - If Last Acerto exists -> Show ACERTO CLIENTE only
+                      - If Last Acerto does NOT exist -> Show CAPTAÇÃO only
+                    */}
+                    {lastAcerto ? (
+                      <Button
+                        onClick={() => handleConfirmClient('ACERTO')}
+                        className="bg-green-600 hover:bg-green-700 text-white min-w-[160px]"
+                        size="lg"
+                      >
+                        <Check className="mr-2 h-5 w-5" />
+                        ACERTO CLIENTE
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={() => handleConfirmClient('CAPTACAO')}
+                        className="bg-gray-200 hover:bg-gray-300 text-gray-900 min-w-[160px]"
+                        size="lg"
+                      >
+                        <Check className="mr-2 h-5 w-5" />
+                        CAPTAÇÃO
+                      </Button>
+                    )}
+                  </>
+                )}
               </div>
             )}
           </div>
