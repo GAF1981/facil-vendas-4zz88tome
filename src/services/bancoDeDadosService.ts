@@ -91,7 +91,7 @@ export const bancoDeDadosService = {
     const dataAcertoStr = format(date, 'yyyy-MM-dd')
     const horaAcerto = format(date, 'HH:mm:ss')
 
-    // 2. Fetch current product prices
+    // 2. Fetch current product prices (Automated Price Lookup)
     const productIds = items.map((i) => i.produtoId)
 
     // Guard against empty items list
@@ -111,7 +111,7 @@ export const bancoDeDadosService = {
 
     // 3. Prepare rows
     const rowsToInsert = items.map((item) => {
-      // Get current price from DB
+      // Get current official price from DB
       const currentPrice = priceMap.get(item.produtoId) || item.precoUnitario
 
       // Calculate derived values
@@ -143,7 +143,7 @@ export const bancoDeDadosService = {
         valorConsignadoVendaVal - valorConsignadoVendaVal * discountFactor
 
       return {
-        // Explicitly set ID VENDA ITENS as per User Story
+        // Explicitly set ID VENDA ITENS
         'ID VENDA ITENS': item.idVendaItens,
 
         'NÚMERO DO PEDIDO': nextPedido,
@@ -158,7 +158,7 @@ export const bancoDeDadosService = {
 
         'DESCONTO POR GRUPO': client.Desconto,
 
-        // Explicitly map Product Code and Name as per User Story
+        // Explicitly map Product Code and Name
         'COD. PRODUTO': item.produtoCodigo ?? null,
         MERCADORIA: item.produtoNome,
 
@@ -175,13 +175,13 @@ export const bancoDeDadosService = {
         'VALOR VENDIDO': formatCurrency(valorVendidoVal),
         'VALOR VENDA PRODUTO': formatCurrency(valorVendidoVal),
 
-        'SALDO FINAL': saldoFinal,
+        // Automated population of PREÇO VENDIDO based on product catalog
+        'PREÇO VENDIDO': formatCurrency(currentPrice),
 
-        // VALENTIA column reference removed as it is obsolete
+        'SALDO FINAL': saldoFinal,
 
         'NOVAS CONSIGNAÇÕES': formatCurrency(novasConsignacoesVal),
 
-        // Using the corrected column name
         RECOLHIDO: formatCurrency(recolhidoVal),
 
         'VALOR CONSIGNADO TOTAL (Preço Venda)': formatCurrency(
