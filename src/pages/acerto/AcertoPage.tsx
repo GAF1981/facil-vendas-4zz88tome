@@ -346,7 +346,9 @@ export default function AcertoPage() {
   const valorDesconto = totalVendido * discountFactor
   const valorAcerto = totalVendido - valorDesconto
 
-  const totalPaid = payments.reduce((acc, p) => acc + p.value, 0)
+  // Use registered value (p.value) for validation against "Saldo a Pagar"
+  const totalRegistered = payments.reduce((acc, p) => acc + p.value, 0)
+  const totalPaid = payments.reduce((acc, p) => acc + p.paidValue, 0)
 
   const handleSaveClick = () => {
     if (!client || !employee) {
@@ -383,11 +385,11 @@ export default function AcertoPage() {
 
     // 2. Negative Debt Check (Overpayment)
     // Only applied if payments exist (which is 0 for Captação, so safe)
-    if (totalPaid > valorAcerto + 0.01) {
+    if (totalRegistered > valorAcerto + 0.01) {
       toast({
         title: 'Débito Negativo',
         description:
-          'O valor total pago não pode exceder o saldo a pagar. O débito não pode ser negativo.',
+          'O valor total registrado não pode exceder o saldo a pagar. O débito não pode ser negativo.',
         variant: 'destructive',
       })
       return

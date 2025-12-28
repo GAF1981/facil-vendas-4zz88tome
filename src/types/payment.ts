@@ -8,7 +8,8 @@ export interface PaymentInstallment {
 
 export interface PaymentEntry {
   method: PaymentMethodType
-  value: number
+  value: number // Maps to "Valor Registrado"
+  paidValue: number // Maps to "Valor Pago"
   installments: number
   dueDate: string
   details?: PaymentInstallment[] // For granular control

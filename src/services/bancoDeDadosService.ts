@@ -272,41 +272,6 @@ export const bancoDeDadosService = {
       return dtB - dtA
     })
 
-    const orderIds = orders.map((o) => o.id)
-
-    // Fetch payments from RECEBIMENTOS for these orders
-    const paymentsInfoMap = new Map<
-      number,
-      { total: number; methods: Set<string>; abatimento: number }
-    >()
-
-    if (orderIds.length > 0) {
-      const { data: paymentsData, error: paymentsError } = await supabase
-        .from('RECEBIMENTOS')
-        .select('venda_id, valor_pago, forma_pagamento')
-        .in('venda_id', orderIds)
-
-      if (!paymentsError && paymentsData) {
-        paymentsData.forEach((p) => {
-          const current = paymentsInfoMap.get(p.venda_id) || {
-            total: 0,
-            methods: new Set(),
-            abatimento: 0,
-          }
-          const val = Number(p.valor_pago) || 0
-          current.total += val
-          if (p.forma_pagamento) current.methods.add(p.forma_pagamento)
-
-          // Logic: Only 'Dinheiro' and 'Cheque' abate the debt
-          if (['Dinheiro', 'Cheque'].includes(p.forma_pagamento)) {
-            current.abatimento += val
-          }
-
-          paymentsInfoMap.set(p.venda_id, current)
-        })
-      }
-    }
-
     // Process calculated fields and financial data
     const result = orders.map((order) => {
       const descontoStr = order.desconto || '0'
@@ -315,23 +280,49 @@ export const bancoDeDadosService = {
       const valorDesconto = order.valorVendaTotal * discountFactor
       const saldoAPagar = order.valorVendaTotal - valorDesconto
 
-      // Prioritize RECEBIMENTOS table
-      const paymentInfo = paymentsInfoMap.get(order.id)
-      let valorPago = paymentInfo?.total || 0
-      let valorAbatimento = paymentInfo?.abatimento || 0
-      let methods = paymentInfo ? Array.from(paymentInfo.methods) : []
+      // Retrieve "Valor Pago" from DETALHES_PAGAMENTO (JSON)
+      // This is the new logic requested by User Story
+      let valorPago = 0
+      let valorAbatimento = 0
+      let methods: string[] = []
 
-      // If no payment found in RECEBIMENTOS (or value is 0), try to use the legacy JSON column from BANCO_DE_DADOS
-      if (valorPago === 0 && Array.isArray(order.pagamentos)) {
+      if (Array.isArray(order.pagamentos)) {
+        // Calculate Total Paid Value from JSON (New logic)
         valorPago = order.pagamentos.reduce(
-          (acc: number, p: any) => acc + (Number(p.value) || 0),
+          (acc: number, p: any) => acc + (Number(p.paidValue) || 0),
           0,
         )
 
-        // Calculate legacy abatement
+        // If valorPago is 0, check if it is a legacy record where we only had 'value'
+        // Legacy check: If 'paidValue' property is missing or undefined in ALL entries, fallback to 'value'
+        // However, if it's a new record with paidValue=0 (e.g. future boleto), we want 0.
+        // Heuristic: If ANY entry has 'paidValue' property defined (even 0), we assume it's new structure.
+        const isNewStructure = order.pagamentos.some(
+          (p: any) => 'paidValue' in p,
+        )
+
+        if (!isNewStructure) {
+          // Legacy Fallback: Use 'value' as 'Valor Pago' (assuming legacy records were immediate payments or effectively paid)
+          // Or should we trust RECEBIMENTOS for legacy?
+          // The previous code preferred RECEBIMENTOS, then JSON.
+          // Now instructions say "retrieve data from the new 'Valor Pago' field saved within the detailing items".
+          // I will use 'value' as legacy fallback for 'paidValue'.
+          valorPago = order.pagamentos.reduce(
+            (acc: number, p: any) => acc + (Number(p.value) || 0),
+            0,
+          )
+        }
+
+        // Calculate legacy abatement logic (Dinheiro/Cheque) to determine 'Debito'
+        // Abatement usually depends on the payment method type, regardless of whether it's registered or paid?
+        // Usually, only what is PAID abates the immediate debt.
+        // So I should use 'paidValue' for abatement too.
         valorAbatimento = order.pagamentos.reduce((acc: number, p: any) => {
           const method = p.method
-          const val = Number(p.value) || 0
+          const val = isNewStructure
+            ? Number(p.paidValue) || 0
+            : Number(p.value) || 0
+
           if (['Dinheiro', 'Cheque'].includes(method)) {
             return acc + val
           }
@@ -346,9 +337,8 @@ export const bancoDeDadosService = {
       const uniqueMethods = [...new Set(methods)].join(', ')
 
       // Logic:
-      // Valor Pago -> Total amount paid (for records)
+      // Valor Pago -> Total amount paid (retrieved from JSON)
       // Debito -> Saldo a Pagar minus only specific methods (Dinheiro/Cheque)
-      // Pix/Boleto do NOT abate the debt in this summary.
       const debito = saldoAPagar - valorAbatimento
 
       return {
@@ -421,7 +411,8 @@ export const bancoDeDadosService = {
     // Construct Payment String (FORMA)
     const paymentString = payments
       .map(
-        (p) => `${p.method} R$ ${formatCurrency(p.value)} (${p.installments}x)`,
+        (p) =>
+          `${p.method} Reg: R$ ${formatCurrency(p.value)} Pago: R$ ${formatCurrency(p.paidValue)} (${p.installments}x)`,
       )
       .join(' | ')
 
@@ -495,6 +486,8 @@ export const bancoDeDadosService = {
     if (error) throw error
 
     // 5. Insert into RECEBIMENTOS
+    // Logic: RECEBIMENTOS table tracks the schedule of payments (Registered Value).
+    // The history display relies on JSON `paidValue` for "Valor Pago", but RECEBIMENTOS is useful for cash flow forecast.
     const recebimentosToInsert: RecebimentoInsert[] = []
 
     payments.forEach((payment) => {
@@ -524,7 +517,7 @@ export const bancoDeDadosService = {
           cliente_id: client.CODIGO,
           funcionario_id: employee.id,
           forma_pagamento: payment.method,
-          valor_pago: payment.value,
+          valor_pago: payment.value, // Keep inserting Registered Value to track the "Receivable"
           // Use dueDate if available (set to 12:00 to avoid timezone issues), otherwise now
           data_pagamento: payment.dueDate
             ? new Date(`${payment.dueDate}T12:00:00`).toISOString()
@@ -540,8 +533,6 @@ export const bancoDeDadosService = {
 
       if (recebimentosError) {
         console.error('Error inserting recebimentos:', recebimentosError)
-        // Throw error to alert failure even if BANCO_DE_DADOS insert was successful
-        // This ensures the caller knows something went wrong with critical financial data
         throw recebimentosError
       }
     }
