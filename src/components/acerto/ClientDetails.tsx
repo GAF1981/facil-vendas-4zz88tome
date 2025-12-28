@@ -3,16 +3,34 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { Clock } from 'lucide-react'
 
 interface ClientDetailsProps {
   client: ClientRow
-  lastAcertoDate?: string | null
+  lastAcerto?: { date: string; time: string } | null
 }
 
-export function ClientDetails({ client, lastAcertoDate }: ClientDetailsProps) {
-  const formattedDate = lastAcertoDate
-    ? format(parseISO(lastAcertoDate), 'dd/MM/yyyy', { locale: ptBR })
-    : 'Nenhum acerto encontrado'
+export function ClientDetails({ client, lastAcerto }: ClientDetailsProps) {
+  let formattedDate = 'Nenhum acerto encontrado'
+  let formattedTime = ''
+
+  if (lastAcerto?.date) {
+    try {
+      // Assuming date comes as YYYY-MM-DD from the DB
+      const dateObj = parseISO(lastAcerto.date)
+      formattedDate = format(dateObj, 'dd/MM/yyyy', { locale: ptBR })
+    } catch (e) {
+      formattedDate = lastAcerto.date
+    }
+
+    if (lastAcerto.time) {
+      // Try to keep HH:mm if it's longer
+      formattedTime =
+        lastAcerto.time.length >= 5
+          ? lastAcerto.time.substring(0, 5)
+          : lastAcerto.time
+    }
+  }
 
   return (
     <Card className="bg-muted/30 border-primary/20">
@@ -52,11 +70,19 @@ export function ClientDetails({ client, lastAcertoDate }: ClientDetailsProps) {
           </div>
           <div>
             <Label className="text-xs text-muted-foreground">
-              Data do último Acerto:
+              Data do último Acerto
             </Label>
-            <p className="font-medium truncate text-base text-blue-600">
-              {formattedDate}
-            </p>
+            <div className="flex flex-col">
+              <p className="font-medium truncate text-base text-blue-600">
+                {formattedDate}
+              </p>
+              {formattedTime && (
+                <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
+                  <Clock className="h-3 w-3" />
+                  <span>{formattedTime}</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </CardContent>

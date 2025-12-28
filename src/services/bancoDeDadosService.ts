@@ -77,21 +77,29 @@ export const bancoDeDadosService = {
     return max + 1
   },
 
-  async getLastAcertoDate(clienteId: number): Promise<string | null> {
+  async getLastAcerto(
+    clienteId: number,
+  ): Promise<{ date: string; time: string } | null> {
     const { data, error } = await supabase
       .from('BANCO_DE_DADOS')
-      .select('"DATA DO ACERTO"')
+      .select('"DATA DO ACERTO", "HORA DO ACERTO"')
       .eq('COD. CLIENTE', clienteId)
       .order('"DATA DO ACERTO"', { ascending: false })
+      .order('"HORA DO ACERTO"', { ascending: false })
       .limit(1)
       .maybeSingle()
 
     if (error) {
-      console.error('Error fetching last acerto date:', error)
+      console.error('Error fetching last acerto:', error)
       return null
     }
 
-    return data?.['DATA DO ACERTO'] || null
+    if (!data) return null
+
+    return {
+      date: data['DATA DO ACERTO'] || '',
+      time: data['HORA DO ACERTO'] || '',
+    }
   },
 
   async saveTransaction(

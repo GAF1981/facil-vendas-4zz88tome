@@ -35,7 +35,10 @@ export default function AcertoPage() {
   const navigate = useNavigate()
 
   const [client, setClient] = useState<ClientRow | null>(null)
-  const [lastAcertoDate, setLastAcertoDate] = useState<string | null>(null)
+  const [lastAcerto, setLastAcerto] = useState<{
+    date: string
+    time: string
+  } | null>(null)
   const [isClientConfirmed, setIsClientConfirmed] = useState(false)
   const [currentTime, setCurrentTime] = useState(new Date())
   const [items, setItems] = useState<AcertoItem[]>([])
@@ -54,16 +57,16 @@ export default function AcertoPage() {
     return () => clearInterval(timer)
   }, [])
 
-  // Effect to fetch last acerto date when client is selected
+  // Effect to fetch last acerto (date and time) when client is selected
   useEffect(() => {
     if (client) {
-      setLastAcertoDate(null) // Reset while fetching
+      setLastAcerto(null) // Reset while fetching
       bancoDeDadosService
-        .getLastAcertoDate(client.CODIGO)
-        .then((date) => setLastAcertoDate(date))
-        .catch((err) => console.error('Error fetching last date', err))
+        .getLastAcerto(client.CODIGO)
+        .then((data) => setLastAcerto(data))
+        .catch((err) => console.error('Error fetching last acerto', err))
     } else {
-      setLastAcertoDate(null)
+      setLastAcerto(null)
     }
   }, [client])
 
@@ -374,7 +377,7 @@ export default function AcertoPage() {
               )}
             </div>
 
-            <ClientDetails client={client} lastAcertoDate={lastAcertoDate} />
+            <ClientDetails client={client} lastAcerto={lastAcerto} />
 
             {!isClientConfirmed && (
               <div className="flex flex-col sm:flex-row gap-4 pt-2">
