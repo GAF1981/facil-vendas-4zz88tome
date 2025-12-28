@@ -1,5 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
+import { PDFDocument, StandardFonts, rgb, degrees } from 'pdf-lib'
 import { corsHeaders } from '../_shared/cors.ts'
 
 const removeAccents = (str: string) => {
@@ -68,6 +68,7 @@ serve(async (req) => {
         font?: any
         align?: 'left' | 'right' | 'center'
         color?: any
+        rotate?: any
       } = {},
     ) => {
       const {
@@ -75,14 +76,18 @@ serve(async (req) => {
         font = fontRegular,
         align = 'left',
         color = rgb(0, 0, 0),
+        rotate = undefined,
       } = options
       const cleanText = removeAccents(text || '')
       const textWidth = font.widthOfTextAtSize(cleanText, size)
       let xPos = x
-      if (align === 'right') xPos = x - textWidth
-      if (align === 'center') xPos = x - textWidth / 2
+      // Alignment logic only applied if no rotation (or handle rotation alignment manually)
+      if (!rotate) {
+        if (align === 'right') xPos = x - textWidth
+        if (align === 'center') xPos = x - textWidth / 2
+      }
 
-      page.drawText(cleanText, { x: xPos, y: yPos, size, font, color })
+      page.drawText(cleanText, { x: xPos, y: yPos, size, font, color, rotate })
       return textWidth
     }
 
@@ -160,52 +165,46 @@ serve(async (req) => {
     drawText('ITENS DO PEDIDO', margins.left, y, { size: 12, font: fontBold })
     y -= 15
 
-    // Table Headers
+    // Table Headers - Optimized layout with Unit removed and shifted columns
     const colX = {
       prod: margins.left,
-      saldoIni: 280,
-      cont: 330,
-      venda: 380,
-      preco: 430,
+      saldoIni: 310,
+      cont: 370,
+      venda: 430,
+      // preco (Unit) Removed
       total: 490,
       saldoFin: 550,
     }
 
+    const headerHeight = 60 // Reserved height for vertical headers
+
     const drawHeaders = (currentY: number) => {
+      // Horizontal Header
       drawText('Produto', colX.prod, currentY, { size: 8, font: fontBold })
-      drawText('S.Ini', colX.saldoIni, currentY, {
-        size: 8,
-        font: fontBold,
-        align: 'right',
-      })
-      // Added Contagem Header
-      drawText('Contagem', colX.cont, currentY, {
-        size: 8,
-        font: fontBold,
-        align: 'right',
-      })
-      drawText('Q.Vend', colX.venda, currentY, {
-        size: 8,
-        font: fontBold,
-        align: 'right',
-      })
-      drawText('Unit', colX.preco, currentY, {
-        size: 8,
-        font: fontBold,
-        align: 'right',
-      })
-      drawText('Total', colX.total, currentY, {
-        size: 8,
-        font: fontBold,
-        align: 'right',
-      })
-      drawText('S.Fin', colX.saldoFin, currentY, {
-        size: 8,
-        font: fontBold,
-        align: 'right',
+
+      // Vertical Headers
+      const headers = [
+        { text: 'Saldo Inicial', x: colX.saldoIni },
+        { text: 'Contagem', x: colX.cont },
+        { text: 'Qtd. Vendida', x: colX.venda },
+        { text: 'Valor Total', x: colX.total },
+        { text: 'Saldo Final', x: colX.saldoFin },
+      ]
+
+      headers.forEach((h) => {
+        // Draw vertical text (rotated 90deg counter-clockwise)
+        // Adjust x to align roughly centered/right-ish relative to the column end
+        // h.x is the right boundary of the numeric column
+        drawText(h.text, h.x - 12, currentY, {
+          size: 8,
+          font: fontBold,
+          rotate: degrees(90),
+        })
       })
     }
 
+    // Reserve space for headers
+    y -= headerHeight
     drawHeaders(y)
 
     y -= 5
@@ -221,7 +220,16 @@ serve(async (req) => {
     for (const item of items) {
       if (checkPageBreak(20)) {
         // Redraw Headers on new page
+        y -= headerHeight
         drawHeaders(y)
+        y -= 10
+        // Redraw separator line
+        page.drawLine({
+          start: { x: margins.left, y },
+          end: { x: width - margins.right, y },
+          thickness: 1,
+          color: rgb(0.8, 0.8, 0.8),
+        })
         y -= 15
       }
 
@@ -242,10 +250,7 @@ serve(async (req) => {
         size: 8,
         align: 'right',
       })
-      drawText(formatCurrency(item.precoUnitario), colX.preco, y, {
-        size: 8,
-        align: 'right',
-      })
+      // Removed Unit Price
       drawText(formatCurrency(item.valorVendido), colX.total, y, {
         size: 8,
         align: 'right',
