@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase/client'
-import { Acerto, AcertoItem } from '@/types/acerto'
+import { Acerto } from '@/types/acerto'
 
 export const acertoService = {
   async getLastAcertoDate(clienteId: number) {
@@ -60,5 +60,19 @@ export const acertoService = {
     }
 
     return acertoData
+  },
+
+  async generatePdf(data: any) {
+    const { data: blob, error } = await supabase.functions.invoke(
+      'generate-pdf',
+      {
+        body: data,
+        // @ts-expect-error - responseType is valid in v2 but might be missing in types
+        responseType: 'blob',
+      },
+    )
+
+    if (error) throw error
+    return blob as Blob
   },
 }

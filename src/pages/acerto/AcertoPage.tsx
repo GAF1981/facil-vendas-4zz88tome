@@ -249,6 +249,8 @@ export default function AcertoPage() {
     setSaving(true)
     try {
       const now = new Date()
+
+      // 1. Save to Database
       await bancoDeDadosService.saveTransaction(
         client,
         employee,
@@ -257,12 +259,45 @@ export default function AcertoPage() {
         acertoTipo,
       )
 
+      // 2. Generate and Download PDF
+      try {
+        const total = items.reduce((acc, item) => acc + item.valorVendido, 0)
+
+        const pdfBlob = await acertoService.generatePdf({
+          client,
+          employee,
+          items,
+          date: now.toISOString(),
+          acertoTipo,
+          total,
+        })
+
+        // Trigger Download
+        const url = window.URL.createObjectURL(pdfBlob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `Pedido_${client.CODIGO}_${format(now, 'yyyyMMdd_HHmm')}.pdf`
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        window.URL.revokeObjectURL(url)
+      } catch (pdfError) {
+        console.error('Error generating PDF:', pdfError)
+        toast({
+          title: 'Erro ao gerar PDF',
+          description: 'O pedido foi salvo, mas o PDF não pôde ser gerado.',
+          variant: 'destructive',
+        })
+      }
+
+      // 3. Success Message (Required Text)
       toast({
-        title: 'Sucesso',
-        description: `${mode === 'CAPTACAO' ? 'Captação' : 'Acerto'} registrado com sucesso!`,
+        title: 'Pedido realizado com Sucesso',
+        description: 'Operação finalizada.',
         className: 'bg-green-50 border-green-200 text-green-900',
       })
 
+      // 4. Redirect
       setItems([])
       setClient(null)
       setIsClientConfirmed(false)
@@ -463,11 +498,16 @@ export default function AcertoPage() {
                 disabled={saving || items.length === 0}
               >
                 {saving ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Gerando PDF...
+                  </>
                 ) : (
-                  <Save className="mr-2 h-4 w-4" />
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Finalizar {mode === 'ACERTO' ? 'Acerto' : 'Captação'}
+                  </>
                 )}
-                Finalizar {mode === 'ACERTO' ? 'Acerto' : 'Captação'}
               </Button>
             </div>
           </div>
