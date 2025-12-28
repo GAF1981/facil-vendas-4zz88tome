@@ -45,6 +45,8 @@ serve(async (req) => {
       payments,
       history,
       monthlyAverage,
+      preview,
+      signature,
     } = await req.json()
 
     const pdfDoc = await PDFDocument.create()
@@ -95,6 +97,22 @@ serve(async (req) => {
         return true
       }
       return false
+    }
+
+    // PDF Preview Warning
+    if (preview) {
+      drawText(
+        "esse 'PDF é somente para visualização e confirmação do pedido'",
+        width / 2,
+        y + 20,
+        {
+          size: 14,
+          font: fontBold,
+          align: 'center',
+          color: rgb(1, 0, 0), // Red
+        },
+      )
+      y -= 10
     }
 
     // Header
@@ -380,6 +398,40 @@ serve(async (req) => {
     }
 
     y -= 20
+
+    // Signature Section
+    if (signature) {
+      checkPageBreak(100)
+      drawText('ASSINATURA DO CLIENTE', margins.left, y, {
+        size: 10,
+        font: fontBold,
+      })
+      y -= 10
+      // Decode Base64 and embed
+      try {
+        const base64Data = signature.split(',')[1]
+        const imageBytes = Uint8Array.from(atob(base64Data), (c) =>
+          c.charCodeAt(0),
+        )
+        const image = await pdfDoc.embedPng(imageBytes)
+        const imageDims = image.scale(0.5) // Scale down if needed
+
+        y -= imageDims.height
+        page.drawImage(image, {
+          x: margins.left,
+          y: y,
+          width: imageDims.width,
+          height: imageDims.height,
+        })
+        y -= 10
+      } catch (e) {
+        drawText('(Erro ao carregar assinatura)', margins.left, y, {
+          size: 8,
+          color: rgb(1, 0, 0),
+        })
+        y -= 20
+      }
+    }
 
     // NEW: Resumo de Acertos (Histórico)
     // Updated to match UI Columns: Data, Vendedor, Média Mensal, Valor da Venda, Saldo a Pagar, Valor Pago, Débito

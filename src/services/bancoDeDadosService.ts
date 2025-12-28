@@ -283,7 +283,6 @@ export const bancoDeDadosService = {
       // Retrieve "Valor Pago" from DETALHES_PAGAMENTO (JSON)
       // This is the new logic requested by User Story
       let valorPago = 0
-      let valorAbatimento = 0
       let methods: string[] = []
 
       if (Array.isArray(order.pagamentos)) {
@@ -295,39 +294,17 @@ export const bancoDeDadosService = {
 
         // If valorPago is 0, check if it is a legacy record where we only had 'value'
         // Legacy check: If 'paidValue' property is missing or undefined in ALL entries, fallback to 'value'
-        // However, if it's a new record with paidValue=0 (e.g. future boleto), we want 0.
-        // Heuristic: If ANY entry has 'paidValue' property defined (even 0), we assume it's new structure.
         const isNewStructure = order.pagamentos.some(
           (p: any) => 'paidValue' in p,
         )
 
         if (!isNewStructure) {
-          // Legacy Fallback: Use 'value' as 'Valor Pago' (assuming legacy records were immediate payments or effectively paid)
-          // Or should we trust RECEBIMENTOS for legacy?
-          // The previous code preferred RECEBIMENTOS, then JSON.
-          // Now instructions say "retrieve data from the new 'Valor Pago' field saved within the detailing items".
-          // I will use 'value' as legacy fallback for 'paidValue'.
+          // Legacy Fallback: Use 'value' as 'Valor Pago'
           valorPago = order.pagamentos.reduce(
             (acc: number, p: any) => acc + (Number(p.value) || 0),
             0,
           )
         }
-
-        // Calculate legacy abatement logic (Dinheiro/Cheque) to determine 'Debito'
-        // Abatement usually depends on the payment method type, regardless of whether it's registered or paid?
-        // Usually, only what is PAID abates the immediate debt.
-        // So I should use 'paidValue' for abatement too.
-        valorAbatimento = order.pagamentos.reduce((acc: number, p: any) => {
-          const method = p.method
-          const val = isNewStructure
-            ? Number(p.paidValue) || 0
-            : Number(p.value) || 0
-
-          if (['Dinheiro', 'Cheque'].includes(method)) {
-            return acc + val
-          }
-          return acc
-        }, 0)
 
         methods = order.pagamentos
           .map((p: any) => p.method)
@@ -336,10 +313,9 @@ export const bancoDeDadosService = {
 
       const uniqueMethods = [...new Set(methods)].join(', ')
 
-      // Logic:
-      // Valor Pago -> Total amount paid (retrieved from JSON)
-      // Debito -> Saldo a Pagar minus only specific methods (Dinheiro/Cheque)
-      const debito = saldoAPagar - valorAbatimento
+      // Logic updated per User Story:
+      // Debito = Saldo a Pagar - Valor Pago
+      const debito = saldoAPagar - valorPago
 
       return {
         ...order,
@@ -486,8 +462,6 @@ export const bancoDeDadosService = {
     if (error) throw error
 
     // 5. Insert into RECEBIMENTOS
-    // Logic: RECEBIMENTOS table tracks the schedule of payments (Registered Value).
-    // The history display relies on JSON `paidValue` for "Valor Pago", but RECEBIMENTOS is useful for cash flow forecast.
     const recebimentosToInsert: RecebimentoInsert[] = []
 
     payments.forEach((payment) => {

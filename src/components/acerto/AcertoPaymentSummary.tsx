@@ -16,6 +16,7 @@ import {
   Calendar,
   AlertTriangle,
   DollarSign,
+  Link as LinkIcon,
 } from 'lucide-react'
 import {
   PaymentEntry,
@@ -61,6 +62,7 @@ export function AcertoPaymentSummary({
         paidValue: 0,
         installments: 1,
         dueDate: dueDate,
+        autoFill: false,
       }
       onPaymentsChange([...payments, newEntry])
     } else {
@@ -94,6 +96,28 @@ export function AcertoPaymentSummary({
 
         const updated = { ...p, [field]: value }
 
+        // Logic for AutoFill Checked state change
+        if (field === 'autoFill') {
+          if (value === true) {
+            // Sync immediately when checked
+            updated.paidValue = updated.value
+          }
+        }
+
+        // Logic for Value change when AutoFill is ON
+        if (field === 'value') {
+          if (updated.autoFill) {
+            updated.paidValue = value as number
+          }
+
+          if (updated.installments > 1) {
+            updated.details = generateInstallments(
+              value as number,
+              updated.installments,
+            )
+          }
+        }
+
         if (field === 'installments') {
           const count = value as number
           if (count > 1) {
@@ -104,13 +128,6 @@ export function AcertoPaymentSummary({
             const dueDateDate = method === 'Boleto' ? addDays(today, 10) : today
             updated.dueDate = format(dueDateDate, 'yyyy-MM-dd')
           }
-        }
-
-        if (field === 'value' && p.installments > 1) {
-          updated.details = generateInstallments(
-            value as number,
-            p.installments,
-          )
         }
 
         return updated
@@ -138,7 +155,18 @@ export function AcertoPaymentSummary({
           newValue = newDetails.reduce((acc, curr) => acc + curr.value, 0)
         }
 
-        return { ...p, details: newDetails, value: newValue }
+        // If value changes and autofill is on, sync paidValue
+        let newPaidValue = p.paidValue
+        if (field === 'value' && p.autoFill) {
+          newPaidValue = newValue
+        }
+
+        return {
+          ...p,
+          details: newDetails,
+          value: newValue,
+          paidValue: newPaidValue,
+        }
       }),
     )
   }
@@ -289,6 +317,30 @@ export function AcertoPaymentSummary({
                       </div>
                     </div>
 
+                    <div className="flex items-center justify-center pb-1">
+                      <div
+                        className={cn(
+                          'flex flex-col items-center cursor-pointer',
+                          disabled && 'pointer-events-none opacity-50',
+                        )}
+                        title="Repetir Valor (Auto-preencher)"
+                      >
+                        <Label
+                          htmlFor={`autofill-${entry.method}`}
+                          className="text-[10px] text-muted-foreground mb-1 cursor-pointer"
+                        >
+                          Repetir
+                        </Label>
+                        <Checkbox
+                          id={`autofill-${entry.method}`}
+                          checked={!!entry.autoFill}
+                          onCheckedChange={(c) =>
+                            handleUpdateEntry(entry.method, 'autoFill', !!c)
+                          }
+                        />
+                      </div>
+                    </div>
+
                     <div className="w-full md:flex-1">
                       <Label className="text-xs font-medium mb-1.5 block text-green-700">
                         Valor Pago
@@ -303,7 +355,7 @@ export function AcertoPaymentSummary({
                           min="0"
                           className="pl-9 font-bold text-lg h-10 border-green-200 bg-green-50/20 text-green-700"
                           value={entry.paidValue}
-                          disabled={disabled}
+                          disabled={disabled || !!entry.autoFill}
                           onChange={(e) =>
                             handleUpdateEntry(
                               entry.method,
@@ -312,6 +364,11 @@ export function AcertoPaymentSummary({
                             )
                           }
                         />
+                        {entry.autoFill && (
+                          <div className="absolute right-3 top-2.5 text-green-600">
+                            <LinkIcon className="h-4 w-4" />
+                          </div>
+                        )}
                       </div>
                     </div>
 

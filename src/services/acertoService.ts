@@ -44,11 +44,18 @@ export const acertoService = {
     return acertoData
   },
 
-  async generatePdf(data: any) {
+  async generatePdf(
+    data: any,
+    options?: { preview?: boolean; signature?: string | null },
+  ) {
     const { data: blob, error } = await supabase.functions.invoke(
       'generate-pdf',
       {
-        body: data,
+        body: {
+          ...data,
+          preview: options?.preview ?? false,
+          signature: options?.signature ?? null,
+        },
         // @ts-expect-error - responseType is valid in v2 but might be missing in types
         responseType: 'blob',
       },

@@ -6,13 +6,6 @@ import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
   Loader2,
   Calendar,
   Clock,
@@ -20,6 +13,8 @@ import {
   ArrowLeft,
   Check,
   Copy,
+  FileText,
+  PenTool,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -52,6 +47,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { SignatureModal } from '@/components/acerto/SignatureModal'
 
 export default function AcertoPage() {
   const { employee } = useUserStore()
@@ -69,6 +65,7 @@ export default function AcertoPage() {
   const [currentTime, setCurrentTime] = useState(new Date())
   const [items, setItems] = useState<AcertoItem[]>([])
   const [saving, setSaving] = useState(false)
+  const [generatingPdf, setGeneratingPdf] = useState(false)
 
   const [mode, setMode] = useState<'ACERTO' | 'CAPTACAO'>('ACERTO')
   const [acertoTipo, setAcertoTipo] = useState<string>('ACERTO')
@@ -81,6 +78,10 @@ export default function AcertoPage() {
 
   // Confirmation Dialog State
   const [showZeroStockAlert, setShowZeroStockAlert] = useState(false)
+
+  // Signature State
+  const [signature, setSignature] = useState<string | null>(null)
+  const [showSignatureModal, setShowSignatureModal] = useState(false)
 
   // State for automatic order number
   const [nextOrderNumber, setNextOrderNumber] = useState<number | null>(null)
@@ -227,17 +228,7 @@ export default function AcertoPage() {
     setMode('ACERTO')
     setAcertoTipo('ACERTO')
     setPayments([])
-  }
-
-  const handleAcertoTipoChange = (value: string) => {
-    setAcertoTipo(value)
-    // Automatically switch mode if needed for consistency, but keep as ACERTO for COMPLEMENTO
-    if (value === 'CAPTAÇÃO') {
-      setMode('CAPTACAO')
-      setPayments([]) // Clear payments when switching to Captação
-    } else {
-      setMode('ACERTO')
-    }
+    setSignature(null)
   }
 
   const handleAddProducts = async (products: ProductRow[]) => {
@@ -377,14 +368,15 @@ export default function AcertoPage() {
   const totalRegistered = payments.reduce((acc, p) => acc + p.value, 0)
   const totalPaid = payments.reduce((acc, p) => acc + p.paidValue, 0)
 
-  const handleSaveClick = () => {
+  // Validation Logic
+  const validateAcerto = () => {
     if (!client || !employee) {
       toast({
         title: 'Dados incompletos',
         description: 'Verifique cliente e funcionário.',
         variant: 'destructive',
       })
-      return
+      return false
     }
 
     if (items.length === 0) {
@@ -393,7 +385,7 @@ export default function AcertoPage() {
         description: 'Adicione produtos antes de salvar.',
         variant: 'destructive',
       })
-      return
+      return false
     }
 
     // STRICT VALIDATION
@@ -407,7 +399,7 @@ export default function AcertoPage() {
           'É necessário selecionar pelo menos uma forma de pagamento e atribuir um valor.',
         variant: 'destructive',
       })
-      return
+      return false
     }
 
     // 2. Negative Debt Check (Overpayment)
@@ -419,8 +411,71 @@ export default function AcertoPage() {
           'O valor total registrado não pode exceder o saldo a pagar. O débito não pode ser negativo.',
         variant: 'destructive',
       })
-      return
+      return false
     }
+
+    return true
+  }
+
+  const preparePdfData = async (now: Date) => {
+    // Fetch history
+    let historyForPdf: any[] = []
+    try {
+      const history = await bancoDeDadosService.getAcertoHistory(client!.CODIGO)
+      historyForPdf = history.slice(0, 12)
+    } catch (e) {
+      console.error('Failed to fetch history for PDF', e)
+    }
+
+    return {
+      client,
+      employee,
+      items,
+      date: now.toISOString(),
+      acertoTipo,
+      // Financials
+      totalVendido,
+      valorDesconto,
+      valorAcerto,
+      valorPago: totalPaid,
+      debito: Math.max(0, valorAcerto - totalPaid),
+      // Payments
+      payments,
+      // New fields for PDF
+      history: historyForPdf,
+      monthlyAverage,
+    }
+  }
+
+  const handlePreviewPdf = async () => {
+    if (!validateAcerto()) return
+
+    setGeneratingPdf(true)
+    try {
+      const now = new Date()
+      const data = await preparePdfData(now)
+
+      const pdfBlob = await acertoService.generatePdf(data, {
+        preview: true,
+        signature: null, // Preview doesn't need signature yet? Or maybe it does? Requirement implies signature captured first, then preview? No, preview usually before signing or independent. I'll pass null for now.
+      })
+
+      const url = window.URL.createObjectURL(pdfBlob)
+      window.open(url, '_blank')
+    } catch (error) {
+      console.error('Error generating PDF preview:', error)
+      toast({
+        title: 'Erro no Preview',
+        description: 'Não foi possível gerar a visualização do PDF.',
+        variant: 'destructive',
+      })
+    } finally {
+      setGeneratingPdf(false)
+    }
+  }
+
+  const handleSaveClick = () => {
+    if (!validateAcerto()) return
 
     // Zero-Stock Validation
     const totalSaldoFinal = items.reduce(
@@ -443,20 +498,6 @@ export default function AcertoPage() {
 
       const now = new Date()
 
-      // Fetch history BEFORE saving to ensure we get previous transactions only
-      // We do this to populate the PDF history table
-      let historyForPdf: any[] = []
-      try {
-        const history = await bancoDeDadosService.getAcertoHistory(
-          client.CODIGO,
-        )
-        // Get only the last 12 records
-        historyForPdf = history.slice(0, 12)
-      } catch (e) {
-        console.error('Failed to fetch history for PDF', e)
-        // We continue even if history fails, just without history in PDF
-      }
-
       // 1. Save to Database
       await bancoDeDadosService.saveTransaction(
         client,
@@ -469,24 +510,10 @@ export default function AcertoPage() {
 
       // 2. Generate and Download PDF
       try {
-        const pdfBlob = await acertoService.generatePdf({
-          client,
-          employee,
-          items,
-          date: now.toISOString(),
-          acertoTipo,
-          // Financials
-          totalVendido,
-          // Stock movement summary removed from PDF, so we don't need to pass it
-          valorDesconto,
-          valorAcerto,
-          valorPago: totalPaid,
-          debito: Math.max(0, valorAcerto - totalPaid),
-          // Payments
-          payments,
-          // New fields for PDF
-          history: historyForPdf,
-          monthlyAverage,
+        const data = await preparePdfData(now)
+        const pdfBlob = await acertoService.generatePdf(data, {
+          preview: false,
+          signature: signature,
         })
 
         // Trigger Download
@@ -519,6 +546,7 @@ export default function AcertoPage() {
       setClient(null)
       setIsClientConfirmed(false)
       setPayments([])
+      setSignature(null)
       navigate('/')
     } catch (error: any) {
       console.error(error)
@@ -532,6 +560,15 @@ export default function AcertoPage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleSignatureSave = (dataUrl: string) => {
+    setSignature(dataUrl)
+    toast({
+      title: 'Assinatura salva',
+      description: 'A assinatura foi capturada com sucesso.',
+      className: 'bg-green-50 border-green-200 text-green-900',
+    })
   }
 
   return (
@@ -610,7 +647,7 @@ export default function AcertoPage() {
                   </>
                 ) : (
                   <>
-                    {/* 
+                    {/*
                       Visibility Logic:
                       - If Last Acerto exists -> Show ACERTO CLIENTE only
                       - If Last Acerto does NOT exist -> Show CAPTAÇÃO only
@@ -661,22 +698,6 @@ export default function AcertoPage() {
                 readOnly
                 className="w-24 h-9 font-mono text-center font-bold bg-muted"
               />
-            </div>
-
-            <div className="flex items-center gap-3 pb-2">
-              <Label className="text-sm font-bold text-muted-foreground uppercase w-32">
-                Acerto Tipo
-              </Label>
-              <Select value={acertoTipo} onValueChange={handleAcertoTipoChange}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Selecione..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ACERTO">ACERTO</SelectItem>
-                  <SelectItem value="CAPTAÇÃO">CAPTAÇÃO</SelectItem>
-                  <SelectItem value="COMPLEMENTO">COMPLEMENTO</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
           </div>
 
@@ -743,12 +764,33 @@ export default function AcertoPage() {
           />
 
           {/* Bottom Action Bar */}
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-card border p-4 rounded-lg shadow-sm">
-            <div className="text-sm text-muted-foreground">
-              {acertoTipo === 'CAPTAÇÃO' || acertoTipo === 'COMPLEMENTO'
-                ? '* A Contagem é preenchida automaticamente para este tipo de operação.'
-                : '* Verifique os totais antes de finalizar.'}
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-card border p-4 rounded-lg shadow-sm sticky bottom-4 z-50">
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                onClick={() => setShowSignatureModal(true)}
+                className={cn(
+                  'border border-muted-foreground/20',
+                  signature && 'bg-green-100 text-green-800 border-green-300',
+                )}
+              >
+                <PenTool className="mr-2 h-4 w-4" />
+                {signature ? 'Assinatura Capturada' : 'Assinatura'}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handlePreviewPdf}
+                disabled={generatingPdf || items.length === 0}
+              >
+                {generatingPdf ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <FileText className="mr-2 h-4 w-4" />
+                )}
+                PDF
+              </Button>
             </div>
+
             <div className="flex items-center gap-4">
               <div className="text-right">
                 <p className="text-sm text-muted-foreground">Total a Pagar</p>
@@ -762,14 +804,14 @@ export default function AcertoPage() {
               />
               <Button
                 size="lg"
-                className="w-full sm:w-auto"
+                className="w-full sm:w-auto min-w-[150px]"
                 onClick={handleSaveClick}
                 disabled={saving || items.length === 0}
               >
                 {saving ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Gerando PDF...
+                    Finalizando...
                   </>
                 ) : (
                   <>
@@ -807,6 +849,13 @@ export default function AcertoPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Signature Modal */}
+      <SignatureModal
+        open={showSignatureModal}
+        onOpenChange={setShowSignatureModal}
+        onSave={handleSignatureSave}
+      />
     </div>
   )
 }
