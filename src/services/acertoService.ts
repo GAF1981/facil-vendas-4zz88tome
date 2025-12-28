@@ -7,12 +7,13 @@ export const acertoService = {
     // 1. Get the absolute last transaction (Acerto) date for this client
     // 2. Get the last transaction that was specifically a "CAPTAÇÃO"
 
+    // Note: DATA DO ACERTO is now a native DATE column, ensuring correct chronological sorting.
     const [lastAcertoResult, lastCaptacaoResult] = await Promise.all([
       supabase
         .from('BANCO_DE_DADOS')
         .select('"DATA DO ACERTO", "HORA DO ACERTO"')
         .eq('COD. CLIENTE', clienteId)
-        .neq('DATA DO ACERTO', null) // Ensure we don't pick up null dates
+        .not('DATA DO ACERTO', 'is', null) // Explicitly filter out NULL dates
         .order('DATA DO ACERTO', { ascending: false })
         .order('HORA DO ACERTO', { ascending: false }) // Use time as tie-breaker
         .limit(1)
