@@ -410,6 +410,20 @@ export default function AcertoPage() {
 
       const now = new Date()
 
+      // Fetch history BEFORE saving to ensure we get previous transactions only
+      // We do this to populate the PDF history table
+      let historyForPdf: any[] = []
+      try {
+        const history = await bancoDeDadosService.getAcertoHistory(
+          client.CODIGO,
+        )
+        // Get only the last 12 records
+        historyForPdf = history.slice(0, 12)
+      } catch (e) {
+        console.error('Failed to fetch history for PDF', e)
+        // We continue even if history fails, just without history in PDF
+      }
+
       // 1. Save to Database
       await bancoDeDadosService.saveTransaction(
         client,
@@ -422,26 +436,6 @@ export default function AcertoPage() {
 
       // 2. Generate and Download PDF
       try {
-        const paymentString =
-          payments
-            .map((p) => `${p.method}: R$ ${formatCurrency(p.value)}`)
-            .join(' | ') || acertoTipo
-
-        // Calculate Consignment Totals (Value)
-        const consignmentSummary = items.reduce(
-          (acc, item) => {
-            const diff = item.saldoFinal - item.contagem
-            const price = item.precoUnitario
-            if (diff > 0) {
-              acc.novasConsignacoes += diff * price
-            } else if (diff < 0) {
-              acc.recolhido += Math.abs(diff) * price
-            }
-            return acc
-          },
-          { novasConsignacoes: 0, recolhido: 0 },
-        )
-
         const pdfBlob = await acertoService.generatePdf({
           client,
           employee,
@@ -450,14 +444,16 @@ export default function AcertoPage() {
           acertoTipo,
           // Financials
           totalVendido,
-          totalRecolhido: consignmentSummary.recolhido,
-          totalNovasConsignacoes: consignmentSummary.novasConsignacoes,
+          // Stock movement summary removed from PDF, so we don't need to pass it
           valorDesconto,
           valorAcerto,
           valorPago: totalPaid,
           debito: Math.max(0, valorAcerto - totalPaid),
           // Payments
           payments,
+          // New fields for PDF
+          history: historyForPdf,
+          monthlyAverage,
         })
 
         // Trigger Download

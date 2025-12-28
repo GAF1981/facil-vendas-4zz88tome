@@ -10,6 +10,21 @@ const formatCurrency = (value: number) => {
   return value.toFixed(2).replace('.', ',')
 }
 
+const formatDate = (dateStr: string) => {
+  if (!dateStr) return '-'
+  try {
+    // Expecting YYYY-MM-DD
+    const parts = dateStr.split('-')
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`
+    }
+    // Fallback
+    return new Date(dateStr).toLocaleDateString('pt-BR')
+  } catch {
+    return dateStr
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -23,13 +38,16 @@ serve(async (req) => {
       date,
       acertoTipo,
       totalVendido,
-      totalRecolhido,
-      totalNovasConsignacoes,
+      // Removed stock values from destructuring as they are no longer used
+      // totalRecolhido,
+      // totalNovasConsignacoes,
       valorDesconto,
       valorAcerto,
       valorPago,
       debito,
       payments,
+      history, // New field
+      monthlyAverage, // New field
     } = await req.json()
 
     const pdfDoc = await PDFDocument.create()
@@ -237,7 +255,6 @@ serve(async (req) => {
     // Financial Summary
     checkPageBreak(120)
 
-    const summaryY = y
     // Left Column: Values
     drawText('RESUMO FINANCEIRO', margins.left, y, {
       size: 10,
@@ -286,31 +303,9 @@ serve(async (req) => {
       y -= 12
     }
 
-    // Right Column: Stock Values
-    let rightY = summaryY - 15
-    const rightX = 300
+    // Removed "MOVIMENTACAO DE ESTOQUE" section as per new requirement
 
-    drawText('MOVIMENTACAO DE ESTOQUE (Valores)', rightX, rightY + 15, {
-      size: 10,
-      font: fontBold,
-    })
-
-    drawText('Novas Consignacoes:', rightX, rightY, { size: 9 })
-    drawText(
-      `R$ ${formatCurrency(totalNovasConsignacoes)}`,
-      rightX + 130,
-      rightY,
-      { size: 9, align: 'right' },
-    )
-    rightY -= 12
-
-    drawText('Recolhido:', rightX, rightY, { size: 9 })
-    drawText(`R$ ${formatCurrency(totalRecolhido)}`, rightX + 130, rightY, {
-      size: 9,
-      align: 'right',
-    })
-
-    y = Math.min(y, rightY) - 20
+    y -= 20
 
     // Payments Detail
     checkPageBreak(100)
@@ -362,6 +357,115 @@ serve(async (req) => {
       }
     } else {
       drawText('Nenhum pagamento registrado.', margins.left, y, { size: 9 })
+    }
+
+    y -= 20
+
+    // NEW: Resumo de Acertos (Histórico)
+    if (history && history.length > 0) {
+      checkPageBreak(150)
+      drawText('RESUMO DE ACERTOS (HISTÓRICO)', margins.left, y, {
+        size: 10,
+        font: fontBold,
+      })
+      y -= 15
+
+      // Header Coords
+      const histX = {
+        vend: margins.left,
+        data: margins.left + 110,
+        media: margins.left + 170,
+        venda: margins.left + 240,
+        saldo: margins.left + 310,
+        pago: margins.left + 380,
+        debito: margins.left + 450,
+      }
+
+      drawText('Vendedor', histX.vend, y, { size: 7, font: fontBold })
+      drawText('Data', histX.data, y, { size: 7, font: fontBold })
+      drawText('Média', histX.media, y, {
+        size: 7,
+        font: fontBold,
+        align: 'right',
+      })
+      drawText('Venda', histX.venda, y, {
+        size: 7,
+        font: fontBold,
+        align: 'right',
+      })
+      drawText('Saldo', histX.saldo, y, {
+        size: 7,
+        font: fontBold,
+        align: 'right',
+      })
+      drawText('Pago', histX.pago, y, {
+        size: 7,
+        font: fontBold,
+        align: 'right',
+      })
+      drawText('Débito', histX.debito, y, {
+        size: 7,
+        font: fontBold,
+        align: 'right',
+      })
+
+      y -= 5
+      page.drawLine({
+        start: { x: margins.left, y },
+        end: { x: width - margins.right, y },
+        thickness: 0.5,
+        color: rgb(0.6, 0.6, 0.6),
+      })
+      y -= 10
+
+      // Rows
+      const monthlyAverageFormatted = formatCurrency(monthlyAverage || 0)
+
+      for (const row of history) {
+        if (checkPageBreak(15)) {
+          drawText('RESUMO DE ACERTOS (HISTÓRICO) (cont.)', margins.left, y, {
+            size: 8,
+            font: fontBold,
+          })
+          y -= 15
+        }
+
+        drawText((row.vendedor || '-').substring(0, 20), histX.vend, y, {
+          size: 7,
+        })
+        drawText(formatDate(row.data), histX.data, y, { size: 7 })
+
+        // Média Mensal (same for all rows as requested)
+        drawText(monthlyAverageFormatted, histX.media, y, {
+          size: 7,
+          align: 'right',
+          color: rgb(0.5, 0.5, 0.5),
+        })
+
+        drawText(formatCurrency(row.valorVendaTotal), histX.venda, y, {
+          size: 7,
+          align: 'right',
+        })
+        drawText(formatCurrency(row.saldoAPagar), histX.saldo, y, {
+          size: 7,
+          align: 'right',
+          color: rgb(0, 0.2, 0.8), // Blue-ish
+        })
+        drawText(formatCurrency(row.valorPago), histX.pago, y, {
+          size: 7,
+          align: 'right',
+          color: rgb(0, 0.5, 0), // Green-ish
+        })
+        // Debito can be negative if overpaid? Usually not in this context, but handle max(0)
+        const debitoVal = Math.max(0, row.debito)
+        drawText(formatCurrency(debitoVal), histX.debito, y, {
+          size: 7,
+          align: 'right',
+          color: debitoVal > 0.01 ? rgb(0.8, 0, 0) : rgb(0.6, 0.6, 0.6),
+        })
+
+        y -= 10
+      }
     }
 
     const pdfBytes = await pdfDoc.save()
