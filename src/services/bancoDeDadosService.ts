@@ -251,12 +251,19 @@ export const bancoDeDadosService = {
     ] as number[]
 
     // 3. Fetch Payments from RECEBIMENTOS for these orders
-    let paymentsMap = new Map<number, { total: number; methods: Set<string> }>()
+    let paymentsMap = new Map<
+      number,
+      {
+        total: number
+        methods: Set<string>
+        details: { method: string; value: number; date: string }[]
+      }
+    >()
 
     if (orderIds.length > 0) {
       const { data: paymentsData, error: paymentsError } = await supabase
         .from('RECEBIMENTOS')
-        .select('venda_id, valor_pago, forma_pagamento')
+        .select('venda_id, valor_pago, forma_pagamento, data_pagamento')
         .in('venda_id', orderIds)
 
       if (paymentsError) {
@@ -268,9 +275,18 @@ export const bancoDeDadosService = {
           const existing = paymentsMap.get(p.venda_id) || {
             total: 0,
             methods: new Set<string>(),
+            details: [],
           }
           existing.total += p.valor_pago || 0
           if (p.forma_pagamento) existing.methods.add(p.forma_pagamento)
+
+          // Add detail
+          existing.details.push({
+            method: p.forma_pagamento,
+            value: p.valor_pago || 0,
+            date: p.data_pagamento || '',
+          })
+
           paymentsMap.set(p.venda_id, existing)
         })
       }
@@ -320,6 +336,7 @@ export const bancoDeDadosService = {
       const uniqueMethods = paymentInfo
         ? Array.from(paymentInfo.methods).join(', ')
         : '-'
+      const paymentDetails = paymentInfo ? paymentInfo.details : []
 
       // Debito = Saldo a Pagar - Valor Pago (Aggregated from RECEBIMENTOS)
       const debito = saldoAPagar - valorPago
@@ -330,6 +347,7 @@ export const bancoDeDadosService = {
         valorPago,
         debito: debito,
         methods: uniqueMethods,
+        paymentDetails,
         mediaMensal: null as number | null,
       }
     })

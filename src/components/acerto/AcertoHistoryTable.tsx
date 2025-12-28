@@ -9,11 +9,18 @@ import {
 } from '@/components/ui/table'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
 import { bancoDeDadosService } from '@/services/bancoDeDadosService'
 import { formatCurrency } from '@/lib/formatters'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { FileClock, Loader2, AlertCircle } from 'lucide-react'
+import { FileClock, Loader2, AlertCircle, Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export interface HistoryRow {
@@ -27,6 +34,7 @@ export interface HistoryRow {
   debito: number
   mediaMensal: number | null
   methods?: string
+  paymentDetails?: { method: string; value: number; date?: string }[]
 }
 
 interface AcertoHistoryTableProps {
@@ -52,6 +60,13 @@ export function AcertoHistoryTable({
   const [history, setHistory] = useState<HistoryRow[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
+
+  // State for Payment Details Modal
+  const [selectedPaymentDetails, setSelectedPaymentDetails] = useState<
+    { method: string; value: number; date?: string }[] | null
+  >(null)
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const [selectedOrderRef, setSelectedOrderRef] = useState<number | null>(null)
 
   useEffect(() => {
     // If external data is provided, use it and skip fetch
@@ -96,6 +111,12 @@ export function AcertoHistoryTable({
     }
   }
 
+  const handleShowDetails = (order: HistoryRow) => {
+    setSelectedPaymentDetails(order.paymentDetails || [])
+    setSelectedOrderRef(order.id)
+    setDetailsOpen(true)
+  }
+
   // Check if any order is currently selected
   const isAnyOrderSelected =
     selectedOrderId !== null && selectedOrderId !== undefined
@@ -114,139 +135,231 @@ export function AcertoHistoryTable({
   }
 
   return (
-    <Card
-      className={cn('border-muted bg-white dark:bg-card shadow-sm', className)}
-    >
-      {!hideHeader && (
-        <CardHeader className="pb-4">
-          <CardTitle className="text-lg font-semibold flex items-center gap-2">
-            <FileClock className="h-5 w-5 text-primary" />
-            Resumo de Acertos (Histórico)
-          </CardTitle>
-        </CardHeader>
-      )}
-      <CardContent className={cn('p-6', hideHeader && 'pt-6')}>
-        {error ? (
-          <div className="flex items-center gap-2 text-red-600 bg-red-50 p-4 rounded-md">
-            <AlertCircle className="h-5 w-5" />
-            <p>Erro ao carregar o histórico de acertos.</p>
-          </div>
-        ) : (
-          <div className="rounded-md border overflow-hidden">
-            <Table>
-              <TableHeader className="bg-muted/50">
-                <TableRow>
-                  <TableHead className="w-[80px]">Pedido</TableHead>
-                  <TableHead>Data do Acerto</TableHead>
-                  <TableHead>Vendedor</TableHead>
-                  <TableHead className="text-right">Média Mensal</TableHead>
-                  <TableHead className="text-right">Valor da Venda</TableHead>
-                  <TableHead className="text-right text-blue-600">
-                    Saldo a Pagar
-                  </TableHead>
-                  <TableHead className="text-right text-green-600">
-                    Valor Pago
-                  </TableHead>
-                  <TableHead className="text-right text-red-600">
-                    Débito
-                  </TableHead>
-                  {onSelectOrder && (
-                    <TableHead className="w-[50px]"></TableHead>
-                  )}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {history.length === 0 ? (
+    <>
+      <Card
+        className={cn(
+          'border-muted bg-white dark:bg-card shadow-sm',
+          className,
+        )}
+      >
+        {!hideHeader && (
+          <CardHeader className="pb-4">
+            <CardTitle className="text-lg font-semibold flex items-center gap-2">
+              <FileClock className="h-5 w-5 text-primary" />
+              Resumo de Acertos (Histórico)
+            </CardTitle>
+          </CardHeader>
+        )}
+        <CardContent className={cn('p-6', hideHeader && 'pt-6')}>
+          {error ? (
+            <div className="flex items-center gap-2 text-red-600 bg-red-50 p-4 rounded-md">
+              <AlertCircle className="h-5 w-5" />
+              <p>Erro ao carregar o histórico de acertos.</p>
+            </div>
+          ) : (
+            <div className="rounded-md border overflow-hidden">
+              <Table>
+                <TableHeader className="bg-muted/50">
                   <TableRow>
-                    <TableCell
-                      colSpan={onSelectOrder ? 9 : 8}
-                      className="h-24 text-center text-muted-foreground"
-                    >
-                      Nenhum histórico encontrado para este cliente.
-                    </TableCell>
+                    <TableHead className="w-[80px]">Pedido</TableHead>
+                    <TableHead>Data do Acerto</TableHead>
+                    <TableHead>Vendedor</TableHead>
+                    <TableHead className="text-right">Média Mensal</TableHead>
+                    <TableHead className="text-right">Valor da Venda</TableHead>
+                    <TableHead className="text-right text-blue-600">
+                      Saldo a Pagar
+                    </TableHead>
+                    <TableHead className="text-right text-green-600">
+                      Valor Pago
+                    </TableHead>
+                    <TableHead className="text-right text-red-600">
+                      Débito
+                    </TableHead>
+                    {onSelectOrder && (
+                      <TableHead className="w-[50px]"></TableHead>
+                    )}
                   </TableRow>
-                ) : (
-                  history.map((row) => {
-                    // Logic for checkbox visibility
-                    const isSelected = selectedOrderId === row.id
-                    const hasDebt = row.debito > 0.005 // Use epsilon for float comparison to ensure strict > 0.00
+                </TableHeader>
+                <TableBody>
+                  {history.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={onSelectOrder ? 9 : 8}
+                        className="h-24 text-center text-muted-foreground"
+                      >
+                        Nenhum histórico encontrado para este cliente.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    history.map((row) => {
+                      // Logic for checkbox visibility
+                      const isSelected = selectedOrderId === row.id
+                      const hasDebt = row.debito > 0.005 // Use epsilon for float comparison to ensure strict > 0.00
 
-                    // Show checkbox if:
-                    // 1. It is the selected row (so it can be deselected)
-                    // 2. OR (No row is selected AND it has debt)
-                    const showCheckbox =
-                      isSelected || (!isAnyOrderSelected && hasDebt)
+                      // Show checkbox if:
+                      // 1. It is the selected row (so it can be deselected)
+                      // 2. OR (No row is selected AND it has debt)
+                      const showCheckbox =
+                        isSelected || (!isAnyOrderSelected && hasDebt)
 
-                    return (
-                      <TableRow key={row.id} className="hover:bg-muted/30">
-                        <TableCell className="font-mono font-medium text-xs text-muted-foreground">
-                          #{row.id}
-                        </TableCell>
+                      return (
+                        <TableRow key={row.id} className="hover:bg-muted/30">
+                          <TableCell className="font-mono font-medium text-xs text-muted-foreground">
+                            #{row.id}
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            <div className="flex flex-col">
+                              <span>
+                                {row.data
+                                  ? format(parseISO(row.data), 'dd/MM/yyyy', {
+                                      locale: ptBR,
+                                    })
+                                  : '-'}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {row.hora
+                                  ? row.hora.split(':').slice(0, 2).join(':')
+                                  : ''}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell>{row.vendedor || '-'}</TableCell>
+                          <TableCell className="text-right font-mono text-muted-foreground">
+                            {row.mediaMensal !== null
+                              ? `R$ ${formatCurrency(row.mediaMensal)}`
+                              : '-'}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            R$ {formatCurrency(row.valorVendaTotal)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono font-medium text-blue-600 bg-blue-50/30">
+                            R$ {formatCurrency(row.saldoAPagar)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono font-medium text-green-600 bg-green-50/30 p-2">
+                            <div className="flex items-center justify-end gap-2">
+                              <span>R$ {formatCurrency(row.valorPago)}</span>
+                              {row.valorPago > 0 && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 text-green-700 hover:text-green-800 hover:bg-green-200"
+                                  onClick={() => handleShowDetails(row)}
+                                  title="Ver detalhes do pagamento"
+                                >
+                                  <Search className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell
+                            className={cn(
+                              'text-right font-mono font-medium',
+                              row.debito > 0.01
+                                ? 'text-red-600'
+                                : row.debito < -0.01
+                                  ? 'text-green-600'
+                                  : 'text-gray-400',
+                            )}
+                          >
+                            R$ {formatCurrency(row.debito)}
+                          </TableCell>
+                          {onSelectOrder && (
+                            <TableCell>
+                              {showCheckbox && (
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={(c) =>
+                                    handleCheckboxChange(row, c as boolean)
+                                  }
+                                  aria-label={`Selecionar pedido ${row.id}`}
+                                />
+                              )}
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      )
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Payment Details Dialog */}
+      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Detalhes do Pagamento</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between text-sm text-muted-foreground border-b pb-2">
+              <span>Pedido #{selectedOrderRef}</span>
+              <span>
+                Total Pago:{' '}
+                <span className="font-bold text-green-600">
+                  R${' '}
+                  {formatCurrency(
+                    selectedPaymentDetails?.reduce(
+                      (acc, curr) => acc + curr.value,
+                      0,
+                    ) || 0,
+                  )}
+                </span>
+              </span>
+            </div>
+
+            <div className="rounded-md border overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50">
+                    <TableHead>Método</TableHead>
+                    <TableHead>Data</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {!selectedPaymentDetails ||
+                  selectedPaymentDetails.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={3}
+                        className="text-center text-muted-foreground"
+                      >
+                        Nenhum detalhe encontrado.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    selectedPaymentDetails.map((detail, index) => (
+                      <TableRow key={index}>
                         <TableCell className="font-medium">
-                          <div className="flex flex-col">
-                            <span>
-                              {row.data
-                                ? format(parseISO(row.data), 'dd/MM/yyyy', {
-                                    locale: ptBR,
-                                  })
-                                : '-'}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {row.hora
-                                ? row.hora.split(':').slice(0, 2).join(':')
-                                : ''}
-                            </span>
-                          </div>
+                          {detail.method}
                         </TableCell>
-                        <TableCell>{row.vendedor || '-'}</TableCell>
-                        <TableCell className="text-right font-mono text-muted-foreground">
-                          {row.mediaMensal !== null
-                            ? `R$ ${formatCurrency(row.mediaMensal)}`
+                        <TableCell className="text-xs text-muted-foreground">
+                          {detail.date
+                            ? format(parseISO(detail.date), 'dd/MM/yyyy')
                             : '-'}
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          R$ {formatCurrency(row.valorVendaTotal)}
+                          R$ {formatCurrency(detail.value)}
                         </TableCell>
-                        <TableCell className="text-right font-mono font-medium text-blue-600 bg-blue-50/30">
-                          R$ {formatCurrency(row.saldoAPagar)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono font-medium text-green-600 bg-green-50/30">
-                          R$ {formatCurrency(row.valorPago)}
-                        </TableCell>
-                        <TableCell
-                          className={cn(
-                            'text-right font-mono font-medium',
-                            row.debito > 0.01
-                              ? 'text-red-600'
-                              : row.debito < -0.01
-                                ? 'text-green-600'
-                                : 'text-gray-400',
-                          )}
-                        >
-                          R$ {formatCurrency(row.debito)}
-                        </TableCell>
-                        {onSelectOrder && (
-                          <TableCell>
-                            {showCheckbox && (
-                              <Checkbox
-                                checked={isSelected}
-                                onCheckedChange={(c) =>
-                                  handleCheckboxChange(row, c as boolean)
-                                }
-                                aria-label={`Selecionar pedido ${row.id}`}
-                              />
-                            )}
-                          </TableCell>
-                        )}
                       </TableRow>
-                    )
-                  })
-                )}
-              </TableBody>
-            </Table>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <Button variant="outline" onClick={() => setDetailsOpen(false)}>
+                Fechar
+              </Button>
+            </div>
           </div>
-        )}
-      </CardContent>
-    </Card>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
