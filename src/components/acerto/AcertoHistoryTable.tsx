@@ -96,6 +96,10 @@ export function AcertoHistoryTable({
     }
   }
 
+  // Check if any order is currently selected
+  const isAnyOrderSelected =
+    selectedOrderId !== null && selectedOrderId !== undefined
+
   if (loading && !externalData) {
     return (
       <Card
@@ -162,67 +166,81 @@ export function AcertoHistoryTable({
                     </TableCell>
                   </TableRow>
                 ) : (
-                  history.map((row) => (
-                    <TableRow key={row.id} className="hover:bg-muted/30">
-                      <TableCell className="font-mono font-medium text-xs text-muted-foreground">
-                        #{row.id}
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        <div className="flex flex-col">
-                          <span>
-                            {row.data
-                              ? format(parseISO(row.data), 'dd/MM/yyyy', {
-                                  locale: ptBR,
-                                })
-                              : '-'}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {row.hora
-                              ? row.hora.split(':').slice(0, 2).join(':')
-                              : ''}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>{row.vendedor || '-'}</TableCell>
-                      <TableCell className="text-right font-mono text-muted-foreground">
-                        {row.mediaMensal !== null
-                          ? `R$ ${formatCurrency(row.mediaMensal)}`
-                          : '-'}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        R$ {formatCurrency(row.valorVendaTotal)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono font-medium text-blue-600 bg-blue-50/30">
-                        R$ {formatCurrency(row.saldoAPagar)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono font-medium text-green-600 bg-green-50/30">
-                        R$ {formatCurrency(row.valorPago)}
-                      </TableCell>
-                      <TableCell
-                        className={cn(
-                          'text-right font-mono font-medium',
-                          row.debito > 0.01
-                            ? 'text-red-600'
-                            : row.debito < -0.01
-                              ? 'text-green-600'
-                              : 'text-gray-400',
-                        )}
-                      >
-                        R$ {formatCurrency(row.debito)}
-                      </TableCell>
-                      {onSelectOrder && (
-                        <TableCell>
-                          <Checkbox
-                            checked={selectedOrderId === row.id}
-                            onCheckedChange={(c) =>
-                              handleCheckboxChange(row, c as boolean)
-                            }
-                            aria-label={`Selecionar pedido ${row.id}`}
-                          />
+                  history.map((row) => {
+                    // Logic for checkbox visibility
+                    const isSelected = selectedOrderId === row.id
+                    const hasDebt = row.debito > 0.005 // Use epsilon for float comparison to ensure strict > 0.00
+
+                    // Show checkbox if:
+                    // 1. It is the selected row (so it can be deselected)
+                    // 2. OR (No row is selected AND it has debt)
+                    const showCheckbox =
+                      isSelected || (!isAnyOrderSelected && hasDebt)
+
+                    return (
+                      <TableRow key={row.id} className="hover:bg-muted/30">
+                        <TableCell className="font-mono font-medium text-xs text-muted-foreground">
+                          #{row.id}
                         </TableCell>
-                      )}
-                    </TableRow>
-                  ))
+                        <TableCell className="font-medium">
+                          <div className="flex flex-col">
+                            <span>
+                              {row.data
+                                ? format(parseISO(row.data), 'dd/MM/yyyy', {
+                                    locale: ptBR,
+                                  })
+                                : '-'}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {row.hora
+                                ? row.hora.split(':').slice(0, 2).join(':')
+                                : ''}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>{row.vendedor || '-'}</TableCell>
+                        <TableCell className="text-right font-mono text-muted-foreground">
+                          {row.mediaMensal !== null
+                            ? `R$ ${formatCurrency(row.mediaMensal)}`
+                            : '-'}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          R$ {formatCurrency(row.valorVendaTotal)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-medium text-blue-600 bg-blue-50/30">
+                          R$ {formatCurrency(row.saldoAPagar)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-medium text-green-600 bg-green-50/30">
+                          R$ {formatCurrency(row.valorPago)}
+                        </TableCell>
+                        <TableCell
+                          className={cn(
+                            'text-right font-mono font-medium',
+                            row.debito > 0.01
+                              ? 'text-red-600'
+                              : row.debito < -0.01
+                                ? 'text-green-600'
+                                : 'text-gray-400',
+                          )}
+                        >
+                          R$ {formatCurrency(row.debito)}
+                        </TableCell>
+                        {onSelectOrder && (
+                          <TableCell>
+                            {showCheckbox && (
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={(c) =>
+                                  handleCheckboxChange(row, c as boolean)
+                                }
+                                aria-label={`Selecionar pedido ${row.id}`}
+                              />
+                            )}
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    )
+                  })
                 )}
               </TableBody>
             </Table>
