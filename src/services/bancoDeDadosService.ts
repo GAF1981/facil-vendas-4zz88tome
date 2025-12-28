@@ -227,6 +227,7 @@ export const bancoDeDadosService = {
 
   async getAcertoHistory(clienteId: number) {
     // 1. Fetch Orders from BANCO_DE_DADOS
+    // Fetch a larger limit to ensure we get complete orders given it's a line-item table
     const { data, error } = await supabase
       .from('BANCO_DE_DADOS')
       .select(
@@ -235,39 +236,44 @@ export const bancoDeDadosService = {
       .eq('"CÓDIGO DO CLIENTE"', clienteId)
       .order('"DATA DO ACERTO"', { ascending: false })
       .order('"HORA DO ACERTO"', { ascending: false })
-      .limit(500)
+      .limit(1000)
 
     if (error) throw error
     if (!data || data.length === 0) return []
 
-    // 2. Fetch Payments from RECEBIMENTOS
-    // We fetch all payments for this client to ensure we cover all displayed orders
-    const { data: paymentsData, error: paymentsError } = await supabase
-      .from('RECEBIMENTOS')
-      .select('venda_id, valor_pago, forma_pagamento')
-      .eq('cliente_id', clienteId)
+    // 2. Identify unique Order IDs to fetch relevant payments
+    const orderIds = [
+      ...new Set(
+        data
+          .map((item) => item['NÚMERO DO PEDIDO'])
+          .filter((id) => id !== null && id !== undefined),
+      ),
+    ] as number[]
 
-    if (paymentsError) {
-      console.error('Error fetching receipts:', paymentsError)
-      // Fallback or just continue with empty payments (showing as debt)
-    }
+    // 3. Fetch Payments from RECEBIMENTOS for these orders
+    let paymentsMap = new Map<number, { total: number; methods: Set<string> }>()
 
-    // 3. Group Payments by venda_id
-    const paymentsMap = new Map<
-      number,
-      { total: number; methods: Set<string> }
-    >()
-    if (paymentsData) {
-      paymentsData.forEach((p) => {
-        if (!p.venda_id) return
-        const existing = paymentsMap.get(p.venda_id) || {
-          total: 0,
-          methods: new Set<string>(),
-        }
-        existing.total += p.valor_pago || 0
-        if (p.forma_pagamento) existing.methods.add(p.forma_pagamento)
-        paymentsMap.set(p.venda_id, existing)
-      })
+    if (orderIds.length > 0) {
+      const { data: paymentsData, error: paymentsError } = await supabase
+        .from('RECEBIMENTOS')
+        .select('venda_id, valor_pago, forma_pagamento')
+        .in('venda_id', orderIds)
+
+      if (paymentsError) {
+        console.error('Error fetching receipts:', paymentsError)
+      } else if (paymentsData) {
+        // Aggregate payments by venda_id
+        paymentsData.forEach((p) => {
+          if (!p.venda_id) return
+          const existing = paymentsMap.get(p.venda_id) || {
+            total: 0,
+            methods: new Set<string>(),
+          }
+          existing.total += p.valor_pago || 0
+          if (p.forma_pagamento) existing.methods.add(p.forma_pagamento)
+          paymentsMap.set(p.venda_id, existing)
+        })
+      }
     }
 
     // 4. Group by Order Number to create "Settlements"
@@ -315,9 +321,7 @@ export const bancoDeDadosService = {
         ? Array.from(paymentInfo.methods).join(', ')
         : '-'
 
-      // Debito = Saldo a Pagar - Valor Pago
-      // If no payments found (e.g. log entries), value is 0, debt is full.
-      // If receipt log entry (sales 0), then debt is -Paid (Credit) or just 0 if linked.
+      // Debito = Saldo a Pagar - Valor Pago (Aggregated from RECEBIMENTOS)
       const debito = saldoAPagar - valorPago
 
       return {
