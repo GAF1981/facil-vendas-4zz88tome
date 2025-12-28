@@ -20,7 +20,7 @@ import { acertoService } from '@/services/acertoService'
 import { bancoDeDadosService } from '@/services/bancoDeDadosService'
 import { ClientRow } from '@/types/client'
 import { ProductRow } from '@/types/product'
-import { AcertoItem, LastAcertoInfo } from '@/types/acerto'
+import { AcertoItem } from '@/types/acerto'
 import { useToast } from '@/hooks/use-toast'
 import { ProductSelector } from '@/components/acerto/ProductSelector'
 import { AcertoTable } from '@/components/acerto/AcertoTable'
@@ -36,14 +36,12 @@ export default function AcertoPage() {
 
   const [client, setClient] = useState<ClientRow | null>(null)
   const [isClientConfirmed, setIsClientConfirmed] = useState(false)
-  const [lastAcerto, setLastAcerto] = useState<LastAcertoInfo | null>(null)
   const [currentTime, setCurrentTime] = useState(new Date())
   const [items, setItems] = useState<AcertoItem[]>([])
   const [saving, setSaving] = useState(false)
 
   const [mode, setMode] = useState<'ACERTO' | 'CAPTACAO'>('ACERTO')
   const [acertoTipo, setAcertoTipo] = useState<string>('ACERTO')
-  const [loadingStatus, setLoadingStatus] = useState(false)
 
   // State for automatic order number
   const [nextOrderNumber, setNextOrderNumber] = useState<number | null>(null)
@@ -94,25 +92,8 @@ export default function AcertoPage() {
     }
   }, [isClientConfirmed, toast])
 
-  const handleClientSelect = async (selectedClient: ClientRow) => {
+  const handleClientSelect = (selectedClient: ClientRow) => {
     setClient(selectedClient)
-    setLastAcerto(null)
-    setLoadingStatus(true)
-
-    try {
-      // This fetches the last settlement date as per the user story
-      const info = await acertoService.getLastAcerto(selectedClient.CODIGO)
-      setLastAcerto(info)
-    } catch (error) {
-      console.error(error)
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível buscar o último acerto.',
-        variant: 'destructive',
-      })
-    } finally {
-      setLoadingStatus(false)
-    }
   }
 
   const handleConfirmClient = (selectedMode: 'ACERTO' | 'CAPTACAO') => {
@@ -132,7 +113,6 @@ export default function AcertoPage() {
     setClient(null)
     setIsClientConfirmed(false)
     setItems([])
-    setLastAcerto(null)
     setMode('ACERTO')
     setAcertoTipo('ACERTO')
   }
@@ -305,7 +285,6 @@ export default function AcertoPage() {
       setItems([])
       setClient(null)
       setIsClientConfirmed(false)
-      setLastAcerto(null)
       navigate('/')
     } catch (error) {
       console.error(error)
@@ -373,9 +352,6 @@ export default function AcertoPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <h2 className="text-lg font-semibold">Cliente Selecionado</h2>
-                {loadingStatus && (
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                )}
               </div>
               {isClientConfirmed && (
                 <Button variant="ghost" size="sm" onClick={handleChangeClient}>
@@ -384,13 +360,9 @@ export default function AcertoPage() {
               )}
             </div>
 
-            <ClientDetails
-              client={client}
-              lastAcerto={lastAcerto}
-              loading={loadingStatus}
-            />
+            <ClientDetails client={client} />
 
-            {!isClientConfirmed && !loadingStatus && (
+            {!isClientConfirmed && (
               <div className="flex flex-col sm:flex-row gap-4 pt-2">
                 <Button
                   onClick={() => handleConfirmClient('ACERTO')}

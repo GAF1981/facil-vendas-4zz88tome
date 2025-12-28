@@ -24,9 +24,3 @@ export interface Acerto {
   observacoes?: string
   itens: AcertoItem[]
 }
-
-export interface LastAcertoInfo {
-  data: string | null
-  hora: string | null
-  captacao?: string | null
-}
