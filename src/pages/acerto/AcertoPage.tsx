@@ -29,10 +29,21 @@ import { ClientDetails } from '@/components/acerto/ClientDetails'
 import { AcertoStockSummary } from '@/components/acerto/AcertoStockSummary'
 import { AcertoSalesSummary } from '@/components/acerto/AcertoSalesSummary'
 import { AcertoPaymentSummary } from '@/components/acerto/AcertoPaymentSummary'
+import { AcertoSummary } from '@/components/acerto/AcertoSummary'
 import { cn } from '@/lib/utils'
 import { parseCurrency, formatCurrency } from '@/lib/formatters'
 import { Skeleton } from '@/components/ui/skeleton'
 import { PaymentEntry } from '@/types/payment'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 export default function AcertoPage() {
   const { employee } = useUserStore()
@@ -56,6 +67,12 @@ export default function AcertoPage() {
 
   // New Payment State
   const [payments, setPayments] = useState<PaymentEntry[]>([])
+
+  // New Monthly Average State
+  const [monthlyAverage, setMonthlyAverage] = useState<number>(0)
+
+  // Confirmation Dialog State
+  const [showZeroStockAlert, setShowZeroStockAlert] = useState(false)
 
   // State for automatic order number
   const [nextOrderNumber, setNextOrderNumber] = useState<number | null>(null)
@@ -121,11 +138,20 @@ export default function AcertoPage() {
             })
           })
       }
+
+      // Fetch Monthly Average
+      if (client) {
+        bancoDeDadosService
+          .getMonthlyAverage(client.CODIGO)
+          .then((avg) => setMonthlyAverage(avg))
+          .catch((err) => console.error('Error fetching monthly average', err))
+      }
     } else {
       setNextOrderNumber(null)
       nextItemIdRef.current = null
+      setMonthlyAverage(0)
     }
-  }, [isClientConfirmed, toast]) // Removed items from dependency to avoid loop/reset
+  }, [isClientConfirmed, toast, client])
 
   const handleClientSelect = (selectedClient: ClientRow) => {
     setClient(selectedClient)
@@ -294,7 +320,9 @@ export default function AcertoPage() {
   const valorDesconto = totalVendido * discountFactor
   const valorAcerto = totalVendido - valorDesconto
 
-  const handleSave = async () => {
+  const totalPaid = payments.reduce((acc, p) => acc + p.value, 0)
+
+  const handleSaveClick = () => {
     if (!client || !employee) {
       toast({
         title: 'Dados incompletos',
@@ -320,8 +348,25 @@ export default function AcertoPage() {
       if (!confirmNoPayment) return
     }
 
+    // Zero-Stock Validation
+    const totalSaldoFinal = items.reduce(
+      (acc, item) => acc + item.saldoFinal,
+      0,
+    )
+    if (totalSaldoFinal <= 0) {
+      setShowZeroStockAlert(true)
+      return
+    }
+
+    // Proceed to save
+    executeSave()
+  }
+
+  const executeSave = async () => {
     setSaving(true)
     try {
+      if (!client || !employee) return
+
       const now = new Date()
 
       // 1. Save to Database
@@ -586,6 +631,16 @@ export default function AcertoPage() {
             onPaymentsChange={setPayments}
           />
 
+          {/* New Settlement Summary */}
+          <AcertoSummary
+            employee={employee}
+            date={currentTime}
+            monthlyAverage={monthlyAverage}
+            totalSales={totalVendido}
+            balanceToPay={valorAcerto}
+            totalPaid={totalPaid}
+          />
+
           {/* Bottom Action Bar */}
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-card border p-4 rounded-lg shadow-sm">
             <div className="text-sm text-muted-foreground">
@@ -607,7 +662,7 @@ export default function AcertoPage() {
               <Button
                 size="lg"
                 className="w-full sm:w-auto"
-                onClick={handleSave}
+                onClick={handleSaveClick}
                 disabled={saving || items.length === 0}
               >
                 {saving ? (
@@ -626,6 +681,31 @@ export default function AcertoPage() {
           </div>
         </div>
       )}
+
+      {/* Zero Stock Warning Dialog */}
+      <AlertDialog
+        open={showZeroStockAlert}
+        onOpenChange={setShowZeroStockAlert}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmação Necessária</AlertDialogTitle>
+            <AlertDialogDescription className="text-red-600 font-bold text-base">
+              O Acerto esta sendo Finalizado e o cliente está sem estoque de
+              mercadorias ATENÇÃO
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={executeSave}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Confirmar e Finalizar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

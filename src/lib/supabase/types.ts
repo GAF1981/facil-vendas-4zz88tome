@@ -24,6 +24,7 @@ export type Database = {
           CONTAGEM: number | null
           'DATA DO ACERTO': string | null
           'DESCONTO POR GRUPO': string | null
+          DETALHES_PAGAMENTO: Json | null
           FORMA: string | null
           FUNCIONÁRIO: string | null
           'HORA DO ACERTO': string | null
@@ -50,6 +51,7 @@ export type Database = {
           CONTAGEM?: number | null
           'DATA DO ACERTO'?: string | null
           'DESCONTO POR GRUPO'?: string | null
+          DETALHES_PAGAMENTO?: Json | null
           FORMA?: string | null
           FUNCIONÁRIO?: string | null
           'HORA DO ACERTO'?: string | null
@@ -76,6 +78,7 @@ export type Database = {
           CONTAGEM?: number | null
           'DATA DO ACERTO'?: string | null
           'DESCONTO POR GRUPO'?: string | null
+          DETALHES_PAGAMENTO?: Json | null
           FORMA?: string | null
           FUNCIONÁRIO?: string | null
           'HORA DO ACERTO'?: string | null

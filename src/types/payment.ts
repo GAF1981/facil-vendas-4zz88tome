@@ -1,20 +1,21 @@
-export type PaymentMethodType =
-  | 'Boleto'
-  | 'Boleto Parcelado'
-  | 'Pix'
-  | 'Dinheiro'
-  | 'Cheque'
+export type PaymentMethodType = 'Boleto' | 'Pix' | 'Dinheiro' | 'Cheque'
+
+export interface PaymentInstallment {
+  number: number
+  value: number
+  dueDate: string
+}
 
 export interface PaymentEntry {
   method: PaymentMethodType
   value: number
   installments: number
   dueDate: string
+  details?: PaymentInstallment[] // For granular control
 }
 
 export const PAYMENT_METHODS: PaymentMethodType[] = [
   'Boleto',
-  'Boleto Parcelado',
   'Pix',
   'Dinheiro',
   'Cheque',

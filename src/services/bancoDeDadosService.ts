@@ -154,8 +154,6 @@ export const bancoDeDadosService = {
         )
 
         // If product not found by code, we can't reliably link it.
-        // For robustness, we could try to search by name in a real scenario,
-        // but for now we skip to avoid data corruption.
         if (!product) return null
 
         currentMaxId++
@@ -189,6 +187,41 @@ export const bancoDeDadosService = {
       .filter((i) => i !== null) as AcertoItem[]
 
     return { items, nextId: currentMaxId + 1 }
+  },
+
+  async getMonthlyAverage(clienteId: number): Promise<number> {
+    const { data, error } = await supabase
+      .from('BANCO_DE_DADOS')
+      .select('"VALOR VENDIDO", "DATA DO ACERTO"')
+      .eq('"CÓDIGO DO CLIENTE"', clienteId)
+      .order('"DATA DO ACERTO"', { ascending: false })
+      .limit(100) // Last 100 transactions to estimate average
+
+    if (error) {
+      console.error('Error calculating monthly average:', error)
+      return 0
+    }
+
+    if (!data || data.length === 0) return 0
+
+    const monthlyTotals: Record<string, number> = {}
+
+    data.forEach((row) => {
+      const date = row['DATA DO ACERTO']
+      const valStr = row['VALOR VENDIDO']
+      if (!date || !valStr) return
+
+      const monthKey = date.substring(0, 7) // YYYY-MM
+      const val = parseCurrency(valStr)
+
+      monthlyTotals[monthKey] = (monthlyTotals[monthKey] || 0) + val
+    })
+
+    const months = Object.values(monthlyTotals)
+    if (months.length === 0) return 0
+
+    const total = months.reduce((a, b) => a + b, 0)
+    return total / months.length
   },
 
   async saveTransaction(
