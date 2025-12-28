@@ -10,7 +10,7 @@ import { AcertoPaymentSummary } from '@/components/acerto/AcertoPaymentSummary'
 import { ClientRow } from '@/types/client'
 import { bancoDeDadosService } from '@/services/bancoDeDadosService'
 import { recebimentoService } from '@/services/recebimentoService'
-import { ArrowDownCircle, Save, Loader2 } from 'lucide-react'
+import { ArrowDownCircle, Save, Loader2, AlertCircle } from 'lucide-react'
 import { PaymentEntry } from '@/types/payment'
 import { useUserStore } from '@/stores/useUserStore'
 import { useToast } from '@/hooks/use-toast'
@@ -129,6 +129,16 @@ export default function RecebimentoPage() {
       return
     }
 
+    if (!selectedOrder) {
+      toast({
+        title: 'Pedido não selecionado',
+        description:
+          'Por favor, selecione um pedido no histórico abaixo para realizar o pagamento.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     if (payments.length === 0) {
       toast({
         title: 'Pagamento vazio',
@@ -154,14 +164,12 @@ export default function RecebimentoPage() {
         client,
         employee,
         payments,
-        selectedOrder ? selectedOrder.id : undefined,
+        selectedOrder.id,
       )
 
       toast({
         title: 'Recebimento salvo',
-        description: selectedOrder
-          ? `Pagamento registrado para o pedido #${selectedOrder.id}.`
-          : 'Pagamento registrado com sucesso.',
+        description: `Pagamento registrado para o pedido #${selectedOrder.id}.`,
         className: 'bg-green-50 border-green-200 text-green-900',
       })
 
@@ -218,9 +226,9 @@ export default function RecebimentoPage() {
               loading={loadingLastAcerto}
             />
 
-            {/* Payment Section - Reusing AcertoPaymentSummary */}
+            {/* Payment Section */}
             <div className="space-y-4">
-              {selectedOrder && (
+              {selectedOrder ? (
                 <div className="bg-blue-50 border border-blue-200 text-blue-800 p-4 rounded-md flex items-center justify-between animate-fade-in">
                   <span className="font-medium">
                     Pagando Pedido Selecionado:{' '}
@@ -235,20 +243,28 @@ export default function RecebimentoPage() {
                     Cancelar Seleção
                   </Button>
                 </div>
+              ) : (
+                <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-md flex items-center gap-2 animate-fade-in">
+                  <AlertCircle className="h-5 w-5" />
+                  <span className="font-medium">
+                    Selecione um pedido no histórico abaixo para habilitar o
+                    pagamento.
+                  </span>
+                </div>
               )}
 
               <AcertoPaymentSummary
                 saldoAPagar={currentDebt}
                 payments={payments}
                 onPaymentsChange={setPayments}
-                disabled={saving}
+                disabled={saving || !selectedOrder}
               />
 
               <div className="flex justify-end pt-2">
                 <Button
                   size="lg"
                   onClick={handleSaveRecebimento}
-                  disabled={saving || payments.length === 0}
+                  disabled={saving || payments.length === 0 || !selectedOrder}
                   className="w-full sm:w-auto min-w-[200px]"
                 >
                   {saving ? (
