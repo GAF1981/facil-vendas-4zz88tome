@@ -31,7 +31,6 @@ import {
 import { useState } from 'react'
 import { ClientRow } from '@/types/client'
 import { clientsService } from '@/services/clientsService'
-import { ClientHistoryDialog } from '@/components/clients/ClientHistoryDialog'
 
 interface ClientTableProps {
   clients: ClientRow[]
@@ -41,7 +40,6 @@ interface ClientTableProps {
 export function ClientTable({ clients, onUpdate }: ClientTableProps) {
   const { toast } = useToast()
   const [clientToDelete, setClientToDelete] = useState<number | null>(null)
-  const [historyClient, setHistoryClient] = useState<ClientRow | null>(null)
 
   const handleDelete = async () => {
     if (clientToDelete) {
@@ -114,12 +112,11 @@ export function ClientTable({ clients, onUpdate }: ClientTableProps) {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                      <DropdownMenuItem
-                        onClick={() => setHistoryClient(client)}
-                        className="cursor-pointer"
-                      >
-                        <History className="mr-2 h-4 w-4" /> Resumo de Acerto
-                        (Histórico)
+                      <DropdownMenuItem asChild>
+                        <Link to={`/clientes/${client.CODIGO}/historico`}>
+                          <History className="mr-2 h-4 w-4" /> Resumo de Acerto
+                          (Histórico)
+                        </Link>
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem asChild>
@@ -166,12 +163,6 @@ export function ClientTable({ clients, onUpdate }: ClientTableProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <ClientHistoryDialog
-        client={historyClient}
-        open={!!historyClient}
-        onOpenChange={(open) => !open && setHistoryClient(null)}
-      />
     </>
   )
 }

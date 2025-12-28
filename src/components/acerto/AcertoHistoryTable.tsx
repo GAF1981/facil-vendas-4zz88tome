@@ -18,6 +18,8 @@ import { cn } from '@/lib/utils'
 interface AcertoHistoryTableProps {
   clientId: number
   monthlyAverage: number
+  hideHeader?: boolean
+  className?: string
 }
 
 interface HistoryRow {
@@ -34,6 +36,8 @@ interface HistoryRow {
 export function AcertoHistoryTable({
   clientId,
   monthlyAverage,
+  hideHeader = false,
+  className,
 }: AcertoHistoryTableProps) {
   const [history, setHistory] = useState<HistoryRow[]>([])
   const [loading, setLoading] = useState(false)
@@ -68,21 +72,30 @@ export function AcertoHistoryTable({
 
   if (loading) {
     return (
-      <Card className="border-muted bg-white dark:bg-card shadow-sm h-[300px] flex items-center justify-center">
+      <Card
+        className={cn(
+          'border-muted bg-white dark:bg-card shadow-sm h-[300px] flex items-center justify-center',
+          className,
+        )}
+      >
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </Card>
     )
   }
 
   return (
-    <Card className="border-muted bg-white dark:bg-card shadow-sm">
-      <CardHeader className="pb-4">
-        <CardTitle className="text-lg font-semibold flex items-center gap-2">
-          <FileClock className="h-5 w-5 text-primary" />
-          Resumo de Acertos (Histórico)
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
+    <Card
+      className={cn('border-muted bg-white dark:bg-card shadow-sm', className)}
+    >
+      {!hideHeader && (
+        <CardHeader className="pb-4">
+          <CardTitle className="text-lg font-semibold flex items-center gap-2">
+            <FileClock className="h-5 w-5 text-primary" />
+            Resumo de Acertos (Histórico)
+          </CardTitle>
+        </CardHeader>
+      )}
+      <CardContent className={cn('p-6', hideHeader && 'pt-6')}>
         {error ? (
           <div className="flex items-center gap-2 text-red-600 bg-red-50 p-4 rounded-md">
             <AlertCircle className="h-5 w-5" />

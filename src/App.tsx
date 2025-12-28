@@ -8,6 +8,7 @@ import DashboardPage from '@/pages/dashboard/DashboardPage'
 import NotFound from '@/pages/NotFound'
 import ClientsPage from '@/pages/clients/ClientsPage'
 import ClientFormPage from '@/pages/clients/ClientFormPage'
+import ClientHistoryPage from '@/pages/clients/ClientHistoryPage'
 import EmployeesPage from '@/pages/employees/EmployeesPage'
 import EmployeeFormPage from '@/pages/employees/EmployeeFormPage'
 import ProductsPage from '@/pages/products/ProductsPage'
@@ -37,6 +38,10 @@ const App = () => (
               <Route path="/clientes" element={<ClientsPage />} />
               <Route path="/clientes/novo" element={<ClientFormPage />} />
               <Route path="/clientes/:id" element={<ClientFormPage />} />
+              <Route
+                path="/clientes/:id/historico"
+                element={<ClientHistoryPage />}
+              />
 
               <Route path="/funcionarios" element={<EmployeesPage />} />
               <Route path="/funcionarios/novo" element={<EmployeeFormPage />} />
