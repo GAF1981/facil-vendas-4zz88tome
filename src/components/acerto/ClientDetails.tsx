@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { Clock } from 'lucide-react'
+import { Clock, Calendar } from 'lucide-react'
 
 interface ClientDetailsProps {
   client: ClientRow
@@ -11,24 +11,32 @@ interface ClientDetailsProps {
 }
 
 export function ClientDetails({ client, lastAcerto }: ClientDetailsProps) {
-  let formattedDate = 'Nenhum acerto encontrado'
-  let formattedTime = ''
+  let formattedDate: string | null = null
+  let formattedTime: string | null = null
+  const hasAcerto = !!lastAcerto && (!!lastAcerto.date || !!lastAcerto.time)
 
-  if (lastAcerto?.date) {
+  if (hasAcerto && lastAcerto?.date) {
     try {
-      // Assuming date comes as YYYY-MM-DD from the DB
+      // Attempt to parse ISO string (YYYY-MM-DD) which is the standard format
+      // If fails (e.g. DD/MM/YYYY string in legacy data), fallback to raw
       const dateObj = parseISO(lastAcerto.date)
-      formattedDate = format(dateObj, 'dd/MM/yyyy', { locale: ptBR })
+      if (!isNaN(dateObj.getTime())) {
+        formattedDate = format(dateObj, 'dd/MM/yyyy', { locale: ptBR })
+      } else {
+        formattedDate = lastAcerto.date
+      }
     } catch (e) {
       formattedDate = lastAcerto.date
     }
+  }
 
-    if (lastAcerto.time) {
-      // Try to keep HH:mm if it's longer
-      formattedTime =
-        lastAcerto.time.length >= 5
-          ? lastAcerto.time.substring(0, 5)
-          : lastAcerto.time
+  if (hasAcerto && lastAcerto?.time) {
+    // Format time to HH:mm, removing seconds if present
+    const timeParts = lastAcerto.time.split(':')
+    if (timeParts.length >= 2) {
+      formattedTime = `${timeParts[0]}:${timeParts[1]}`
+    } else {
+      formattedTime = lastAcerto.time
     }
   }
 
@@ -70,19 +78,26 @@ export function ClientDetails({ client, lastAcerto }: ClientDetailsProps) {
           </div>
           <div>
             <Label className="text-xs text-muted-foreground">
-              Data do último Acerto
+              Último Acerto
             </Label>
-            <div className="flex flex-col">
-              <p className="font-medium truncate text-base text-blue-600">
-                {formattedDate}
-              </p>
-              {formattedTime && (
-                <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
-                  <Clock className="h-3 w-3" />
-                  <span>{formattedTime}</span>
+            {hasAcerto ? (
+              <div className="flex flex-col">
+                <div className="flex items-center gap-1.5 font-medium truncate text-base text-blue-600">
+                  <Calendar className="h-3.5 w-3.5" />
+                  <span>{formattedDate || 'Data N/D'}</span>
                 </div>
-              )}
-            </div>
+                {formattedTime && (
+                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground mt-1">
+                    <Clock className="h-3.5 w-3.5" />
+                    <span>{formattedTime}</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground italic pt-1">
+                Nenhum acerto encontrado
+              </p>
+            )}
           </div>
         </div>
       </CardContent>

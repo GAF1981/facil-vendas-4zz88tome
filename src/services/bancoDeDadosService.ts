@@ -80,6 +80,8 @@ export const bancoDeDadosService = {
   async getLastAcerto(
     clienteId: number,
   ): Promise<{ date: string; time: string } | null> {
+    // Explicitly selecting and ordering by columns with spaces
+    // ensuring we map COD. CLIENTE to the passed ID
     const { data, error } = await supabase
       .from('BANCO_DE_DADOS')
       .select('"DATA DO ACERTO", "HORA DO ACERTO"')
