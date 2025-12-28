@@ -5,6 +5,7 @@ import { Employee } from '@/types/employee'
 import { ProductRow } from '@/types/product'
 import { parseCurrency, formatCurrency } from '@/lib/formatters'
 import { format } from 'date-fns'
+import { PaymentEntry } from '@/types/payment'
 
 export const bancoDeDadosService = {
   async hasOutstandingBalance(clienteId: number): Promise<boolean> {
@@ -196,6 +197,7 @@ export const bancoDeDadosService = {
     items: AcertoItem[],
     date: Date,
     acertoTipo: string,
+    payments: PaymentEntry[],
   ) {
     // 1. Get Context (Order Number)
     // We calculate it again here to ensure sequence integrity at the moment of saving
@@ -221,6 +223,16 @@ export const bancoDeDadosService = {
     productsData?.forEach((p) => {
       priceMap.set(p.ID, parseCurrency(p.PREÇO))
     })
+
+    // Construct Payment String (FORMA)
+    // Example: "Pix R$ 100,00 | Dinheiro R$ 50,00"
+    const paymentString = payments
+      .map(
+        (p) => `${p.method} R$ ${formatCurrency(p.value)} (${p.installments}x)`,
+      )
+      .join(' | ')
+
+    const formaPagamento = paymentString || acertoTipo
 
     // 3. Prepare rows
     const rowsToInsert = items.map((item) => {
@@ -278,8 +290,8 @@ export const bancoDeDadosService = {
         // Mapped TIPO from item (Resumo da Contagem)
         TIPO: item.tipo,
 
-        // Mapped FORMA from ACERTO TIPO (Dropdown)
-        FORMA: acertoTipo,
+        // Mapped FORMA from Calculated String
+        FORMA: formaPagamento,
 
         'SALDO INICIAL': item.saldoInicial,
         CONTAGEM: contagem,
@@ -303,6 +315,9 @@ export const bancoDeDadosService = {
         'VALOR CONSIGNADO TOTAL (Custo)': formatCurrency(
           valorConsignadoCustoVal,
         ),
+
+        // Add detailed payment info
+        DETALHES_PAGAMENTO: payments,
       }
     })
 

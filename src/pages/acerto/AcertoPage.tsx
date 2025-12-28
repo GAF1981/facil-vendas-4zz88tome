@@ -30,8 +30,9 @@ import { AcertoStockSummary } from '@/components/acerto/AcertoStockSummary'
 import { AcertoSalesSummary } from '@/components/acerto/AcertoSalesSummary'
 import { AcertoPaymentSummary } from '@/components/acerto/AcertoPaymentSummary'
 import { cn } from '@/lib/utils'
-import { parseCurrency } from '@/lib/formatters'
+import { parseCurrency, formatCurrency } from '@/lib/formatters'
 import { Skeleton } from '@/components/ui/skeleton'
+import { PaymentEntry } from '@/types/payment'
 
 export default function AcertoPage() {
   const { employee } = useUserStore()
@@ -52,7 +53,9 @@ export default function AcertoPage() {
 
   const [mode, setMode] = useState<'ACERTO' | 'CAPTACAO'>('ACERTO')
   const [acertoTipo, setAcertoTipo] = useState<string>('ACERTO')
-  const [paymentMethod, setPaymentMethod] = useState<string>('')
+
+  // New Payment State
+  const [payments, setPayments] = useState<PaymentEntry[]>([])
 
   // State for automatic order number
   const [nextOrderNumber, setNextOrderNumber] = useState<number | null>(null)
@@ -186,7 +189,7 @@ export default function AcertoPage() {
     setItems([])
     setMode('ACERTO')
     setAcertoTipo('ACERTO')
-    setPaymentMethod('')
+    setPayments([])
   }
 
   const handleAcertoTipoChange = (value: string) => {
@@ -310,15 +313,12 @@ export default function AcertoPage() {
       return
     }
 
-    // Optional: Validate payment method
-    // if (!paymentMethod) {
-    //   toast({
-    //     title: 'Forma de Pagamento',
-    //     description: 'Selecione uma forma de pagamento.',
-    //     variant: 'destructive',
-    //   })
-    //   return
-    // }
+    if (payments.length === 0) {
+      const confirmNoPayment = window.confirm(
+        'Nenhuma forma de pagamento selecionada. Deseja continuar mesmo assim?',
+      )
+      if (!confirmNoPayment) return
+    }
 
     setSaving(true)
     try {
@@ -331,10 +331,16 @@ export default function AcertoPage() {
         items,
         now,
         acertoTipo,
+        payments,
       )
 
       // 2. Generate and Download PDF
       try {
+        const paymentString =
+          payments
+            .map((p) => `${p.method}: R$ ${formatCurrency(p.value)}`)
+            .join(' | ') || acertoTipo
+
         const pdfBlob = await acertoService.generatePdf({
           client,
           employee,
@@ -345,7 +351,7 @@ export default function AcertoPage() {
           // Pass new calculated values if backend supports it in future
           discount: valorDesconto,
           finalValue: valorAcerto,
-          paymentMethod: paymentMethod,
+          paymentMethod: paymentString,
         })
 
         // Trigger Download
@@ -377,7 +383,7 @@ export default function AcertoPage() {
       setItems([])
       setClient(null)
       setIsClientConfirmed(false)
-      setPaymentMethod('')
+      setPayments([])
       navigate('/')
     } catch (error) {
       console.error(error)
@@ -576,8 +582,8 @@ export default function AcertoPage() {
           {/* New Payment Summary */}
           <AcertoPaymentSummary
             saldoAPagar={valorAcerto}
-            paymentMethod={paymentMethod}
-            onPaymentMethodChange={setPaymentMethod}
+            payments={payments}
+            onPaymentsChange={setPayments}
           />
 
           {/* Bottom Action Bar */}

@@ -1,5 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Select,
   SelectContent,
@@ -7,20 +9,69 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { formatCurrency } from '@/lib/formatters'
-import { Wallet, CreditCard } from 'lucide-react'
+import { formatCurrency, parseCurrency } from '@/lib/formatters'
+import { Wallet, CreditCard, Calendar, AlertTriangle } from 'lucide-react'
+import {
+  PaymentEntry,
+  PaymentMethodType,
+  PAYMENT_METHODS,
+} from '@/types/payment'
+import { cn } from '@/lib/utils'
+import { useEffect } from 'react'
 
 interface AcertoPaymentSummaryProps {
   saldoAPagar: number
-  paymentMethod: string
-  onPaymentMethodChange: (value: string) => void
+  payments: PaymentEntry[]
+  onPaymentsChange: (payments: PaymentEntry[]) => void
 }
 
 export function AcertoPaymentSummary({
   saldoAPagar,
-  paymentMethod,
-  onPaymentMethodChange,
+  payments,
+  onPaymentsChange,
 }: AcertoPaymentSummaryProps) {
+  const totalPaid = payments.reduce((acc, p) => acc + p.value, 0)
+  const remaining = saldoAPagar - totalPaid
+  const isComplete = Math.abs(remaining) < 0.01
+
+  // Update default payment if list is empty and there is balance
+  useEffect(() => {
+    // Only if user hasn't selected anything yet and there is a balance
+    // This is optional UX - removed to avoid overriding user intent
+  }, [])
+
+  const handleToggleMethod = (method: PaymentMethodType, checked: boolean) => {
+    if (checked) {
+      // Add method
+      // Default value is remaining balance (or 0 if negative)
+      const defaultValue = Math.max(0, remaining)
+      const today = new Date().toISOString().split('T')[0]
+      const newEntry: PaymentEntry = {
+        method,
+        value: defaultValue,
+        installments: 1,
+        dueDate: today,
+      }
+      onPaymentsChange([...payments, newEntry])
+    } else {
+      // Remove method
+      onPaymentsChange(payments.filter((p) => p.method !== method))
+    }
+  }
+
+  const handleUpdateEntry = (
+    method: PaymentMethodType,
+    field: keyof PaymentEntry,
+    value: any,
+  ) => {
+    onPaymentsChange(
+      payments.map((p) => {
+        if (p.method !== method) return p
+        return { ...p, [field]: value }
+      }),
+    )
+  }
+
   return (
     <Card className="border-muted bg-muted/10">
       <CardHeader className="pb-2">
@@ -29,7 +80,7 @@ export function AcertoPaymentSummary({
           Resumos de Pagamento
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           {/* Saldo a Pagar */}
           <div className="flex flex-col space-y-1 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900 shadow-sm">
@@ -41,31 +92,173 @@ export function AcertoPaymentSummary({
             </span>
           </div>
 
-          {/* Forma de Pagamento */}
-          <div className="flex flex-col space-y-2 justify-center">
-            <Label className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
-              <CreditCard className="h-4 w-4" />
-              Forma de Pagamento
-            </Label>
-            <Select value={paymentMethod} onValueChange={onPaymentMethodChange}>
-              <SelectTrigger className="h-12 text-base">
-                <SelectValue placeholder="Selecione a forma de pagamento..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Boleto">Boleto</SelectItem>
-                <SelectItem value="Boleto Parcelado">
-                  Boleto Parcelado
-                </SelectItem>
-                <SelectItem value="Pix/dinheiro/Cheque">
-                  Pix / Dinheiro / Cheque
-                </SelectItem>
-                <SelectItem value="Pix/dinheiro/Cheque (Parcelado)">
-                  Pix / Dinheiro / Cheque (Parcelado)
-                </SelectItem>
-              </SelectContent>
-            </Select>
+          {/* Total Selecionado */}
+          <div
+            className={cn(
+              'flex flex-col space-y-1 p-3 rounded-lg border shadow-sm',
+              isComplete
+                ? 'bg-green-50 border-green-200 text-green-900'
+                : 'bg-yellow-50 border-yellow-200 text-yellow-900',
+            )}
+          >
+            <span className="text-sm font-medium flex items-center gap-1">
+              <CreditCard className="h-3.5 w-3.5" /> Total Selecionado
+            </span>
+            <div className="flex items-end justify-between">
+              <span className="text-3xl font-bold">
+                R$ {formatCurrency(totalPaid)}
+              </span>
+              {!isComplete && (
+                <span className="text-sm font-medium mb-1">
+                  (Restante: R$ {formatCurrency(remaining)})
+                </span>
+              )}
+            </div>
           </div>
         </div>
+
+        {/* Payment Methods Selection */}
+        <div className="space-y-4 pt-4 border-t">
+          <Label className="text-base font-semibold">Formas de Pagamento</Label>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+            {PAYMENT_METHODS.map((method) => {
+              const isSelected = payments.some((p) => p.method === method)
+              return (
+                <div
+                  key={method}
+                  className={cn(
+                    'flex items-center space-x-2 border rounded-md p-3 transition-colors cursor-pointer hover:bg-muted',
+                    isSelected
+                      ? 'bg-primary/5 border-primary shadow-sm'
+                      : 'bg-card',
+                  )}
+                  onClick={() => handleToggleMethod(method, !isSelected)}
+                >
+                  <Checkbox
+                    id={`chk-${method}`}
+                    checked={isSelected}
+                    onCheckedChange={(c) =>
+                      handleToggleMethod(method, c as boolean)
+                    }
+                  />
+                  <Label
+                    htmlFor={`chk-${method}`}
+                    className="cursor-pointer font-medium text-sm"
+                  >
+                    {method}
+                  </Label>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Active Payments Details */}
+        {payments.length > 0 && (
+          <div className="space-y-4 animate-fade-in">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+              Detalhamento
+            </h3>
+            <div className="grid gap-4">
+              {payments.map((entry) => (
+                <div
+                  key={entry.method}
+                  className="bg-card border rounded-lg p-4 flex flex-col md:flex-row gap-4 items-start md:items-end shadow-sm animate-slide-up"
+                >
+                  <div className="w-full md:w-48 shrink-0">
+                    <Label className="text-xs text-muted-foreground font-bold uppercase mb-1.5 block">
+                      Método
+                    </Label>
+                    <div className="font-semibold text-primary flex items-center gap-2 h-10 px-3 bg-muted/50 rounded-md border text-sm">
+                      {entry.method}
+                    </div>
+                  </div>
+
+                  <div className="w-full md:flex-1">
+                    <Label className="text-xs font-medium mb-1.5 block">
+                      Valor do Pagamento
+                    </Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2.5 text-muted-foreground text-sm">
+                        R$
+                      </span>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        className="pl-9 font-bold"
+                        value={entry.value}
+                        onChange={(e) =>
+                          handleUpdateEntry(
+                            entry.method,
+                            'value',
+                            parseFloat(e.target.value) || 0,
+                          )
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="w-full md:w-32">
+                    <Label className="text-xs font-medium mb-1.5 block">
+                      Parcelas
+                    </Label>
+                    <Select
+                      value={entry.installments.toString()}
+                      onValueChange={(val) =>
+                        handleUpdateEntry(
+                          entry.method,
+                          'installments',
+                          parseInt(val),
+                        )
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 12 }, (_, i) => i + 1).map(
+                          (n) => (
+                            <SelectItem key={n} value={n.toString()}>
+                              {n}x
+                            </SelectItem>
+                          ),
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="w-full md:w-40">
+                    <Label className="text-xs font-medium mb-1.5 flex items-center gap-1">
+                      <Calendar className="h-3 w-3" /> Vencimento
+                    </Label>
+                    <Input
+                      type="date"
+                      value={entry.dueDate}
+                      onChange={(e) =>
+                        handleUpdateEntry(
+                          entry.method,
+                          'dueDate',
+                          e.target.value,
+                        )
+                      }
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            {!isComplete && (
+              <div className="flex items-center gap-2 text-yellow-600 bg-yellow-50 p-3 rounded-md border border-yellow-200 text-sm">
+                <AlertTriangle className="h-4 w-4" />
+                <span>
+                  Atenção: A soma dos pagamentos (R$ {formatCurrency(totalPaid)}
+                  ) difere do saldo total (R$ {formatCurrency(saldoAPagar)}).
+                </span>
+              </div>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   )
