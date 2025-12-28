@@ -18,8 +18,8 @@ export type Database = {
       BANCO_DE_DADOS: {
         Row: {
           CLIENTE: string | null
-          'COD. CLIENTE': number | null
           'COD. PRODUTO': number | null
+          'CÓDIGO DO CLIENTE': number | null
           'CODIGO FUNCIONARIO': number | null
           CONTAGEM: number | null
           'DATA DO ACERTO': string | null
@@ -44,8 +44,8 @@ export type Database = {
         }
         Insert: {
           CLIENTE?: string | null
-          'COD. CLIENTE'?: number | null
           'COD. PRODUTO'?: number | null
+          'CÓDIGO DO CLIENTE'?: number | null
           'CODIGO FUNCIONARIO'?: number | null
           CONTAGEM?: number | null
           'DATA DO ACERTO'?: string | null
@@ -70,8 +70,8 @@ export type Database = {
         }
         Update: {
           CLIENTE?: string | null
-          'COD. CLIENTE'?: number | null
           'COD. PRODUTO'?: number | null
+          'CÓDIGO DO CLIENTE'?: number | null
           'CODIGO FUNCIONARIO'?: number | null
           CONTAGEM?: number | null
           'DATA DO ACERTO'?: string | null

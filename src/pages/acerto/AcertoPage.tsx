@@ -39,6 +39,7 @@ export default function AcertoPage() {
     date: string
     time: string
   } | null>(null)
+  const [loadingLastAcerto, setLoadingLastAcerto] = useState(false)
   const [isClientConfirmed, setIsClientConfirmed] = useState(false)
   const [currentTime, setCurrentTime] = useState(new Date())
   const [items, setItems] = useState<AcertoItem[]>([])
@@ -61,12 +62,15 @@ export default function AcertoPage() {
   useEffect(() => {
     if (client) {
       setLastAcerto(null) // Reset while fetching
+      setLoadingLastAcerto(true)
       bancoDeDadosService
         .getLastAcerto(client.CODIGO)
         .then((data) => setLastAcerto(data))
         .catch((err) => console.error('Error fetching last acerto', err))
+        .finally(() => setLoadingLastAcerto(false))
     } else {
       setLastAcerto(null)
+      setLoadingLastAcerto(false)
     }
   }, [client])
 
@@ -377,7 +381,11 @@ export default function AcertoPage() {
               )}
             </div>
 
-            <ClientDetails client={client} lastAcerto={lastAcerto} />
+            <ClientDetails
+              client={client}
+              lastAcerto={lastAcerto}
+              loading={loadingLastAcerto}
+            />
 
             {!isClientConfirmed && (
               <div className="flex flex-col sm:flex-row gap-4 pt-2">

@@ -10,7 +10,7 @@ export const bancoDeDadosService = {
     const { count, error } = await supabase
       .from('BANCO_DE_DADOS')
       .select('*', { count: 'exact', head: true })
-      .eq('COD. CLIENTE', clienteId)
+      .eq('"CÓDIGO DO CLIENTE"', clienteId)
       .gt('SALDO FINAL', 0)
 
     if (error) {
@@ -28,7 +28,7 @@ export const bancoDeDadosService = {
     const { data, error } = await supabase
       .from('BANCO_DE_DADOS')
       .select('"ID VENDA ITENS"')
-      .eq('COD. CLIENTE', clienteId)
+      .eq('"CÓDIGO DO CLIENTE"', clienteId)
       .eq('COD. PRODUTO', produtoId)
       .order('ID VENDA ITENS', { ascending: false })
       .limit(1)
@@ -81,11 +81,11 @@ export const bancoDeDadosService = {
     clienteId: number,
   ): Promise<{ date: string; time: string } | null> {
     // Explicitly selecting and ordering by columns with spaces
-    // ensuring we map COD. CLIENTE to the passed ID
+    // ensuring we map CÓDIGO DO CLIENTE to the passed ID
     const { data, error } = await supabase
       .from('BANCO_DE_DADOS')
       .select('"DATA DO ACERTO", "HORA DO ACERTO"')
-      .eq('COD. CLIENTE', clienteId)
+      .eq('"CÓDIGO DO CLIENTE"', clienteId)
       .order('"DATA DO ACERTO"', { ascending: false })
       .order('"HORA DO ACERTO"', { ascending: false })
       .limit(1)
@@ -177,7 +177,7 @@ export const bancoDeDadosService = {
         'DATA DO ACERTO': dataAcertoStr,
         'HORA DO ACERTO': horaAcerto,
 
-        'COD. CLIENTE': client.CODIGO,
+        'CÓDIGO DO CLIENTE': client.CODIGO,
         CLIENTE: client['NOME CLIENTE'],
 
         'CODIGO FUNCIONARIO': employee.id,

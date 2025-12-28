@@ -1,6 +1,7 @@
 import { ClientRow } from '@/types/client'
 import { Card, CardContent } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
+import { Skeleton } from '@/components/ui/skeleton'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Clock, Calendar } from 'lucide-react'
@@ -8,9 +9,14 @@ import { Clock, Calendar } from 'lucide-react'
 interface ClientDetailsProps {
   client: ClientRow
   lastAcerto?: { date: string; time: string } | null
+  loading?: boolean
 }
 
-export function ClientDetails({ client, lastAcerto }: ClientDetailsProps) {
+export function ClientDetails({
+  client,
+  lastAcerto,
+  loading = false,
+}: ClientDetailsProps) {
   let formattedDate: string | null = null
   let formattedTime: string | null = null
   const hasAcerto = !!lastAcerto && (!!lastAcerto.date || !!lastAcerto.time)
@@ -78,10 +84,15 @@ export function ClientDetails({ client, lastAcerto }: ClientDetailsProps) {
           </div>
           <div>
             <Label className="text-xs text-muted-foreground">
-              Último Acerto
+              Data do Último Acerto
             </Label>
-            {hasAcerto ? (
-              <div className="flex flex-col">
+            {loading ? (
+              <div className="pt-1 space-y-2">
+                <Skeleton className="h-5 w-24" />
+                <Skeleton className="h-4 w-16" />
+              </div>
+            ) : hasAcerto ? (
+              <div className="flex flex-col animate-fade-in">
                 <div className="flex items-center gap-1.5 font-medium truncate text-base text-blue-600">
                   <Calendar className="h-3.5 w-3.5" />
                   <span>{formattedDate || 'Data N/D'}</span>
@@ -94,7 +105,7 @@ export function ClientDetails({ client, lastAcerto }: ClientDetailsProps) {
                 )}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground italic pt-1">
+              <p className="text-sm text-muted-foreground italic pt-1 animate-fade-in">
                 Nenhum acerto encontrado
               </p>
             )}
