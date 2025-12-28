@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Button } from '@/components/ui/button'
-import { MoreHorizontal, Edit, Trash2 } from 'lucide-react'
+import { MoreHorizontal, Edit, Trash2, History } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useToast } from '@/hooks/use-toast'
 import {
@@ -31,6 +31,7 @@ import {
 import { useState } from 'react'
 import { ClientRow } from '@/types/client'
 import { clientsService } from '@/services/clientsService'
+import { ClientHistoryDialog } from '@/components/clients/ClientHistoryDialog'
 
 interface ClientTableProps {
   clients: ClientRow[]
@@ -40,6 +41,7 @@ interface ClientTableProps {
 export function ClientTable({ clients, onUpdate }: ClientTableProps) {
   const { toast } = useToast()
   const [clientToDelete, setClientToDelete] = useState<number | null>(null)
+  const [historyClient, setHistoryClient] = useState<ClientRow | null>(null)
 
   const handleDelete = async () => {
     if (clientToDelete) {
@@ -112,6 +114,14 @@ export function ClientTable({ clients, onUpdate }: ClientTableProps) {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                      <DropdownMenuItem
+                        onClick={() => setHistoryClient(client)}
+                        className="cursor-pointer"
+                      >
+                        <History className="mr-2 h-4 w-4" /> Resumo de Acerto
+                        (Histórico)
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
                       <DropdownMenuItem asChild>
                         <Link to={`/clientes/${client.CODIGO}`}>
                           <Edit className="mr-2 h-4 w-4" /> Editar
@@ -119,7 +129,7 @@ export function ClientTable({ clients, onUpdate }: ClientTableProps) {
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
-                        className="text-destructive focus:text-destructive"
+                        className="text-destructive focus:text-destructive cursor-pointer"
                         onSelect={() => setClientToDelete(client.CODIGO)}
                       >
                         <Trash2 className="mr-2 h-4 w-4" /> Excluir
@@ -156,6 +166,12 @@ export function ClientTable({ clients, onUpdate }: ClientTableProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ClientHistoryDialog
+        client={historyClient}
+        open={!!historyClient}
+        onOpenChange={(open) => !open && setHistoryClient(null)}
+      />
     </>
   )
 }

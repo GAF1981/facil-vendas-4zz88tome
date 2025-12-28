@@ -268,17 +268,26 @@ export const bancoDeDadosService = {
 
     // Fetch payments from RECEBIMENTOS for these orders
     // This ensures we get the most accurate payment info stored in the structured table
-    const paymentsMap = new Map<number, number>()
+    const paymentsInfoMap = new Map<
+      number,
+      { total: number; methods: Set<string> }
+    >()
+
     if (orderIds.length > 0) {
       const { data: paymentsData, error: paymentsError } = await supabase
         .from('RECEBIMENTOS')
-        .select('venda_id, valor_pago')
+        .select('venda_id, valor_pago, forma_pagamento')
         .in('venda_id', orderIds)
 
       if (!paymentsError && paymentsData) {
         paymentsData.forEach((p) => {
-          const current = paymentsMap.get(p.venda_id) || 0
-          paymentsMap.set(p.venda_id, current + (Number(p.valor_pago) || 0))
+          const current = paymentsInfoMap.get(p.venda_id) || {
+            total: 0,
+            methods: new Set(),
+          }
+          current.total += Number(p.valor_pago) || 0
+          if (p.forma_pagamento) current.methods.add(p.forma_pagamento)
+          paymentsInfoMap.set(p.venda_id, current)
         })
       }
     }
@@ -291,9 +300,10 @@ export const bancoDeDadosService = {
       const valorDesconto = order.valorVendaTotal * discountFactor
       const saldoAPagar = order.valorVendaTotal - valorDesconto
 
-      // Prioritize RECEBIMENTOS table, fallback to JSON in BANCO_DE_DADOS if no records in RECEBIMENTOS
-      // This handles backward compatibility for old records that might not be in RECEBIMENTOS
-      let valorPago = paymentsMap.get(order.id) || 0
+      // Prioritize RECEBIMENTOS table
+      const paymentInfo = paymentsInfoMap.get(order.id)
+      let valorPago = paymentInfo?.total || 0
+      let methods = paymentInfo ? Array.from(paymentInfo.methods) : []
 
       // If no payment found in RECEBIMENTOS (or value is 0), try to use the legacy JSON column from BANCO_DE_DADOS
       if (valorPago === 0 && Array.isArray(order.pagamentos)) {
@@ -301,13 +311,19 @@ export const bancoDeDadosService = {
           (acc: number, p: any) => acc + (Number(p.value) || 0),
           0,
         )
+        methods = order.pagamentos
+          .map((p: any) => p.method)
+          .filter((m: any) => !!m)
       }
+
+      const uniqueMethods = [...new Set(methods)].join(', ')
 
       return {
         ...order,
         saldoAPagar,
         valorPago,
         debito: saldoAPagar - valorPago,
+        methods: uniqueMethods || '-',
       }
     })
   },
