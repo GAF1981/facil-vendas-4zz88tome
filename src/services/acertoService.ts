@@ -3,20 +3,24 @@ import { Acerto, LastAcertoInfo } from '@/types/acerto'
 
 export const acertoService = {
   async getLastAcerto(clienteId: number): Promise<LastAcertoInfo | null> {
+    // We execute two queries in parallel:
+    // 1. Get the absolute last transaction (Acerto) date for this client
+    // 2. Get the last transaction that was specifically a "CAPTAÇÃO"
+
     const [lastAcertoResult, lastCaptacaoResult] = await Promise.all([
       supabase
         .from('BANCO_DE_DADOS')
         .select('"DATA DO ACERTO", "HORA DO ACERTO"')
         .eq('COD. CLIENTE', clienteId)
         .order('DATA DO ACERTO', { ascending: false })
-        .order('HORA DO ACERTO', { ascending: false })
+        .order('HORA DO ACERTO', { ascending: false }) // Use time as tie-breaker
         .limit(1)
         .maybeSingle(),
       supabase
         .from('BANCO_DE_DADOS')
         .select('"DATA DO ACERTO"')
         .eq('COD. CLIENTE', clienteId)
-        .ilike('FORMA', '%CAPTAÇÃO%') // Updated to match records containing "CAPTAÇÃO"
+        .ilike('FORMA', '%CAPTAÇÃO%') // Filter specifically for Captação
         .order('DATA DO ACERTO', { ascending: false })
         .limit(1)
         .maybeSingle(),
@@ -32,6 +36,7 @@ export const acertoService = {
       // We continue even if captacao fails, treating it as not found
     }
 
+    // If no records found for this client at all
     if (!lastAcertoResult.data) return null
 
     return {
@@ -76,7 +81,6 @@ export const acertoService = {
 
     if (itemsError) {
       // If items fail, we should technically rollback, but for simplicity we'll just throw
-      // Ideally this would be an RPC call or transaction
       console.error('Error inserting items:', itemsError)
       throw itemsError
     }
