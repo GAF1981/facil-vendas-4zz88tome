@@ -27,6 +27,8 @@ import { AcertoTable } from '@/components/acerto/AcertoTable'
 import { ClientSearch } from '@/components/acerto/ClientSearch'
 import { ClientDetails } from '@/components/acerto/ClientDetails'
 import { AcertoStockSummary } from '@/components/acerto/AcertoStockSummary'
+import { AcertoSalesSummary } from '@/components/acerto/AcertoSalesSummary'
+import { AcertoPaymentSummary } from '@/components/acerto/AcertoPaymentSummary'
 import { cn } from '@/lib/utils'
 import { parseCurrency } from '@/lib/formatters'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -50,6 +52,7 @@ export default function AcertoPage() {
 
   const [mode, setMode] = useState<'ACERTO' | 'CAPTACAO'>('ACERTO')
   const [acertoTipo, setAcertoTipo] = useState<string>('ACERTO')
+  const [paymentMethod, setPaymentMethod] = useState<string>('')
 
   // State for automatic order number
   const [nextOrderNumber, setNextOrderNumber] = useState<number | null>(null)
@@ -183,6 +186,7 @@ export default function AcertoPage() {
     setItems([])
     setMode('ACERTO')
     setAcertoTipo('ACERTO')
+    setPaymentMethod('')
   }
 
   const handleAcertoTipoChange = (value: string) => {
@@ -279,6 +283,14 @@ export default function AcertoPage() {
     setItems((prev) => prev.filter((i) => i.uid !== uid))
   }
 
+  // Calculate totals for summary and saving
+  const totalVendido = items.reduce((acc, item) => acc + item.valorVendido, 0)
+  const descontoStr = client?.Desconto || '0'
+  const descontoVal = parseCurrency(descontoStr.replace('%', ''))
+  const discountFactor = descontoVal > 1 ? descontoVal / 100 : descontoVal
+  const valorDesconto = totalVendido * discountFactor
+  const valorAcerto = totalVendido - valorDesconto
+
   const handleSave = async () => {
     if (!client || !employee) {
       toast({
@@ -298,6 +310,16 @@ export default function AcertoPage() {
       return
     }
 
+    // Optional: Validate payment method
+    // if (!paymentMethod) {
+    //   toast({
+    //     title: 'Forma de Pagamento',
+    //     description: 'Selecione uma forma de pagamento.',
+    //     variant: 'destructive',
+    //   })
+    //   return
+    // }
+
     setSaving(true)
     try {
       const now = new Date()
@@ -313,15 +335,17 @@ export default function AcertoPage() {
 
       // 2. Generate and Download PDF
       try {
-        const total = items.reduce((acc, item) => acc + item.valorVendido, 0)
-
         const pdfBlob = await acertoService.generatePdf({
           client,
           employee,
           items,
           date: now.toISOString(),
           acertoTipo,
-          total,
+          total: totalVendido,
+          // Pass new calculated values if backend supports it in future
+          discount: valorDesconto,
+          finalValue: valorAcerto,
+          paymentMethod: paymentMethod,
         })
 
         // Trigger Download
@@ -353,6 +377,7 @@ export default function AcertoPage() {
       setItems([])
       setClient(null)
       setIsClientConfirmed(false)
+      setPaymentMethod('')
       navigate('/')
     } catch (error) {
       console.error(error)
@@ -481,7 +506,7 @@ export default function AcertoPage() {
       </div>
 
       {isClientConfirmed && (
-        <div className="space-y-4 animate-fade-in pt-4 border-t">
+        <div className="space-y-6 animate-fade-in pt-4 border-t">
           {/* Automatic Order Number Field - Directly above Resumo da Contagem */}
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-3 pb-2">
@@ -532,6 +557,7 @@ export default function AcertoPage() {
             <ProductSelector onSelect={handleAddProduct} />
           </div>
 
+          {/* Table */}
           <AcertoTable
             items={items}
             onUpdateContagem={handleUpdateContagem}
@@ -541,25 +567,31 @@ export default function AcertoPage() {
             acertoTipo={acertoTipo}
           />
 
+          {/* New Sales Summary */}
+          <AcertoSalesSummary items={items} client={client} />
+
+          {/* Stock Summary */}
           <AcertoStockSummary items={items} />
 
+          {/* New Payment Summary */}
+          <AcertoPaymentSummary
+            saldoAPagar={valorAcerto}
+            paymentMethod={paymentMethod}
+            onPaymentMethodChange={setPaymentMethod}
+          />
+
+          {/* Bottom Action Bar */}
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-card border p-4 rounded-lg shadow-sm">
             <div className="text-sm text-muted-foreground">
               {acertoTipo === 'CAPTAÇÃO' || acertoTipo === 'COMPLEMENTO'
                 ? '* A Contagem é preenchida automaticamente para este tipo de operação.'
-                : '* Saldo Inicial padrão é 0 para novos itens.'}
+                : '* Verifique os totais antes de finalizar.'}
             </div>
             <div className="flex items-center gap-4">
               <div className="text-right">
-                <p className="text-sm text-muted-foreground">
-                  Valor Total Vendido
-                </p>
+                <p className="text-sm text-muted-foreground">Total a Pagar</p>
                 <p className="text-2xl font-bold text-green-600">
-                  R${' '}
-                  {items
-                    .reduce((acc, item) => acc + item.valorVendido, 0)
-                    .toFixed(2)
-                    .replace('.', ',')}
+                  R$ {valorAcerto.toFixed(2).replace('.', ',')}
                 </p>
               </div>
               <Separator
