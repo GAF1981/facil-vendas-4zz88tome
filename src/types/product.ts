@@ -1,9 +1,18 @@
 import { Database } from '@/lib/supabase/types'
 import { z } from 'zod'
 
-export type ProductRow = Database['public']['Tables']['PRODUTOS']['Row']
-export type ProductInsert = Database['public']['Tables']['PRODUTOS']['Insert']
-export type ProductUpdate = Database['public']['Tables']['PRODUTOS']['Update']
+// Manually extending types since we can't regenerate supabase types in this environment
+// Adding the new FREQUENTES column as defined in the migration
+interface AdditionalProductFields {
+  FREQUENTES?: string | null
+}
+
+export type ProductRow = Database['public']['Tables']['PRODUTOS']['Row'] &
+  AdditionalProductFields
+export type ProductInsert = Database['public']['Tables']['PRODUTOS']['Insert'] &
+  AdditionalProductFields
+export type ProductUpdate = Database['public']['Tables']['PRODUTOS']['Update'] &
+  AdditionalProductFields
 
 // Helper to handle empty strings as null for numbers
 const numberOrNull = z.preprocess(
@@ -27,6 +36,7 @@ export const productSchema = z.object({
   GRUPO: z.string().optional().nullable(),
   PREÇO: z.string().optional().nullable(),
   TIPO: z.string().optional().nullable(),
+  FREQUENTES: z.string().optional().nullable(),
 })
 
 export type ProductFormData = z.infer<typeof productSchema>

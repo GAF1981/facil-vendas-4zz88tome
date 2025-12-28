@@ -257,6 +257,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_unique_product_groups: {
+        Args: never
+        Returns: {
+          grupo: string
+        }[]
+      }
       login_by_email: {
         Args: { p_email: string }
         Returns: {
