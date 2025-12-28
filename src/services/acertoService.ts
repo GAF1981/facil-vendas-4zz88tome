@@ -12,6 +12,7 @@ export const acertoService = {
         .from('BANCO_DE_DADOS')
         .select('"DATA DO ACERTO", "HORA DO ACERTO"')
         .eq('COD. CLIENTE', clienteId)
+        .neq('DATA DO ACERTO', null) // Ensure we don't pick up null dates
         .order('DATA DO ACERTO', { ascending: false })
         .order('HORA DO ACERTO', { ascending: false }) // Use time as tie-breaker
         .limit(1)
@@ -31,9 +32,9 @@ export const acertoService = {
       return null
     }
 
+    // We continue even if captacao fails, treating it as not found
     if (lastCaptacaoResult.error) {
       console.error('Error fetching last captacao:', lastCaptacaoResult.error)
-      // We continue even if captacao fails, treating it as not found
     }
 
     // If no records found for this client at all, we return an object with nulls

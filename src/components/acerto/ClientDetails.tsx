@@ -2,7 +2,7 @@ import { ClientRow } from '@/types/client'
 import { LastAcertoInfo } from '@/types/acerto'
 import { Card, CardContent } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
-import { format, parseISO } from 'date-fns'
+import { format, parseISO, isValid } from 'date-fns'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 
@@ -26,8 +26,15 @@ export function ClientDetails({
         const [year, month, day] = dateString.split('-')
         return `${day}/${month}/${year}`
       }
-      // Fallback for other formats (like ISO with time)
-      return format(parseISO(dateString), 'dd/MM/yyyy')
+
+      // Attempt to parse ISO string
+      const date = parseISO(dateString)
+      if (isValid(date)) {
+        return format(date, 'dd/MM/yyyy')
+      }
+
+      // Fallback for other formats
+      return dateString
     } catch (e) {
       console.error('Date formatting error:', e)
       return dateString

@@ -100,6 +100,7 @@ export default function AcertoPage() {
     setLoadingStatus(true)
 
     try {
+      // This fetches the last settlement date as per the user story
       const info = await acertoService.getLastAcerto(selectedClient.CODIGO)
       setLastAcerto(info)
     } catch (error) {
