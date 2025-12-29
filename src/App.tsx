@@ -18,6 +18,7 @@ import LoginPage from '@/pages/auth/LoginPage'
 import AcertoPage from '@/pages/acerto/AcertoPage'
 import RecebimentoPage from '@/pages/recebimento/RecebimentoPage'
 import CobrancaPage from '@/pages/cobranca/CobrancaPage'
+import NotaFiscalPage from '@/pages/nota-fiscal/NotaFiscalPage'
 import { AuthProvider } from '@/hooks/use-auth'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 
@@ -59,12 +60,14 @@ const App = () => (
               {/* Recebimento Module */}
               <Route path="/recebimento" element={<RecebimentoPage />} />
 
-              {/* Cobranca Module (NEW) */}
+              {/* Cobranca Module */}
               <Route path="/cobranca" element={<CobrancaPage />} />
+
+              {/* Nota Fiscal Module (NEW) */}
+              <Route path="/nota-fiscal" element={<NotaFiscalPage />} />
 
               {/* New Modules Routes */}
               <Route path="/complemento" element={<PlaceholderModule />} />
-              <Route path="/nota-fiscal" element={<PlaceholderModule />} />
               <Route path="/caixa" element={<PlaceholderModule />} />
               <Route path="/inventario" element={<PlaceholderModule />} />
               <Route path="/rota" element={<PlaceholderModule />} />
