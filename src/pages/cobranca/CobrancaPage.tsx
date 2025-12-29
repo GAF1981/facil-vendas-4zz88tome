@@ -15,6 +15,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
 import {
   CreditCard,
   Search,
@@ -24,6 +26,8 @@ import {
   Calendar,
   MapPin,
   Users,
+  Building2,
+  Bike,
 } from 'lucide-react'
 import { DebtTable } from '@/components/cobranca/DebtTable'
 import { cobrancaService } from '@/services/cobrancaService'
@@ -42,6 +46,13 @@ export default function CobrancaPage() {
   const [groupFilter, setGroupFilter] = useState<string>('all')
   const [routeFilter, setRouteFilter] = useState<string>('all')
   const [vencimentoFilter, setVencimentoFilter] = useState<string>('')
+
+  // New Filters
+  const [bairroFilter, setBairroFilter] = useState<string>('all')
+  const [municipioFilter, setMunicipioFilter] = useState<string>('all')
+  const [showSelectedOnly, setShowSelectedOnly] = useState(false)
+  const [selectedClients, setSelectedClients] = useState<Set<number>>(new Set())
+
   const { toast } = useToast()
 
   const fetchDebts = async () => {
@@ -75,6 +86,27 @@ export default function CobrancaPage() {
       Array.from(new Set(data.map((c) => c.routeGroup).filter(Boolean))).sort(),
     [data],
   )
+  const uniqueBairros = useMemo(
+    () =>
+      Array.from(
+        new Set(data.map((c) => c.neighborhood).filter(Boolean)),
+      ).sort(),
+    [data],
+  )
+  const uniqueMunicipios = useMemo(
+    () => Array.from(new Set(data.map((c) => c.city).filter(Boolean))).sort(),
+    [data],
+  )
+
+  const toggleClientSelection = (clientId: number) => {
+    const newSelected = new Set(selectedClients)
+    if (newSelected.has(clientId)) {
+      newSelected.delete(clientId)
+    } else {
+      newSelected.add(clientId)
+    }
+    setSelectedClients(newSelected)
+  }
 
   useEffect(() => {
     let res = [...data]
@@ -141,6 +173,18 @@ export default function CobrancaPage() {
       res = res.filter((c) => c.routeGroup === routeFilter)
     }
 
+    if (bairroFilter !== 'all') {
+      res = res.filter((c) => c.neighborhood === bairroFilter)
+    }
+
+    if (municipioFilter !== 'all') {
+      res = res.filter((c) => c.city === municipioFilter)
+    }
+
+    if (showSelectedOnly) {
+      res = res.filter((c) => selectedClients.has(c.clientId))
+    }
+
     setFilteredData(res)
   }, [
     data,
@@ -150,6 +194,10 @@ export default function CobrancaPage() {
     groupFilter,
     routeFilter,
     vencimentoFilter,
+    bairroFilter,
+    municipioFilter,
+    showSelectedOnly,
+    selectedClients,
   ])
 
   // Summary Metrics
@@ -187,6 +235,8 @@ export default function CobrancaPage() {
     0,
   )
 
+  const selectedCount = selectedClients.size
+
   return (
     <div className="space-y-6 animate-fade-in p-2 pb-20 sm:p-0">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -209,7 +259,7 @@ export default function CobrancaPage() {
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
@@ -254,17 +304,34 @@ export default function CobrancaPage() {
             <p className="text-xs text-muted-foreground">Status VENCIDO</p>
           </CardContent>
         </Card>
+        <Card className={showSelectedOnly ? 'border-primary bg-primary/5' : ''}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Rota Motoqueiro
+            </CardTitle>
+            <Bike className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-primary">
+              {selectedCount}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Clientes selecionados
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>Filtros e Busca</CardTitle>
           <CardDescription>
-            Refine a lista para focar nas cobranças prioritárias.
+            Refine a lista para focar nas cobranças prioritárias e organize
+            rotas.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-4">
             <div className="col-span-1 sm:col-span-2 relative">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -334,6 +401,44 @@ export default function CobrancaPage() {
               </Select>
             </div>
             <div className="col-span-1">
+              <Select value={bairroFilter} onValueChange={setBairroFilter}>
+                <SelectTrigger>
+                  <MapPin className="w-4 h-4 mr-2 text-muted-foreground" />
+                  <SelectValue placeholder="Bairro" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos Bairros</SelectItem>
+                  {uniqueBairros.map((b) => (
+                    <SelectItem key={b as string} value={b as string}>
+                      {b}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="col-span-1">
+              <Select
+                value={municipioFilter}
+                onValueChange={setMunicipioFilter}
+              >
+                <SelectTrigger>
+                  <Building2 className="w-4 h-4 mr-2 text-muted-foreground" />
+                  <SelectValue placeholder="Município" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos Municípios</SelectItem>
+                  {uniqueMunicipios.map((m) => (
+                    <SelectItem key={m as string} value={m as string}>
+                      {m}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mt-4 items-center">
+            <div className="col-span-1 sm:col-span-2">
               <div className="relative">
                 <Calendar className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -345,6 +450,21 @@ export default function CobrancaPage() {
                 />
               </div>
             </div>
+            <div className="col-span-1 sm:col-span-2 flex items-center space-x-2 border p-2 rounded-md bg-muted/20">
+              <Checkbox
+                id="rota-motoqueiro-filter"
+                checked={showSelectedOnly}
+                onCheckedChange={(checked) =>
+                  setShowSelectedOnly(checked === true)
+                }
+              />
+              <Label
+                htmlFor="rota-motoqueiro-filter"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+              >
+                Filtrar Rota Motoqueiro ({selectedClients.size})
+              </Label>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -354,7 +474,12 @@ export default function CobrancaPage() {
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       ) : (
-        <DebtTable data={filteredData} onRefresh={fetchDebts} />
+        <DebtTable
+          data={filteredData}
+          onRefresh={fetchDebts}
+          selectedClients={selectedClients}
+          onToggleClient={toggleClientSelection}
+        />
       )}
     </div>
   )

@@ -15,7 +15,7 @@ export type Database = {
   }
   public: {
     Tables: {
-      'AÇOES DE COBRANÇA': {
+      'AÇOES DE COBRANÇA_BACKUP': {
         Row: {
           'AÇÃO DE COBRANÇA': string | null
           CLIENTE: string | null
@@ -48,6 +48,45 @@ export type Database = {
           'NOME FUNCIONÁRIO'?: string | null
           'NOVA DATA COMBINADA PAGAMENTO'?: string | null
           'NÚMERO DO PEDIDO'?: number | null
+        }
+        Relationships: []
+      }
+      acoes_cobranca: {
+        Row: {
+          acao: string | null
+          cliente_id: number | null
+          cliente_nome: string | null
+          created_at: string | null
+          data_acao: string | null
+          funcionario_id: number | null
+          funcionario_nome: string | null
+          id: number
+          nova_data_combinada: string | null
+          pedido_id: number | null
+        }
+        Insert: {
+          acao?: string | null
+          cliente_id?: number | null
+          cliente_nome?: string | null
+          created_at?: string | null
+          data_acao?: string | null
+          funcionario_id?: number | null
+          funcionario_nome?: string | null
+          id?: number
+          nova_data_combinada?: string | null
+          pedido_id?: number | null
+        }
+        Update: {
+          acao?: string | null
+          cliente_id?: number | null
+          cliente_nome?: string | null
+          created_at?: string | null
+          data_acao?: string | null
+          funcionario_id?: number | null
+          funcionario_nome?: string | null
+          id?: number
+          nova_data_combinada?: string | null
+          pedido_id?: number | null
         }
         Relationships: []
       }
