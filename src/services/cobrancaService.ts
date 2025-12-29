@@ -366,7 +366,7 @@ export const cobrancaService = {
   },
 
   async addCollectionAction(action: CollectionActionInsert): Promise<void> {
-    const { error } = await supabase.from('COBRANÇA').insert({
+    const payload: any = {
       'AÇÃO DE COBRANÇA': action.acao,
       'DATA AÇÃO COBRANÇA': action.dataAcao,
       'NOVA DATA COMBINADA PAGAMENTO': action.novaDataCombinada,
@@ -375,7 +375,9 @@ export const cobrancaService = {
       'NÚMERO DO PEDIDO': action.pedidoId,
       'COD. CLIENTE': action.clienteId,
       CLIENTE: action.clienteNome,
-    })
+    }
+
+    const { error } = await supabase.from('COBRANÇA').insert(payload)
 
     if (error) throw error
   },

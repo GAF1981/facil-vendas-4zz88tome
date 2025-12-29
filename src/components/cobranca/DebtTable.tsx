@@ -266,7 +266,9 @@ export function DebtTable({ data, onRefresh }: DebtTableProps) {
                       className={cn(
                         'text-[10px] px-1 py-0 h-5',
                         row.status === 'PAGO' &&
-                          'bg-green-100 text-green-700 hover:bg-green-200',
+                          'bg-green-100 text-green-700 hover:bg-green-200 border-transparent',
+                        row.status === 'A VENCER' &&
+                          'text-red-600 border-red-200 bg-red-50 hover:bg-red-100',
                       )}
                     >
                       {row.status}
