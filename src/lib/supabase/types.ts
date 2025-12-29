@@ -351,6 +351,51 @@ export type Database = {
         }
         Relationships: []
       }
+      PENDENCIAS: {
+        Row: {
+          cliente_id: number
+          created_at: string | null
+          descricao_pendencia: string
+          descricao_resolucao: string | null
+          funcionario_id: number
+          id: number
+          resolvida: boolean
+        }
+        Insert: {
+          cliente_id: number
+          created_at?: string | null
+          descricao_pendencia: string
+          descricao_resolucao?: string | null
+          funcionario_id: number
+          id?: number
+          resolvida?: boolean
+        }
+        Update: {
+          cliente_id?: number
+          created_at?: string | null
+          descricao_pendencia?: string
+          descricao_resolucao?: string | null
+          funcionario_id?: number
+          id?: number
+          resolvida?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'PENDENCIAS_cliente_id_fkey'
+            columns: ['cliente_id']
+            isOneToOne: false
+            referencedRelation: 'CLIENTES'
+            referencedColumns: ['CODIGO']
+          },
+          {
+            foreignKeyName: 'PENDENCIAS_funcionario_id_fkey'
+            columns: ['funcionario_id']
+            isOneToOne: false
+            referencedRelation: 'FUNCIONARIOS'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       PRODUTOS: {
         Row: {
           CODIGO: number | null
