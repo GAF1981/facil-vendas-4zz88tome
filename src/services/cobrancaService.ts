@@ -32,20 +32,20 @@ export const cobrancaService = {
 
     // 2.5 Fetch Collection Actions Counts from new table
     const { data: cobrancaData, error: cobrancaError } = await supabase
-      .from('AÇOES DE COBRANÇA' as any)
-      .select('"NÚMERO DO PEDIDO"')
+      .from('acoes_cobranca')
+      .select('pedido_id')
 
     if (cobrancaError) throw cobrancaError
 
     const cobrancaCounts = new Map<number, number>()
     cobrancaData?.forEach((row: any) => {
-      const pid = row['NÚMERO DO PEDIDO']
+      const pid = row.pedido_id
       if (pid) {
         cobrancaCounts.set(pid, (cobrancaCounts.get(pid) || 0) + 1)
       }
     })
 
-    // 3. Fetch Client Types, Groups and Address Info efficiently
+    // 3. Fetch Client Types, Groups and Address Info efficiently with chunking
     const clientIds = [
       ...new Set(dbData?.map((r) => r['CÓDIGO DO CLIENTE']) || []),
     ] as number[]
@@ -61,25 +61,35 @@ export const cobrancaService = {
         city: string | null
       }
     >()
-    if (clientIds.length > 0) {
-      const { data: clientData, error: clientError } = await supabase
-        .from('CLIENTES')
-        .select(
-          'CODIGO, "TIPO DE CLIENTE", GRUPO, "GRUPO ROTA", ENDEREÇO, BAIRRO, MUNICÍPIO',
-        )
-        .in('CODIGO', clientIds)
 
-      if (!clientError && clientData) {
-        clientData.forEach((c) => {
-          clientInfoMap.set(c.CODIGO, {
-            type: c['TIPO DE CLIENTE'] || 'N/D',
-            group: (c as any)['GRUPO'] || null,
-            route: (c as any)['GRUPO ROTA'] || null,
-            address: (c as any)['ENDEREÇO'] || null,
-            neighborhood: (c as any)['BAIRRO'] || null,
-            city: (c as any)['MUNICÍPIO'] || null,
+    if (clientIds.length > 0) {
+      const chunkSize = 200
+      for (let i = 0; i < clientIds.length; i += chunkSize) {
+        const chunk = clientIds.slice(i, i + chunkSize)
+        const { data: clientData, error: clientError } = await supabase
+          .from('CLIENTES')
+          .select(
+            'CODIGO, "TIPO DE CLIENTE", GRUPO, "GRUPO ROTA", ENDEREÇO, BAIRRO, MUNICÍPIO',
+          )
+          .in('CODIGO', chunk)
+
+        if (clientError) {
+          console.error('Error fetching clients chunk:', clientError)
+          continue
+        }
+
+        if (clientData) {
+          clientData.forEach((c) => {
+            clientInfoMap.set(c.CODIGO, {
+              type: c['TIPO DE CLIENTE'] || 'N/D',
+              group: (c as any)['GRUPO'] || null,
+              route: (c as any)['GRUPO ROTA'] || null,
+              address: (c as any)['ENDEREÇO'] || null,
+              neighborhood: (c as any)['BAIRRO'] || null,
+              city: (c as any)['MUNICÍPIO'] || null,
+            })
           })
-        })
+        }
       }
     }
 
@@ -369,44 +379,40 @@ export const cobrancaService = {
   },
 
   async getCollectionActions(orderId: string): Promise<CollectionAction[]> {
-    // Cast to any to access new table not in types
     const { data, error } = await supabase
-      .from('AÇOES DE COBRANÇA' as any)
+      .from('acoes_cobranca')
       .select('*')
-      .eq('NÚMERO DO PEDIDO', Number(orderId)) // Ensure it is number
-      .order('DATA AÇÃO COBRANÇA', { ascending: false })
+      .eq('pedido_id', Number(orderId))
+      .order('data_acao', { ascending: false })
 
     if (error) throw error
 
     return (data || []).map((row: any) => ({
-      id: row['ID AÇÃO'],
-      acao: row['AÇÃO DE COBRANÇA'],
-      dataAcao: row['DATA AÇÃO COBRANÇA'],
-      novaDataCombinada: row['NOVA DATA COMBINADA PAGAMENTO'],
-      funcionarioNome: row['NOME FUNCIONÁRIO'],
-      funcionarioId: row['CÓDIGO FUNCIONÁRIO'],
-      pedidoId: row['NÚMERO DO PEDIDO'],
-      clienteId: row['COD. CLIENTE'],
-      clienteNome: row['CLIENTE'],
+      id: row.id,
+      acao: row.acao,
+      dataAcao: row.data_acao,
+      novaDataCombinada: row.nova_data_combinada,
+      funcionarioNome: row.funcionario_nome,
+      funcionarioId: row.funcionario_id,
+      pedidoId: row.pedido_id,
+      clienteId: row.cliente_id,
+      clienteNome: row.cliente_nome,
     }))
   },
 
   async addCollectionAction(action: CollectionActionInsert): Promise<void> {
-    // Explicitly casting and mapping to database schema to avoid type mismatch
     const payload = {
-      'AÇÃO DE COBRANÇA': action.acao,
-      'DATA AÇÃO COBRANÇA': action.dataAcao,
-      'NOVA DATA COMBINADA PAGAMENTO': action.novaDataCombinada || null,
-      'NOME FUNCIONÁRIO': action.funcionarioNome,
-      'CÓDIGO FUNCIONÁRIO': action.funcionarioId, // Number
-      'NÚMERO DO PEDIDO': action.pedidoId, // Number
-      'COD. CLIENTE': action.clienteId, // Number
-      CLIENTE: action.clienteNome,
+      acao: action.acao,
+      data_acao: action.dataAcao,
+      nova_data_combinada: action.novaDataCombinada || null,
+      funcionario_nome: action.funcionarioNome,
+      funcionario_id: action.funcionarioId,
+      pedido_id: action.pedidoId,
+      cliente_id: action.clienteId,
+      cliente_nome: action.clienteNome,
     }
 
-    const { error } = await supabase
-      .from('AÇOES DE COBRANÇA' as any)
-      .insert(payload)
+    const { error } = await supabase.from('acoes_cobranca').insert(payload)
 
     if (error) throw error
 
