@@ -72,6 +72,8 @@ export function ClientForm({
           'DESCONTO BRINQUEDO': '',
           'DESCONTO ACESSORIO': '',
           'DESCONTO OUTROS': '',
+          GRUPO: '',
+          'GRUPO ROTA': '',
           'OBSERVAÇÃO FIXA': '',
           'ALTERAÇÃO CLIENTE': '',
         },
@@ -555,6 +557,47 @@ export function ClientForm({
                     <FormControl>
                       <Input
                         placeholder="%"
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Classification Fields */}
+            <div className="md:col-span-6">
+              <FormField
+                control={form.control}
+                name="GRUPO"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Grupo</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Grupo de clientes"
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="md:col-span-6">
+              <FormField
+                control={form.control}
+                name="GRUPO ROTA"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Rota / Grupo Rota</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Rota de entrega"
                         {...field}
                         value={field.value || ''}
                       />

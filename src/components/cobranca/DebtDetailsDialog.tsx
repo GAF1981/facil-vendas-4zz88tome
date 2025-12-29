@@ -43,14 +43,31 @@ export function DebtDetailsDialog({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl">
-            Detalhamento de Débitos: {client.clientName}
-          </DialogTitle>
-          <div className="text-sm text-muted-foreground">
-            Total Devido:{' '}
-            <span className="font-bold text-red-600">
-              R$ {formatCurrency(client.totalDebt)}
-            </span>
+          <div className="flex flex-col gap-1">
+            <DialogTitle className="text-xl">
+              Detalhamento de Débitos: {client.clientName}
+            </DialogTitle>
+            <div className="flex gap-2 text-xs text-muted-foreground flex-wrap">
+              <Badge variant="secondary" className="font-normal">
+                {client.clientType}
+              </Badge>
+              {client.group && (
+                <Badge variant="outline" className="font-normal">
+                  Grupo: {client.group}
+                </Badge>
+              )}
+              {client.routeGroup && (
+                <Badge variant="outline" className="font-normal">
+                  Rota: {client.routeGroup}
+                </Badge>
+              )}
+            </div>
+            <div className="text-sm text-muted-foreground mt-1">
+              Total Devido:{' '}
+              <span className="font-bold text-red-600">
+                R$ {formatCurrency(client.totalDebt)}
+              </span>
+            </div>
           </div>
         </DialogHeader>
 

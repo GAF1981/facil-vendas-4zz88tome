@@ -41,6 +41,9 @@ export interface ClientDebt {
   lastAcertoDate: string
   oldestOverdueDate: string | null
   orders: OrderDebt[]
+  // New classification fields
+  group: string | null
+  routeGroup: string | null
 }
 
 export interface CollectionAction {

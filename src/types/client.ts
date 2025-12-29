@@ -8,6 +8,8 @@ interface AdditionalFields {
   'DESCONTO BRINQUEDO'?: string | null
   'DESCONTO ACESSORIO'?: string | null
   'DESCONTO OUTROS'?: string | null
+  GRUPO?: string | null
+  'GRUPO ROTA'?: string | null
 }
 
 // Type definition derived from Supabase Row with manual extension
@@ -52,6 +54,9 @@ export const clientSchema = z.object({
   'DESCONTO BRINQUEDO': z.string().optional().nullable(),
   'DESCONTO ACESSORIO': z.string().optional().nullable(),
   'DESCONTO OUTROS': z.string().optional().nullable(),
+  // New classification fields
+  GRUPO: z.string().optional().nullable(),
+  'GRUPO ROTA': z.string().optional().nullable(),
 
   'OBSERVAÇÃO FIXA': z.string().optional().nullable(),
   'ALTERAÇÃO CLIENTE': z.string().optional().nullable(),

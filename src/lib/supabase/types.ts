@@ -144,6 +144,27 @@ export type Database = {
         }
         Relationships: []
       }
+      'CLIENTE COMPLETA': {
+        Row: {
+          CODIGO: number
+          GRUPO: string | null
+          'GRUPO ROTA': string | null
+          'NOME CLIENTE': string | null
+        }
+        Insert: {
+          CODIGO: number
+          GRUPO?: string | null
+          'GRUPO ROTA'?: string | null
+          'NOME CLIENTE'?: string | null
+        }
+        Update: {
+          CODIGO?: number
+          GRUPO?: string | null
+          'GRUPO ROTA'?: string | null
+          'NOME CLIENTE'?: string | null
+        }
+        Relationships: []
+      }
       CLIENTES: {
         Row: {
           'ALTERAÇÃO CLIENTE': string | null

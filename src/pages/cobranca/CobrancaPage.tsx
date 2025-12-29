@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import {
   Card,
   CardContent,
@@ -22,6 +22,8 @@ import {
   Loader2,
   Filter,
   Calendar,
+  MapPin,
+  Users,
 } from 'lucide-react'
 import { DebtTable } from '@/components/cobranca/DebtTable'
 import { cobrancaService } from '@/services/cobrancaService'
@@ -37,6 +39,8 @@ export default function CobrancaPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('todos')
   const [typeFilter, setTypeFilter] = useState<string>('all')
+  const [groupFilter, setGroupFilter] = useState<string>('all')
+  const [routeFilter, setRouteFilter] = useState<string>('all')
   const [vencimentoFilter, setVencimentoFilter] = useState<string>('')
   const { toast } = useToast()
 
@@ -45,13 +49,6 @@ export default function CobrancaPage() {
     try {
       const result = await cobrancaService.getDebts()
       setData(result)
-      applyFilters(
-        result,
-        searchTerm,
-        statusFilter,
-        typeFilter,
-        vencimentoFilter,
-      )
     } catch (error) {
       console.error(error)
       toast({
@@ -68,14 +65,19 @@ export default function CobrancaPage() {
     fetchDebts()
   }, [])
 
-  const applyFilters = (
-    source: ClientDebt[],
-    search: string,
-    status: string,
-    type: string,
-    vencimento: string,
-  ) => {
-    let res = [...source]
+  // Derived unique values for filters
+  const uniqueGroups = useMemo(
+    () => Array.from(new Set(data.map((c) => c.group).filter(Boolean))).sort(),
+    [data],
+  )
+  const uniqueRoutes = useMemo(
+    () =>
+      Array.from(new Set(data.map((c) => c.routeGroup).filter(Boolean))).sort(),
+    [data],
+  )
+
+  useEffect(() => {
+    let res = [...data]
 
     // Deep copy enough to modify nested arrays without affecting state directly
     res = res.map((client) => ({
@@ -87,8 +89,8 @@ export default function CobrancaPage() {
     }))
 
     // Filter Installments based on Vencimento
-    if (vencimento) {
-      const targetDate = parseISO(vencimento)
+    if (vencimentoFilter) {
+      const targetDate = parseISO(vencimentoFilter)
       res.forEach((client) => {
         client.orders.forEach((order) => {
           order.installments = order.installments.filter((inst) => {
@@ -98,15 +100,13 @@ export default function CobrancaPage() {
             return false
           })
         })
-        // Remove orders with no matching installments
         client.orders = client.orders.filter((o) => o.installments.length > 0)
       })
-      // Remove clients with no matching orders
       res = res.filter((c) => c.orders.length > 0)
     }
 
-    if (search.trim()) {
-      const lowerSearch = search.toLowerCase()
+    if (searchTerm.trim()) {
+      const lowerSearch = searchTerm.toLowerCase()
       res = res.filter(
         (c) =>
           c.clientName.toLowerCase().includes(lowerSearch) ||
@@ -114,13 +114,13 @@ export default function CobrancaPage() {
       )
     }
 
-    if (status !== 'todos') {
+    if (statusFilter !== 'todos') {
       res.forEach((client) => {
         client.orders.forEach((order) => {
           order.installments = order.installments.filter((inst) => {
-            if (status === 'SEM DÉBITO') return inst.status === 'PAGO' // Treat as 'PAGO' in this context? Or strict
-            if (status === 'A VENCER' || status === 'VENCIDO')
-              return inst.status === status
+            if (statusFilter === 'SEM DÉBITO') return inst.status === 'PAGO'
+            if (statusFilter === 'A VENCER' || statusFilter === 'VENCIDO')
+              return inst.status === statusFilter
             return true
           })
         })
@@ -129,19 +129,30 @@ export default function CobrancaPage() {
       res = res.filter((c) => c.orders.length > 0)
     }
 
-    if (type !== 'all') {
-      res = res.filter((c) => c.clientType === type)
+    if (typeFilter !== 'all') {
+      res = res.filter((c) => c.clientType === typeFilter)
+    }
+
+    if (groupFilter !== 'all') {
+      res = res.filter((c) => c.group === groupFilter)
+    }
+
+    if (routeFilter !== 'all') {
+      res = res.filter((c) => c.routeGroup === routeFilter)
     }
 
     setFilteredData(res)
-  }
+  }, [
+    data,
+    searchTerm,
+    statusFilter,
+    typeFilter,
+    groupFilter,
+    routeFilter,
+    vencimentoFilter,
+  ])
 
-  // Handle filter changes
-  useEffect(() => {
-    applyFilters(data, searchTerm, statusFilter, typeFilter, vencimentoFilter)
-  }, [searchTerm, statusFilter, typeFilter, vencimentoFilter, data])
-
-  // Summary Metrics based on filtered orders/installments
+  // Summary Metrics
   const totalReceivable = filteredData.reduce(
     (acc, c) =>
       acc +
@@ -170,7 +181,6 @@ export default function CobrancaPage() {
     0,
   )
 
-  // Count total displayed rows (installments)
   const totalRows = filteredData.reduce(
     (acc, c) =>
       acc + c.orders.reduce((oAcc, o) => oAcc + o.installments.length, 0),
@@ -212,7 +222,7 @@ export default function CobrancaPage() {
               R$ {formatCurrency(totalReceivable)}
             </div>
             <p className="text-xs text-muted-foreground">
-              Soma das parcelas em aberto listadas
+              Soma das parcelas em aberto
             </p>
           </CardContent>
         </Card>
@@ -254,8 +264,8 @@ export default function CobrancaPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col md:flex-row gap-4 flex-wrap">
-            <div className="relative flex-1 min-w-[200px]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="col-span-1 sm:col-span-2 relative">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Buscar por nome ou código..."
@@ -264,7 +274,7 @@ export default function CobrancaPage() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <div className="w-full md:w-[150px]">
+            <div className="col-span-1">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger>
                   <SelectValue placeholder="Status" />
@@ -277,7 +287,7 @@ export default function CobrancaPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="w-full md:w-[150px]">
+            <div className="col-span-1">
               <Select value={typeFilter} onValueChange={setTypeFilter}>
                 <SelectTrigger>
                   <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
@@ -291,7 +301,39 @@ export default function CobrancaPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="w-full md:w-[180px]">
+            <div className="col-span-1">
+              <Select value={groupFilter} onValueChange={setGroupFilter}>
+                <SelectTrigger>
+                  <Users className="w-4 h-4 mr-2 text-muted-foreground" />
+                  <SelectValue placeholder="Grupo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos Grupos</SelectItem>
+                  {uniqueGroups.map((g) => (
+                    <SelectItem key={g as string} value={g as string}>
+                      {g}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="col-span-1">
+              <Select value={routeFilter} onValueChange={setRouteFilter}>
+                <SelectTrigger>
+                  <MapPin className="w-4 h-4 mr-2 text-muted-foreground" />
+                  <SelectValue placeholder="Rota" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas Rotas</SelectItem>
+                  {uniqueRoutes.map((r) => (
+                    <SelectItem key={r as string} value={r as string}>
+                      {r}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="col-span-1">
               <div className="relative">
                 <Calendar className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input

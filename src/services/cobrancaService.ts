@@ -45,21 +45,28 @@ export const cobrancaService = {
       }
     })
 
-    // 3. Fetch Client Types efficiently
+    // 3. Fetch Client Types and Groups efficiently
     const clientIds = [
       ...new Set(dbData?.map((r) => r['CÓDIGO DO CLIENTE']) || []),
     ] as number[]
 
-    let clientTypesMap = new Map<number, string>()
+    let clientInfoMap = new Map<
+      number,
+      { type: string; group: string | null; route: string | null }
+    >()
     if (clientIds.length > 0) {
       const { data: clientData, error: clientError } = await supabase
         .from('CLIENTES')
-        .select('CODIGO, "TIPO DE CLIENTE"')
+        .select('CODIGO, "TIPO DE CLIENTE", GRUPO, "GRUPO ROTA"')
         .in('CODIGO', clientIds)
 
       if (!clientError && clientData) {
         clientData.forEach((c) => {
-          clientTypesMap.set(c.CODIGO, c['TIPO DE CLIENTE'] || 'N/D')
+          clientInfoMap.set(c.CODIGO, {
+            type: c['TIPO DE CLIENTE'] || 'N/D',
+            group: (c as any)['GRUPO'] || null,
+            route: (c as any)['GRUPO ROTA'] || null,
+          })
         })
       }
     }
@@ -234,10 +241,13 @@ export const cobrancaService = {
       }
 
       if (!clientsMap.has(order.clientId)) {
+        const clientInfo = clientInfoMap.get(order.clientId)
         clientsMap.set(order.clientId, {
           clientId: order.clientId,
           clientName: order.clientName || `Cliente ${order.clientId}`,
-          clientType: clientTypesMap.get(order.clientId) || 'N/D',
+          clientType: clientInfo?.type || 'N/D',
+          group: clientInfo?.group || null,
+          routeGroup: clientInfo?.route || null,
           totalDebt: 0,
           orderCount: 0,
           status: 'SEM DÉBITO', // Default start
