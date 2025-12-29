@@ -10,7 +10,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Search, Eraser } from 'lucide-react'
-import { ClientDebt, OrderDebt, Receivable } from '@/types/cobranca'
+import { ClientDebt } from '@/types/cobranca'
 import { formatCurrency } from '@/lib/formatters'
 import { format, parseISO } from 'date-fns'
 import { DebtDetailsDialog } from './DebtDetailsDialog'
@@ -33,6 +33,7 @@ interface DebtTableProps {
 // Flattened row type for display
 interface FlatRow {
   uniqueId: string
+  receivableId: number
   clientId: number
   clientName: string
   clientType: string
@@ -44,8 +45,9 @@ interface FlatRow {
   formaPagamento: string
   valorRegistrado: number
   valorPago: number
+  debito: number
   status: 'VENCIDO' | 'A VENCER' | 'PAGO'
-  // Editable fields (Order Level)
+  // Editable fields (Receivable Level)
   formaCobranca: string | null
   dataCombinada: string | null
 }
@@ -55,9 +57,9 @@ export function DebtTable({ data }: DebtTableProps) {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const { toast } = useToast()
 
-  // Local state for optimistic updates on editable fields (Order Level)
+  // Local state for optimistic updates on editable fields (Receivable Level)
   const [localUpdates, setLocalUpdates] = useState<
-    Record<number, { formaCobranca?: any; dataCombinada?: any }>
+    Record<string, { formaCobranca?: any; dataCombinada?: any }>
   >({})
 
   const handleOpenDetails = (client: ClientDebt) => {
@@ -73,54 +75,75 @@ export function DebtTable({ data }: DebtTableProps) {
   const flattenedData: FlatRow[] = useMemo(() => {
     return data.flatMap((client) =>
       client.orders.flatMap((order) => {
-        // Apply local updates
-        const updates = localUpdates[order.orderId] || {}
-        const currentFormaCobranca =
-          updates.formaCobranca !== undefined
-            ? updates.formaCobranca
-            : order.formaCobranca
-        const currentDataCombinada =
-          updates.dataCombinada !== undefined
-            ? updates.dataCombinada
-            : order.dataCombinada
+        return order.installments.map((inst, index) => {
+          const uniqueId = `${client.clientId}-${order.orderId}-${inst.id}-${index}`
+          const updates = localUpdates[uniqueId] || {}
 
-        // Use installments for granular rows
-        return order.installments.map((inst, index) => ({
-          uniqueId: `${client.clientId}-${order.orderId}-${inst.id}-${index}`,
-          clientId: client.clientId,
-          clientName: client.clientName,
-          clientType: client.clientType,
-          clientOrderCount: client.orderCount,
-          orderId: order.orderId,
-          orderDate: order.date,
-          vencimento: inst.vencimento,
-          formaPagamento: inst.formaPagamento,
-          valorRegistrado: inst.valorRegistrado,
-          valorPago: inst.valorPago,
-          status: inst.status,
-          formaCobranca: currentFormaCobranca,
-          dataCombinada: currentDataCombinada,
-        }))
+          const currentFormaCobranca =
+            updates.formaCobranca !== undefined
+              ? updates.formaCobranca
+              : inst.formaCobranca
+
+          const currentDataCombinada =
+            updates.dataCombinada !== undefined
+              ? updates.dataCombinada
+              : inst.dataCombinada
+
+          // Calculate Debt (Débito)
+          const debito = Math.max(0, inst.valorRegistrado - inst.valorPago)
+
+          return {
+            uniqueId,
+            receivableId: inst.id,
+            clientId: client.clientId,
+            clientName: client.clientName,
+            clientType: client.clientType,
+            clientOrderCount: client.orderCount,
+            orderId: order.orderId,
+            orderDate: order.date,
+            vencimento: inst.vencimento,
+            formaPagamento: inst.formaPagamento,
+            valorRegistrado: inst.valorRegistrado,
+            valorPago: inst.valorPago,
+            debito,
+            status: inst.status,
+            formaCobranca: currentFormaCobranca,
+            dataCombinada: currentDataCombinada,
+          }
+        })
       }),
     )
   }, [data, localUpdates])
 
   const handleUpdateField = async (
-    orderId: number,
+    row: FlatRow,
     field: 'forma_cobranca' | 'data_combinada',
     value: any,
   ) => {
     // Optimistic Update
     setLocalUpdates((prev) => ({
       ...prev,
-      [orderId]: {
-        ...prev[orderId],
+      [row.uniqueId]: {
+        ...prev[row.uniqueId],
         [field === 'forma_cobranca' ? 'formaCobranca' : 'dataCombinada']: value,
       },
     }))
 
     try {
-      await cobrancaService.updateOrderField(orderId, field, value)
+      await cobrancaService.updateReceivableField(
+        row.receivableId,
+        row.orderId,
+        field,
+        value,
+        // Provide extra data in case we need to materialize a synthetic receivable
+        row.receivableId < 0
+          ? {
+              valorRegistrado: row.valorRegistrado,
+              vencimento: row.vencimento,
+              formaPagamento: row.formaPagamento,
+            }
+          : undefined,
+      )
       toast({
         title: 'Atualizado',
         description: 'Dados atualizados com sucesso.',
@@ -131,40 +154,6 @@ export function DebtTable({ data }: DebtTableProps) {
       toast({
         title: 'Erro',
         description: 'Falha ao atualizar dados.',
-        variant: 'destructive',
-      })
-    }
-  }
-
-  const handleClearAll = async (field: 'forma_cobranca' | 'data_combinada') => {
-    // Collect unique order IDs visible
-    const visibleOrderIds = new Set(flattenedData.map((r) => r.orderId))
-    const updates = {} as Record<
-      number,
-      { formaCobranca?: any; dataCombinada?: any }
-    >
-    const promises: Promise<void>[] = []
-
-    visibleOrderIds.forEach((oid) => {
-      updates[oid] = {
-        ...localUpdates[oid],
-        [field === 'forma_cobranca' ? 'formaCobranca' : 'dataCombinada']: null,
-      }
-      promises.push(cobrancaService.updateOrderField(oid, field, null))
-    })
-
-    setLocalUpdates((prev) => ({ ...prev, ...updates }))
-
-    try {
-      await Promise.all(promises)
-      toast({
-        title: 'Limpeza Concluída',
-        description: `Campo ${field === 'forma_cobranca' ? 'Forma de Cobrança' : 'Data Combinada'} limpo para todos os pedidos visíveis.`,
-      })
-    } catch (error) {
-      toast({
-        title: 'Erro parcial',
-        description: 'Alguns itens podem não ter sido limpos.',
         variant: 'destructive',
       })
     }
@@ -184,41 +173,12 @@ export function DebtTable({ data }: DebtTableProps) {
               <TableHead>F. Pagamento</TableHead>
               <TableHead className="text-right">Valor Parc.</TableHead>
               <TableHead className="text-right">Pago</TableHead>
+              <TableHead className="text-right">Débito</TableHead>
               <TableHead className="text-center">Status</TableHead>
 
               {/* Editable Columns */}
-              <TableHead className="min-w-[140px]">
-                <div className="flex flex-col items-start gap-1">
-                  <div className="flex items-center justify-between w-full">
-                    <span>Forma Cobrança</span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-5 w-5 text-muted-foreground hover:text-red-500"
-                      onClick={() => handleClearAll('forma_cobranca')}
-                      title="Limpar todos"
-                    >
-                      <Eraser className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-              </TableHead>
-              <TableHead className="min-w-[130px]">
-                <div className="flex flex-col items-start gap-1">
-                  <div className="flex items-center justify-between w-full">
-                    <span>Data Combinada</span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-5 w-5 text-muted-foreground hover:text-red-500"
-                      onClick={() => handleClearAll('data_combinada')}
-                      title="Limpar todos"
-                    >
-                      <Eraser className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-              </TableHead>
+              <TableHead className="min-w-[150px]">Forma Cobrança</TableHead>
+              <TableHead className="min-w-[150px]">Data Combinada</TableHead>
 
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
@@ -227,7 +187,7 @@ export function DebtTable({ data }: DebtTableProps) {
             {flattenedData.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={12}
+                  colSpan={13}
                   className="h-24 text-center text-muted-foreground"
                 >
                   Nenhum registro encontrado.
@@ -265,6 +225,9 @@ export function DebtTable({ data }: DebtTableProps) {
                   <TableCell className="text-right font-mono text-xs text-green-600">
                     {formatCurrency(row.valorPago)}
                   </TableCell>
+                  <TableCell className="text-right font-mono text-xs text-red-600 font-bold">
+                    {formatCurrency(row.debito)}
+                  </TableCell>
                   <TableCell className="text-center">
                     <Badge
                       variant={
@@ -286,42 +249,69 @@ export function DebtTable({ data }: DebtTableProps) {
 
                   {/* Editable: Forma de Cobrança */}
                   <TableCell>
-                    <Select
-                      value={row.formaCobranca || ''}
-                      onValueChange={(val) =>
-                        handleUpdateField(
-                          row.orderId,
-                          'forma_cobranca',
-                          val || null,
-                        )
-                      }
-                    >
-                      <SelectTrigger className="h-7 text-xs w-full">
-                        <SelectValue placeholder="-" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="PIX">PIX</SelectItem>
-                        <SelectItem value="MOTOQUEIRO">MOTOQUEIRO</SelectItem>
-                        <SelectItem value="BOLETO">BOLETO</SelectItem>
-                        <SelectItem value="DEPOSITO">DEPOSITO</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="flex items-center gap-1">
+                      <Select
+                        value={row.formaCobranca || ''}
+                        onValueChange={(val) =>
+                          handleUpdateField(
+                            row,
+                            'forma_cobranca',
+                            val === '' || val === 'VAZIO' ? null : val,
+                          )
+                        }
+                      >
+                        <SelectTrigger className="h-7 text-xs w-full">
+                          <SelectValue placeholder="-" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="VAZIO">VAZIO</SelectItem>
+                          <SelectItem value="PIX">PIX</SelectItem>
+                          <SelectItem value="MOTOQUEIRO">MOTOQUEIRO</SelectItem>
+                          <SelectItem value="BOLETO">BOLETO</SelectItem>
+                          <SelectItem value="DEPOSITO">DEPOSITO</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-red-500"
+                        onClick={() =>
+                          handleUpdateField(row, 'forma_cobranca', null)
+                        }
+                        title="Limpar Forma de Cobrança"
+                      >
+                        <Eraser className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </TableCell>
 
                   {/* Editable: Data Combinada */}
                   <TableCell>
-                    <Input
-                      type="date"
-                      className="h-7 text-xs w-full px-1"
-                      value={row.dataCombinada || ''}
-                      onChange={(e) =>
-                        handleUpdateField(
-                          row.orderId,
-                          'data_combinada',
-                          e.target.value || null,
-                        )
-                      }
-                    />
+                    <div className="flex items-center gap-1">
+                      <Input
+                        type="date"
+                        className="h-7 text-xs w-full px-1"
+                        value={row.dataCombinada || ''}
+                        onChange={(e) =>
+                          handleUpdateField(
+                            row,
+                            'data_combinada',
+                            e.target.value || null,
+                          )
+                        }
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-red-500"
+                        onClick={() =>
+                          handleUpdateField(row, 'data_combinada', null)
+                        }
+                        title="Limpar Data Combinada"
+                      >
+                        <Eraser className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </TableCell>
 
                   <TableCell>

@@ -6,6 +6,8 @@ export interface RecebimentoInsert {
   valor_pago: number
   vencimento?: string // Renamed from data_pagamento
   funcionario_id: number
+  forma_cobranca?: string | null
+  data_combinada?: string | null
 }
 
 export interface RecebimentoRow extends RecebimentoInsert {

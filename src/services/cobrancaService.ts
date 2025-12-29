@@ -2,26 +2,26 @@ import { supabase } from '@/lib/supabase/client'
 import { ClientDebt, OrderDebt, Receivable } from '@/types/cobranca'
 import { parseCurrency } from '@/lib/formatters'
 import { isBefore, parseISO, startOfDay } from 'date-fns'
-import { PaymentEntry } from '@/types/payment'
 
 export const cobrancaService = {
   async getDebts(): Promise<ClientDebt[]> {
-    // 1. Fetch data from BANCO_DE_DADOS including new columns
+    // 1. Fetch data from BANCO_DE_DADOS
+    // Removed order-level forma_cobranca/data_combinada from selection to prefer RECEBIMENTOS
     const { data: dbData, error: dbError } = await supabase
       .from('BANCO_DE_DADOS')
       .select(
-        '"NÚMERO DO PEDIDO", "CÓDIGO DO CLIENTE", "CLIENTE", "VALOR VENDIDO", "DESCONTO POR GRUPO", "DATA DO ACERTO", "DETALHES_PAGAMENTO", "VALOR DEVIDO", "FORMA", "forma_cobranca", "data_combinada"',
+        '"NÚMERO DO PEDIDO", "CÓDIGO DO CLIENTE", "CLIENTE", "VALOR VENDIDO", "DESCONTO POR GRUPO", "DATA DO ACERTO", "DETALHES_PAGAMENTO", "VALOR DEVIDO", "FORMA", "CODIGO FUNCIONARIO"',
       )
       .not('NÚMERO DO PEDIDO', 'is', null)
 
     if (dbError) throw dbError
 
     // 2. Fetch data from RECEBIMENTOS (Granular rows)
-    // Renamed data_pagamento to vencimento
+    // Now including forma_cobranca and data_combinada
     const { data: recData, error: recError } = await supabase
       .from('RECEBIMENTOS')
       .select(
-        'id, venda_id, valor_pago, vencimento, valor_registrado, forma_pagamento',
+        'id, venda_id, valor_pago, vencimento, valor_registrado, forma_pagamento, forma_cobranca, data_combinada',
       )
 
     if (recError) throw recError
@@ -52,7 +52,7 @@ export const cobrancaService = {
     >()
     const today = startOfDay(new Date())
 
-    recData?.forEach((r) => {
+    recData?.forEach((r: any) => {
       const pid = r.venda_id
       if (!paymentsMap.has(pid)) {
         paymentsMap.set(pid, { total: 0, history: [], installments: [] })
@@ -87,6 +87,8 @@ export const cobrancaService = {
         valorPago: valorPago,
         formaPagamento: r.forma_pagamento,
         status,
+        formaCobranca: r.forma_cobranca,
+        dataCombinada: r.data_combinada,
       })
     })
 
@@ -108,8 +110,7 @@ export const cobrancaService = {
           paymentDetailsJSON: row['DETALHES_PAGAMENTO'],
           totalValorDevido: 0,
           formaPagamento: row['FORMA'] || 'N/D',
-          formaCobranca: row['forma_cobranca'],
-          dataCombinada: row['data_combinada'],
+          funcionarioId: row['CODIGO FUNCIONARIO'],
         })
       }
       const order = ordersMap.get(oid)
@@ -152,7 +153,7 @@ export const cobrancaService = {
       // Fallback: If no installments found in RECEBIMENTOS, create a synthetic one from Order
       if (installments.length === 0) {
         installments.push({
-          id: -order.orderId, // Temp ID
+          id: -order.orderId, // Synthetic ID (Negative)
           vencimento: order.date, // Default to order date
           valorRegistrado: netValue,
           valorPago: paidValue,
@@ -163,6 +164,8 @@ export const cobrancaService = {
                 ? 'VENCIDO'
                 : 'A VENCER'
               : 'PAGO',
+          formaCobranca: null,
+          dataCombinada: null,
         })
       } else {
         // Sort installments by vencimento
@@ -203,12 +206,10 @@ export const cobrancaService = {
         status: status,
         paymentDetails: order.paymentDetailsJSON || [],
         paymentsMade: paymentInfo.history,
-        installments: installments, // Added
+        installments: installments,
         oldestOverdueDate: oldestOverdue,
         formaPagamento: order.formaPagamento,
         valorDevido: netValue,
-        formaCobranca: order.formaCobranca,
-        dataCombinada: order.dataCombinada,
       }
 
       if (!clientsMap.has(order.clientId)) {
@@ -261,16 +262,63 @@ export const cobrancaService = {
     })
   },
 
-  async updateOrderField(
+  /**
+   * Updates a specific receivable field (Forma de Cobrança or Data Combinada).
+   * Supports both real and synthetic (temporary) receivables.
+   */
+  async updateReceivableField(
+    receivableId: number,
     orderId: number,
     field: 'forma_cobranca' | 'data_combinada',
     value: any,
+    syntheticData?: {
+      valorRegistrado: number
+      vencimento: string | null
+      formaPagamento: string
+    },
   ) {
-    const { error } = await supabase
-      .from('BANCO_DE_DADOS')
-      .update({ [field]: value })
-      .eq('NÚMERO DO PEDIDO', orderId)
+    if (receivableId < 0) {
+      // Synthetic ID: We need to materialize this into RECEBIMENTOS first
+      // 1. Fetch Order Context
+      const { data: orderData, error: orderError } = await supabase
+        .from('BANCO_DE_DADOS')
+        .select('"CÓDIGO DO CLIENTE", "CODIGO FUNCIONARIO", "NÚMERO DO PEDIDO"')
+        .eq('"NÚMERO DO PEDIDO"', orderId)
+        .limit(1)
+        .single()
 
-    if (error) throw error
+      if (orderError || !orderData) {
+        throw new Error(
+          'Não foi possível encontrar o pedido para criar o registro de recebimento.',
+        )
+      }
+
+      // 2. Insert new RECEBIMENTOS row
+      const insertPayload = {
+        venda_id: orderId,
+        cliente_id: orderData['CÓDIGO DO CLIENTE'],
+        funcionario_id: orderData['CODIGO FUNCIONARIO'],
+        forma_pagamento: syntheticData?.formaPagamento || 'Outros',
+        valor_registrado: syntheticData?.valorRegistrado || 0,
+        valor_pago: 0,
+        vencimento: syntheticData?.vencimento,
+        [field]: value,
+      }
+
+      // We need to use 'as any' because types might not be generated yet for new cols
+      const { error: insertError } = await supabase
+        .from('RECEBIMENTOS')
+        .insert(insertPayload as any)
+
+      if (insertError) throw insertError
+    } else {
+      // Real ID: Direct Update
+      const { error } = await supabase
+        .from('RECEBIMENTOS')
+        .update({ [field]: value } as any)
+        .eq('id', receivableId)
+
+      if (error) throw error
+    }
   },
 }

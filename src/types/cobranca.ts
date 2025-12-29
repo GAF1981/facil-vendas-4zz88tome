@@ -7,6 +7,9 @@ export interface Receivable {
   valorPago: number
   formaPagamento: string
   status: 'VENCIDO' | 'A VENCER' | 'PAGO'
+  // New granular fields for collection control
+  formaCobranca?: string | null
+  dataCombinada?: string | null
 }
 
 export interface OrderDebt {
@@ -25,14 +28,12 @@ export interface OrderDebt {
   // New columns
   formaPagamento: string // "Forma de Pagamento" (Order Level)
   valorDevido: number // "Valor Devido"
-  formaCobranca?: string // "Forma de cobrança"
-  dataCombinada?: string // "Data Combinada"
 }
 
 export interface ClientDebt {
   clientId: number
   clientName: string
-  clientType: string // Added client type
+  clientType: string
   totalDebt: number
   orderCount: number
   status: 'VENCIDO' | 'A VENCER' | 'SEM DÉBITO'

@@ -271,34 +271,34 @@ export type Database = {
         Row: {
           cliente_id: number
           created_at: string | null
-          data_pagamento: string | null
           forma_pagamento: string
           funcionario_id: number
           id: number
           valor_pago: number
           valor_registrado: number | null
+          vencimento: string | null
           venda_id: number
         }
         Insert: {
           cliente_id: number
           created_at?: string | null
-          data_pagamento?: string | null
           forma_pagamento: string
           funcionario_id: number
           id?: number
           valor_pago: number
           valor_registrado?: number | null
+          vencimento?: string | null
           venda_id: number
         }
         Update: {
           cliente_id?: number
           created_at?: string | null
-          data_pagamento?: string | null
           forma_pagamento?: string
           funcionario_id?: number
           id?: number
           valor_pago?: number
           valor_registrado?: number | null
+          vencimento?: string | null
           venda_id?: number
         }
         Relationships: [
