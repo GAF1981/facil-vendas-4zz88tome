@@ -109,13 +109,15 @@ export function CollectionActionsSheet({
         funcionarioId: employee.id.toString(),
         funcionarioNome: employee.nome_completo,
         pedidoId: orderId,
-        clienteId: clientId,
+        clientId: clientId,
         clienteNome: clientName,
       })
 
       toast({
         title: 'Sucesso',
         description: 'Ação de cobrança registrada.',
+        variant: 'default',
+        className: 'bg-green-600 text-white',
       })
 
       await fetchActions()
@@ -125,7 +127,7 @@ export function CollectionActionsSheet({
       console.error(error)
       toast({
         title: 'Erro',
-        description: 'Não foi possível salvar a ação.',
+        description: 'Não foi possível salvar a ação. Verifique os dados.',
         variant: 'destructive',
       })
     } finally {

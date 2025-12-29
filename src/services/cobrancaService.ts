@@ -366,14 +366,15 @@ export const cobrancaService = {
   },
 
   async addCollectionAction(action: CollectionActionInsert): Promise<void> {
-    const payload: any = {
+    // Explicitly casting and mapping to database schema to avoid type mismatch
+    const payload = {
       'AÇÃO DE COBRANÇA': action.acao,
       'DATA AÇÃO COBRANÇA': action.dataAcao,
-      'NOVA DATA COMBINADA PAGAMENTO': action.novaDataCombinada,
+      'NOVA DATA COMBINADA PAGAMENTO': action.novaDataCombinada || null,
       'NOME FUNCIONÁRIO': action.funcionarioNome,
-      'CÓDIGO FUNCIONÁRIO': action.funcionarioId,
-      'NÚMERO DO PEDIDO': action.pedidoId,
-      'COD. CLIENTE': action.clienteId,
+      'CÓDIGO FUNCIONÁRIO': String(action.funcionarioId), // Ensure string
+      'NÚMERO DO PEDIDO': String(action.pedidoId), // Ensure string (text column)
+      'COD. CLIENTE': Number(action.clienteId), // Ensure number
       CLIENTE: action.clienteNome,
     }
 

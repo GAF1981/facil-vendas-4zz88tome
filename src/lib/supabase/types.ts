@@ -213,7 +213,7 @@ export type Database = {
           'COD. CLIENTE'?: number | null
           'CÓDIGO FUNCIONÁRIO'?: string | null
           'DATA AÇÃO COBRANÇA'?: string | null
-          'ID COBRANÇA': number
+          'ID COBRANÇA'?: number
           'NOME FUNCIONÁRIO'?: string | null
           'NOVA DATA COMBINADA PAGAMENTO'?: string | null
           'NÚMERO DO PEDIDO'?: string | null

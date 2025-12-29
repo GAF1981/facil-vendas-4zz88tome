@@ -268,7 +268,7 @@ export function DebtTable({ data, onRefresh }: DebtTableProps) {
                         row.status === 'PAGO' &&
                           'bg-green-100 text-green-700 hover:bg-green-200 border-transparent',
                         row.status === 'A VENCER' &&
-                          'text-red-600 border-red-200 bg-red-50 hover:bg-red-100',
+                          'bg-red-600 text-white border-red-600 hover:bg-red-700 font-bold',
                       )}
                     >
                       {row.status}
