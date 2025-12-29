@@ -30,15 +30,15 @@ export const cobrancaService = {
 
     if (recError) throw recError
 
-    // 2.5 Fetch Collection Actions Counts
+    // 2.5 Fetch Collection Actions Counts from new table
     const { data: cobrancaData, error: cobrancaError } = await supabase
-      .from('COBRANÇA')
+      .from('AÇOES DE COBRANÇA' as any)
       .select('"NÚMERO DO PEDIDO"')
 
     if (cobrancaError) throw cobrancaError
 
-    const cobrancaCounts = new Map<string, number>()
-    cobrancaData?.forEach((row) => {
+    const cobrancaCounts = new Map<number, number>()
+    cobrancaData?.forEach((row: any) => {
       const pid = row['NÚMERO DO PEDIDO']
       if (pid) {
         cobrancaCounts.set(pid, (cobrancaCounts.get(pid) || 0) + 1)
@@ -229,8 +229,7 @@ export const cobrancaService = {
         oldestOverdueDate: oldestOverdue,
         formaPagamento: order.formaPagamento,
         valorDevido: netValue,
-        collectionActionCount:
-          cobrancaCounts.get(order.orderId.toString()) || 0,
+        collectionActionCount: cobrancaCounts.get(order.orderId) || 0,
       }
 
       if (!clientsMap.has(order.clientId)) {
@@ -344,16 +343,17 @@ export const cobrancaService = {
   },
 
   async getCollectionActions(orderId: string): Promise<CollectionAction[]> {
+    // Cast to any to access new table not in types
     const { data, error } = await supabase
-      .from('COBRANÇA')
+      .from('AÇOES DE COBRANÇA' as any)
       .select('*')
-      .eq('NÚMERO DO PEDIDO', orderId)
+      .eq('NÚMERO DO PEDIDO', Number(orderId)) // Ensure it is number
       .order('DATA AÇÃO COBRANÇA', { ascending: false })
 
     if (error) throw error
 
-    return (data || []).map((row) => ({
-      id: row['ID COBRANÇA'],
+    return (data || []).map((row: any) => ({
+      id: row['ID AÇÃO'],
       acao: row['AÇÃO DE COBRANÇA'],
       dataAcao: row['DATA AÇÃO COBRANÇA'],
       novaDataCombinada: row['NOVA DATA COMBINADA PAGAMENTO'],
@@ -372,13 +372,15 @@ export const cobrancaService = {
       'DATA AÇÃO COBRANÇA': action.dataAcao,
       'NOVA DATA COMBINADA PAGAMENTO': action.novaDataCombinada || null,
       'NOME FUNCIONÁRIO': action.funcionarioNome,
-      'CÓDIGO FUNCIONÁRIO': String(action.funcionarioId), // Ensure string
-      'NÚMERO DO PEDIDO': String(action.pedidoId), // Ensure string (text column)
-      'COD. CLIENTE': Number(action.clienteId), // Ensure number
+      'CÓDIGO FUNCIONÁRIO': action.funcionarioId, // Number
+      'NÚMERO DO PEDIDO': action.pedidoId, // Number
+      'COD. CLIENTE': action.clienteId, // Number
       CLIENTE: action.clienteNome,
     }
 
-    const { error } = await supabase.from('COBRANÇA').insert(payload)
+    const { error } = await supabase
+      .from('AÇOES DE COBRANÇA' as any)
+      .insert(payload)
 
     if (error) throw error
   },

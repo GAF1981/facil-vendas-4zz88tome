@@ -49,8 +49,8 @@ export interface CollectionAction {
   dataAcao: string | null
   novaDataCombinada: string | null
   funcionarioNome: string | null
-  funcionarioId: string | null
-  pedidoId: string | null
+  funcionarioId: number | null
+  pedidoId: number | null
   clienteId: number | null
   clienteNome: string | null
 }
@@ -60,8 +60,8 @@ export interface CollectionActionInsert {
   dataAcao: string
   novaDataCombinada: string | null
   funcionarioNome: string
-  funcionarioId: string
-  pedidoId: string
+  funcionarioId: number
+  pedidoId: number
   clienteId: number
   clienteNome: string
 }

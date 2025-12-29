@@ -106,10 +106,10 @@ export function CollectionActionsSheet({
         acao: newAction.acao,
         dataAcao: newAction.dataAcao,
         novaDataCombinada: newAction.novaDataCombinada || null,
-        funcionarioId: employee.id.toString(),
+        funcionarioId: employee.id, // Number
         funcionarioNome: employee.nome_completo,
-        pedidoId: orderId,
-        clientId: clientId,
+        pedidoId: Number(orderId), // Converted to Number
+        clienteId: clientId, // Number
         clienteNome: clientName,
       })
 

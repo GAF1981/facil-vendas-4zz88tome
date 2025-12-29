@@ -264,11 +264,11 @@ export function DebtTable({ data, onRefresh }: DebtTableProps) {
                             : 'outline'
                       }
                       className={cn(
-                        'text-[10px] px-1 py-0 h-5',
+                        'text-[10px] px-2 py-0.5 h-6 whitespace-nowrap',
                         row.status === 'PAGO' &&
                           'bg-green-100 text-green-700 hover:bg-green-200 border-transparent',
                         row.status === 'A VENCER' &&
-                          'bg-red-600 text-white border-red-600 hover:bg-red-700 font-bold',
+                          'bg-red-50 text-red-600 border-red-200 hover:bg-red-100 font-bold',
                       )}
                     >
                       {row.status}

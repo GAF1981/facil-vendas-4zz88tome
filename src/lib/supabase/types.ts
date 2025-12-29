@@ -200,34 +200,34 @@ export type Database = {
           'AÇÃO DE COBRANÇA': string | null
           CLIENTE: string | null
           'COD. CLIENTE': number | null
-          'CÓDIGO FUNCIONÁRIO': string | null
+          'CÓDIGO FUNCIONÁRIO': number | null
           'DATA AÇÃO COBRANÇA': string | null
           'ID COBRANÇA': number
           'NOME FUNCIONÁRIO': string | null
           'NOVA DATA COMBINADA PAGAMENTO': string | null
-          'NÚMERO DO PEDIDO': string | null
+          'NÚMERO DO PEDIDO': number | null
         }
         Insert: {
           'AÇÃO DE COBRANÇA'?: string | null
           CLIENTE?: string | null
           'COD. CLIENTE'?: number | null
-          'CÓDIGO FUNCIONÁRIO'?: string | null
+          'CÓDIGO FUNCIONÁRIO'?: number | null
           'DATA AÇÃO COBRANÇA'?: string | null
           'ID COBRANÇA'?: number
           'NOME FUNCIONÁRIO'?: string | null
           'NOVA DATA COMBINADA PAGAMENTO'?: string | null
-          'NÚMERO DO PEDIDO'?: string | null
+          'NÚMERO DO PEDIDO'?: number | null
         }
         Update: {
           'AÇÃO DE COBRANÇA'?: string | null
           CLIENTE?: string | null
           'COD. CLIENTE'?: number | null
-          'CÓDIGO FUNCIONÁRIO'?: string | null
+          'CÓDIGO FUNCIONÁRIO'?: number | null
           'DATA AÇÃO COBRANÇA'?: string | null
           'ID COBRANÇA'?: number
           'NOME FUNCIONÁRIO'?: string | null
           'NOVA DATA COMBINADA PAGAMENTO'?: string | null
-          'NÚMERO DO PEDIDO'?: string | null
+          'NÚMERO DO PEDIDO'?: number | null
         }
         Relationships: []
       }
