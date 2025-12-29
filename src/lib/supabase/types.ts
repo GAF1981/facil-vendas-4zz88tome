@@ -23,9 +23,11 @@ export type Database = {
           'CODIGO FUNCIONARIO': number | null
           CONTAGEM: number | null
           'DATA DO ACERTO': string | null
+          data_combinada: string | null
           'DESCONTO POR GRUPO': string | null
           DETALHES_PAGAMENTO: Json | null
           FORMA: string | null
+          forma_cobranca: string | null
           FUNCIONÁRIO: string | null
           'HORA DO ACERTO': string | null
           'ID VENDA ITENS': number
@@ -51,9 +53,11 @@ export type Database = {
           'CODIGO FUNCIONARIO'?: number | null
           CONTAGEM?: number | null
           'DATA DO ACERTO'?: string | null
+          data_combinada?: string | null
           'DESCONTO POR GRUPO'?: string | null
           DETALHES_PAGAMENTO?: Json | null
           FORMA?: string | null
+          forma_cobranca?: string | null
           FUNCIONÁRIO?: string | null
           'HORA DO ACERTO'?: string | null
           'ID VENDA ITENS'?: number
@@ -79,9 +83,11 @@ export type Database = {
           'CODIGO FUNCIONARIO'?: number | null
           CONTAGEM?: number | null
           'DATA DO ACERTO'?: string | null
+          data_combinada?: string | null
           'DESCONTO POR GRUPO'?: string | null
           DETALHES_PAGAMENTO?: Json | null
           FORMA?: string | null
+          forma_cobranca?: string | null
           FUNCIONÁRIO?: string | null
           'HORA DO ACERTO'?: string | null
           'ID VENDA ITENS'?: number

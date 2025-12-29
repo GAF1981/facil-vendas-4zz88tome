@@ -2,7 +2,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Slider } from '@/components/ui/slider'
 import {
   Select,
   SelectContent,
@@ -11,13 +10,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { formatCurrency } from '@/lib/formatters'
-import {
-  Wallet,
-  CreditCard,
-  Calendar,
-  AlertTriangle,
-  DollarSign,
-} from 'lucide-react'
+import { Wallet, CreditCard, Calendar, DollarSign } from 'lucide-react'
 import {
   PaymentEntry,
   PaymentMethodType,
@@ -25,7 +18,6 @@ import {
   PaymentInstallment,
 } from '@/types/payment'
 import { cn } from '@/lib/utils'
-import { useEffect } from 'react'
 import { addDays, format } from 'date-fns'
 
 interface AcertoPaymentSummaryProps {
@@ -57,12 +49,7 @@ export function AcertoPaymentSummary({
       const newEntry: PaymentEntry = {
         method,
         value: defaultValue,
-        paidValue: 0, // Initial paid value is 0 or equal to value? Usually 0 for registration.
-        // Wait, "Valor Pago" field...
-        // User story says: "In every 'DETALHAMENTO' ... the 'Valor Pago' field must feature a slider control"
-        // In the context of `AcertoPaymentSummary`, we have `value` (Valor Registrado) and `paidValue` (Valor Pago).
-        // I will apply the slider to `paidValue` logic, but arguably it could be `value` too.
-        // Given the prompt specifies "Valor Pago", I'll attach to `paidValue`.
+        paidValue: 0, // Initial paid value is 0
         installments: 1,
         dueDate: dueDate,
       }
@@ -303,42 +290,25 @@ export function AcertoPaymentSummary({
                       <Label className="text-xs font-medium mb-1.5 block text-green-700">
                         Valor Pago
                       </Label>
-                      <div className="space-y-3">
-                        <div className="relative">
-                          <span className="absolute left-3 top-2.5 text-muted-foreground text-sm">
-                            R$
-                          </span>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            className="pl-9 font-bold text-lg h-10 border-green-200 bg-green-50/20 text-green-700"
-                            value={entry.paidValue}
-                            disabled={disabled}
-                            onChange={(e) =>
-                              handleUpdateEntry(
-                                entry.method,
-                                'paidValue',
-                                parseFloat(e.target.value) || 0,
-                              )
-                            }
-                            onBlur={() => handleBlur(entry.method, 'paidValue')}
-                          />
-                        </div>
-                        <Slider
+                      <div className="relative">
+                        <span className="absolute left-3 top-2.5 text-muted-foreground text-sm">
+                          R$
+                        </span>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          className="pl-9 font-bold text-lg h-10 border-green-200 bg-green-50/20 text-green-700"
+                          value={entry.paidValue}
                           disabled={disabled}
-                          min={0}
-                          // Max value logic: It can be up to remaining debt or just 2x current?
-                          // A reasonable max is usually the "Valor Registrado" or "Saldo a Pagar".
-                          // Since "Valor Pago" can be anything, but typically <= Total Debt.
-                          // Let's use `saldoAPagar` as max, or at least `entry.value` if greater.
-                          max={Math.max(saldoAPagar, entry.value, 100)}
-                          step={0.5}
-                          value={[entry.paidValue]}
-                          onValueChange={([val]) =>
-                            handleUpdateEntry(entry.method, 'paidValue', val)
+                          onChange={(e) =>
+                            handleUpdateEntry(
+                              entry.method,
+                              'paidValue',
+                              parseFloat(e.target.value) || 0,
+                            )
                           }
-                          className="w-full"
+                          onBlur={() => handleBlur(entry.method, 'paidValue')}
                         />
                       </div>
                     </div>
