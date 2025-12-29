@@ -279,6 +279,21 @@ export type Database = {
         }
         Relationships: []
       }
+      CRIAR_NOVA_ROTA: {
+        Row: {
+          id: number
+          nome_rota: string
+        }
+        Insert: {
+          id?: number
+          nome_rota: string
+        }
+        Update: {
+          id?: number
+          nome_rota?: string
+        }
+        Relationships: []
+      }
       FUNCIONARIOS: {
         Row: {
           apelido: string | null
