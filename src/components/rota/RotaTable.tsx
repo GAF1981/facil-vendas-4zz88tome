@@ -79,7 +79,10 @@ export function RotaTable({
                 NOME CLIENTE
               </TableHead>
               <TableHead className="w-[120px] bg-muted">ROTA</TableHead>
-              <TableHead className="w-[100px] text-right bg-muted">
+              <TableHead
+                className="w-[100px] text-right bg-muted cursor-help"
+                title="Projeção baseada na média mensal e dias desde último pedido"
+              >
                 PROJEÇÃO
               </TableHead>
               <TableHead className="w-[80px] text-right bg-muted">
