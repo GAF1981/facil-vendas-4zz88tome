@@ -9,7 +9,7 @@ import {
 import { RotaFilterState } from '@/types/rota'
 import { Employee } from '@/types/employee'
 import { Button } from '@/components/ui/button'
-import { Eraser } from 'lucide-react'
+import { Eraser, Search } from 'lucide-react'
 
 interface RotaFiltersProps {
   filters: RotaFilterState
@@ -32,6 +32,7 @@ export function RotaFilters({
 
   const clearFilters = () => {
     setFilters({
+      search: '',
       x_na_rota: 'todos',
       agregado: 'todos',
       vendedor: 'todos',
@@ -49,10 +50,10 @@ export function RotaFilters({
   }
 
   return (
-    <div className="space-y-2 p-3 bg-card border rounded-lg shadow-sm">
+    <div className="space-y-3 p-3 bg-card border rounded-lg shadow-sm">
       <div className="flex justify-between items-center">
         <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-          Filtros Avançados
+          Filtros & Busca
         </h3>
         <Button
           variant="ghost"
@@ -62,6 +63,16 @@ export function RotaFilters({
         >
           <Eraser className="w-3 h-3 mr-1" /> Limpar
         </Button>
+      </div>
+
+      <div className="relative">
+        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Buscar por Nome do Cliente ou Código..."
+          value={filters.search}
+          onChange={(e) => handleChange('search', e.target.value)}
+          className="pl-8 h-9 text-sm"
+        />
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
@@ -147,7 +158,7 @@ export function RotaFilters({
         </Select>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 pt-1">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 pt-1 border-t">
         <div className="flex gap-1 items-center">
           <span className="text-[10px] w-12 font-medium text-muted-foreground">
             Débito:

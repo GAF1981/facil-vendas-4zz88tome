@@ -5,7 +5,7 @@ import { RotaTable } from '@/components/rota/RotaTable'
 import { RotaFilters } from '@/components/rota/RotaFilters'
 import { rotaService } from '@/services/rotaService'
 import { employeesService } from '@/services/employeesService'
-import { Rota, RotaRow, RotaFilterState } from '@/types/rota'
+import { Rota, RotaRow, RotaFilterState, SortConfig } from '@/types/rota'
 import { Employee } from '@/types/employee'
 import { useToast } from '@/hooks/use-toast'
 import { parseISO } from 'date-fns'
@@ -20,6 +20,7 @@ export default function RotaPage() {
 
   // Filter State
   const [filters, setFilters] = useState<RotaFilterState>({
+    search: '',
     x_na_rota: 'todos',
     agregado: 'todos',
     vendedor: 'todos',
@@ -33,6 +34,12 @@ export default function RotaPage() {
     projecao_max: '',
     estoque_min: '',
     estoque_max: '',
+  })
+
+  // Sorting State
+  const [sortConfig, setSortConfig] = useState<SortConfig>({
+    key: 'rowNumber',
+    direction: 'asc',
   })
 
   // Load Initial Data
@@ -142,9 +149,28 @@ export default function RotaPage() {
     }
   }
 
+  const handleSort = (key: string) => {
+    setSortConfig((current) => ({
+      key,
+      direction:
+        current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }))
+  }
+
   // Filter Logic
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
+      // Search Text Filter
+      if (filters.search) {
+        const searchLower = filters.search.toLowerCase()
+        const matchesName = row.client['NOME CLIENTE']
+          ?.toLowerCase()
+          .includes(searchLower)
+        const matchesCode = row.client.CODIGO.toString().includes(searchLower)
+
+        if (!matchesName && !matchesCode) return false
+      }
+
       if (filters.x_na_rota !== 'todos') {
         if (filters.x_na_rota === '>3') {
           if (row.x_na_rota <= 3) return false
@@ -201,6 +227,123 @@ export default function RotaPage() {
     })
   }, [rows, filters])
 
+  // Sorting Logic
+  const sortedRows = useMemo(() => {
+    const sorted = [...filteredRows]
+
+    sorted.sort((a, b) => {
+      let valA: any = ''
+      let valB: any = ''
+
+      switch (sortConfig.key) {
+        case 'rowNumber':
+          valA = a.rowNumber
+          valB = b.rowNumber
+          break
+        case 'x_na_rota':
+          valA = a.x_na_rota
+          valB = b.x_na_rota
+          break
+        case 'nota_fiscal':
+          valA = a.client['NOTA FISCAL'] || ''
+          valB = b.client['NOTA FISCAL'] || ''
+          break
+        case 'boleto':
+          valA = a.boleto ? 1 : 0
+          valB = b.boleto ? 1 : 0
+          break
+        case 'agregado':
+          valA = a.agregado ? 1 : 0
+          valB = b.agregado ? 1 : 0
+          break
+        case 'vendedor':
+          valA = a.vendedor_id || 0
+          valB = b.vendedor_id || 0
+          break
+        case 'debito':
+          valA = a.debito
+          valB = b.debito
+          break
+        case 'quant_debito':
+          valA = a.quant_debito
+          valB = b.quant_debito
+          break
+        case 'data_acerto':
+          valA = a.data_acerto || ''
+          valB = b.data_acerto || ''
+          break
+        case 'codigo':
+          valA = a.client.CODIGO
+          valB = b.client.CODIGO
+          break
+        case 'nome':
+          valA = a.client['NOME CLIENTE'] || ''
+          valB = b.client['NOME CLIENTE'] || ''
+          break
+        case 'rota':
+          valA = a.client['GRUPO ROTA'] || ''
+          valB = b.client['GRUPO ROTA'] || ''
+          break
+        case 'projecao':
+          valA = a.projecao
+          valB = b.projecao
+          break
+        case 'estoque':
+          valA = a.estoque
+          valB = b.estoque
+          break
+        case 'endereco':
+          valA = a.client.ENDEREÇO || ''
+          valB = b.client.ENDEREÇO || ''
+          break
+        case 'bairro':
+          valA = a.client.BAIRRO || ''
+          valB = b.client.BAIRRO || ''
+          break
+        case 'municipio':
+          valA = a.client.MUNICÍPIO || ''
+          valB = b.client.MUNICÍPIO || ''
+          break
+        case 'contato1':
+          valA = a.client['CONTATO 1'] || ''
+          valB = b.client['CONTATO 1'] || ''
+          break
+        case 'contato2':
+          valA = a.client['CONTATO 2'] || ''
+          valB = b.client['CONTATO 2'] || ''
+          break
+        case 'cep':
+          valA = a.client['CEP OFICIO'] || ''
+          valB = b.client['CEP OFICIO'] || ''
+          break
+        case 'tipo':
+          valA = a.client['TIPO DE CLIENTE'] || ''
+          valB = b.client['TIPO DE CLIENTE'] || ''
+          break
+        case 'fone1':
+          valA = a.client['FONE 1'] || ''
+          valB = b.client['FONE 1'] || ''
+          break
+        case 'fone2':
+          valA = a.client['FONE 2'] || ''
+          valB = b.client['FONE 2'] || ''
+          break
+        default:
+          return 0
+      }
+
+      if (typeof valA === 'string' && typeof valB === 'string') {
+        return valA.localeCompare(valB)
+      }
+      return valA < valB ? -1 : valA > valB ? 1 : 0
+    })
+
+    if (sortConfig.direction === 'desc') {
+      sorted.reverse()
+    }
+    return sorted
+  }, [filteredRows, sortConfig])
+
   // Extract unique values for filters
   const uniqueMunicipios = useMemo(
     () => [...new Set(rows.map((r) => r.client.MUNICÍPIO).filter(Boolean))],
@@ -238,10 +381,12 @@ export default function RotaPage() {
 
       <div className="flex-1 overflow-hidden">
         <RotaTable
-          rows={filteredRows}
+          rows={sortedRows}
           sellers={sellers}
           onUpdateRow={handleUpdateRow}
           disabled={!activeRota}
+          sortConfig={sortConfig}
+          onSort={handleSort}
         />
       </div>
     </div>

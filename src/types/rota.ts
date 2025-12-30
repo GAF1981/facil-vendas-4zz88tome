@@ -38,6 +38,7 @@ export interface RotaRow {
 }
 
 export interface RotaFilterState {
+  search: string
   x_na_rota: string | 'todos'
   agregado: string | 'todos' // 'SIM', 'NÃO'
   vendedor: string | 'todos'
@@ -51,4 +52,11 @@ export interface RotaFilterState {
   projecao_max: string
   estoque_min: string
   estoque_max: string
+}
+
+export type SortDirection = 'asc' | 'desc'
+
+export interface SortConfig {
+  key: string
+  direction: SortDirection
 }
