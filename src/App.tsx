@@ -21,6 +21,7 @@ import CobrancaPage from '@/pages/cobranca/CobrancaPage'
 import NotaFiscalPage from '@/pages/nota-fiscal/NotaFiscalPage'
 import PendenciasPage from '@/pages/pendencias/PendenciasPage'
 import RotaPage from '@/pages/rota/RotaPage'
+import BackupPage from '@/pages/backup/BackupPage'
 import { AuthProvider } from '@/hooks/use-auth'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 
@@ -71,8 +72,11 @@ const App = () => (
               {/* Pendencias Module */}
               <Route path="/pendencias" element={<PendenciasPage />} />
 
-              {/* Rota Module (NEW) */}
+              {/* Rota Module */}
               <Route path="/rota" element={<RotaPage />} />
+
+              {/* Backup & Export Module */}
+              <Route path="/backup" element={<BackupPage />} />
 
               {/* New Modules Routes */}
               <Route path="/complemento" element={<PlaceholderModule />} />

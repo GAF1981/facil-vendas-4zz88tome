@@ -564,6 +564,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_client_projections: {
+        Args: never
+        Returns: {
+          client_id: number
+          projecao: number
+        }[]
+      }
       get_unique_client_routes: {
         Args: never
         Returns: {

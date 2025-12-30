@@ -26,6 +26,7 @@ import {
   BarChart3,
   AlertCircle,
   Package,
+  Database,
 } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 
@@ -103,6 +104,11 @@ export function AppSidebar() {
       title: 'Pendências',
       url: '/pendencias',
       icon: AlertCircle,
+    },
+    {
+      title: 'Backup e Exportação',
+      url: '/backup',
+      icon: Database,
     },
   ]
 

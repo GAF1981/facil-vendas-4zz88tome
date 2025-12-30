@@ -13,6 +13,7 @@ import {
   BarChart3,
   AlertCircle,
   Package,
+  Database,
 } from 'lucide-react'
 
 const Index = () => {
@@ -107,6 +108,13 @@ const Index = () => {
       icon: AlertCircle,
       to: '/pendencias',
       color: 'text-amber-600',
+    },
+    {
+      title: 'Backup',
+      description: 'Exportação de dados',
+      icon: Database,
+      to: '/backup',
+      color: 'text-gray-600',
     },
   ]
 
