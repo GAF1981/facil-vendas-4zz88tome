@@ -559,6 +559,41 @@ export type Database = {
           },
         ]
       }
+      system_logs: {
+        Row: {
+          created_at: string
+          description: string
+          id: number
+          meta: Json | null
+          type: string
+          user_id: number | null
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          id?: number
+          meta?: Json | null
+          type: string
+          user_id?: number | null
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: number
+          meta?: Json | null
+          type?: string
+          user_id?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'system_logs_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'FUNCIONARIOS'
+            referencedColumns: ['id']
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

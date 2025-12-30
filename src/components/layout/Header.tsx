@@ -60,9 +60,13 @@ export function Header() {
       case 'rota':
         return 'Rota'
       case 'relatorio':
-        return 'Relatório'
+        return 'Relatórios'
       case 'pendencias':
         return 'Pendências'
+      case 'projecoes':
+        return 'Projeções'
+      case 'estoque':
+        return 'Estoque'
       default:
         return path
     }

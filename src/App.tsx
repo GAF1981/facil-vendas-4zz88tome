@@ -22,6 +22,10 @@ import NotaFiscalPage from '@/pages/nota-fiscal/NotaFiscalPage'
 import PendenciasPage from '@/pages/pendencias/PendenciasPage'
 import RotaPage from '@/pages/rota/RotaPage'
 import BackupPage from '@/pages/backup/BackupPage'
+import RelatorioDashboard from '@/pages/relatorio/RelatorioDashboard'
+import ProjectionsPage from '@/pages/relatorio/ProjectionsPage'
+import SalesReportsPage from '@/pages/relatorio/SalesReportsPage'
+import StockReportsPage from '@/pages/relatorio/StockReportsPage'
 import { AuthProvider } from '@/hooks/use-auth'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 
@@ -78,11 +82,19 @@ const App = () => (
               {/* Backup & Export Module */}
               <Route path="/backup" element={<BackupPage />} />
 
-              {/* New Modules Routes */}
+              {/* Reports Module */}
+              <Route path="/relatorio" element={<RelatorioDashboard />} />
+              <Route
+                path="/relatorio/projecoes"
+                element={<ProjectionsPage />}
+              />
+              <Route path="/relatorio/vendas" element={<SalesReportsPage />} />
+              <Route path="/relatorio/estoque" element={<StockReportsPage />} />
+
+              {/* Other Modules Placeholders */}
               <Route path="/complemento" element={<PlaceholderModule />} />
               <Route path="/caixa" element={<PlaceholderModule />} />
               <Route path="/inventario" element={<PlaceholderModule />} />
-              <Route path="/relatorio" element={<PlaceholderModule />} />
 
               <Route path="/vendas" element={<PlaceholderModule />} />
             </Route>
