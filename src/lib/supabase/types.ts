@@ -612,6 +612,18 @@ export type Database = {
           rota: string
         }[]
       }
+      get_unique_client_types: {
+        Args: never
+        Returns: {
+          tipo: string
+        }[]
+      }
+      get_unique_expositores: {
+        Args: never
+        Returns: {
+          expositor: string
+        }[]
+      }
       get_unique_product_groups: {
         Args: never
         Returns: {

@@ -42,16 +42,15 @@ export interface RotaFilterState {
   search: string
   x_na_rota: string | 'todos'
   agregado: string | 'todos' // 'SIM', 'NÃO'
-  vendedor: string | 'todos'
+  vendedor: string[] // Multi-select ID strings
   municipio: string | 'todos'
   tipo_cliente: string | 'todos'
-  grupo_rota: string | 'todos' // New Rota Filter
+  grupo_rota: string | 'todos'
   debito_min: string
   debito_max: string
   data_acerto_start: string
   data_acerto_end: string
   projecao_min: string
-  // projecao_max removed per user story
   estoque_min: string
   estoque_max: string
 }

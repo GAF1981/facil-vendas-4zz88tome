@@ -10,8 +10,24 @@ import { Label } from '@/components/ui/label'
 import { RotaFilterState } from '@/types/rota'
 import { Employee } from '@/types/employee'
 import { Button } from '@/components/ui/button'
-import { Eraser, Search, Calendar as CalendarIcon } from 'lucide-react'
+import { Eraser, Search, Check, ChevronsUpDown } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from '@/components/ui/command'
+import { cn } from '@/lib/utils'
+import { Badge } from '@/components/ui/badge'
 
 interface RotaFiltersProps {
   filters: RotaFilterState
@@ -30,16 +46,23 @@ export function RotaFilters({
   clientTypes,
   routes,
 }: RotaFiltersProps) {
-  const handleChange = (key: keyof RotaFilterState, value: string) => {
+  const handleChange = (key: keyof RotaFilterState, value: any) => {
     setFilters({ ...filters, [key]: value })
   }
 
   const clearFilters = () => {
+    // We preserve the default behavior for seller selection (all active)
+    // but here "clear" usually means reset to a clean state.
+    // Let's reset to all ACTIVE sellers as per requirement for "default".
+    const activeSellers = sellers
+      .filter((s) => s.situacao === 'ATIVO')
+      .map((s) => s.id.toString())
+
     setFilters({
       search: '',
       x_na_rota: 'todos',
       agregado: 'todos',
-      vendedor: 'todos',
+      vendedor: activeSellers,
       municipio: 'todos',
       tipo_cliente: 'todos',
       grupo_rota: 'todos',
@@ -48,10 +71,32 @@ export function RotaFilters({
       data_acerto_start: '',
       data_acerto_end: '',
       projecao_min: '',
-      // projecao_max removed
       estoque_min: '',
       estoque_max: '',
     })
+  }
+
+  const toggleSeller = (sellerId: string) => {
+    const current = filters.vendedor
+    if (current.includes(sellerId)) {
+      handleChange(
+        'vendedor',
+        current.filter((id) => id !== sellerId),
+      )
+    } else {
+      handleChange('vendedor', [...current, sellerId])
+    }
+  }
+
+  const selectAllSellers = () => {
+    handleChange(
+      'vendedor',
+      sellers.map((s) => s.id.toString()),
+    )
+  }
+
+  const deselectAllSellers = () => {
+    handleChange('vendedor', [])
   }
 
   return (
@@ -108,25 +153,84 @@ export function RotaFilters({
             </Select>
           </div>
 
-          {/* Vendedor */}
+          {/* Vendedor - Multi-Select */}
           <div className="col-span-1 md:col-span-2 lg:col-span-2 xl:col-span-2 flex flex-col gap-1.5">
-            <Label className="text-xs font-semibold">Vendedor</Label>
-            <Select
-              value={filters.vendedor}
-              onValueChange={(v) => handleChange('vendedor', v)}
-            >
-              <SelectTrigger className="h-9 text-xs">
-                <SelectValue placeholder="Todos" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos</SelectItem>
-                {sellers.map((s) => (
-                  <SelectItem key={s.id} value={s.id.toString()}>
-                    {s.nome_completo}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label className="text-xs font-semibold">Vendedor(es)</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  className="h-9 w-full justify-between text-xs px-2"
+                >
+                  {filters.vendedor.length === 0 ? (
+                    <span className="text-muted-foreground">Nenhum</span>
+                  ) : filters.vendedor.length === sellers.length ? (
+                    'Todos'
+                  ) : filters.vendedor.length <= 2 ? (
+                    sellers
+                      .filter((s) => filters.vendedor.includes(s.id.toString()))
+                      .map((s) => s.nome_completo.split(' ')[0])
+                      .join(', ')
+                  ) : (
+                    `${filters.vendedor.length} selecionados`
+                  )}
+                  <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[200px] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Buscar vendedor..." />
+                  <CommandList>
+                    <CommandEmpty>Vendedor não encontrado.</CommandEmpty>
+                    <CommandGroup>
+                      <div className="flex items-center gap-2 p-2 border-b">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-[10px] px-2 w-full"
+                          onClick={selectAllSellers}
+                        >
+                          Todos
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-[10px] px-2 w-full"
+                          onClick={deselectAllSellers}
+                        >
+                          Nenhum
+                        </Button>
+                      </div>
+                      {sellers.map((seller) => (
+                        <CommandItem
+                          key={seller.id}
+                          value={seller.nome_completo}
+                          onSelect={() => toggleSeller(seller.id.toString())}
+                        >
+                          <div
+                            className={cn(
+                              'mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary',
+                              filters.vendedor.includes(seller.id.toString())
+                                ? 'bg-primary text-primary-foreground'
+                                : 'opacity-50 [&_svg]:invisible',
+                            )}
+                          >
+                            <Check className={cn('h-4 w-4')} />
+                          </div>
+                          <div className="flex flex-col">
+                            <span>{seller.nome_completo}</span>
+                            <span className="text-[10px] text-muted-foreground">
+                              {seller.situacao || 'ATIVO'}
+                            </span>
+                          </div>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
 
           {/* Tipo de Cliente */}
@@ -150,7 +254,7 @@ export function RotaFilters({
             </Select>
           </div>
 
-          {/* Projeção Min - Removed Max */}
+          {/* Projeção Min */}
           <div className="col-span-1 md:col-span-2 lg:col-span-1 xl:col-span-1 flex flex-col gap-1.5">
             <Label className="text-xs font-semibold truncate">
               Projeção Min (R$)

@@ -31,6 +31,7 @@ import {
 import { useState } from 'react'
 import { Employee } from '@/types/employee'
 import { employeesService } from '@/services/employeesService'
+import { Badge } from '@/components/ui/badge'
 
 interface EmployeeTableProps {
   employees: Employee[]
@@ -72,6 +73,7 @@ export function EmployeeTable({ employees, onUpdate }: EmployeeTableProps) {
               <TableHead>Nome</TableHead>
               <TableHead className="hidden md:table-cell">Setor</TableHead>
               <TableHead className="hidden md:table-cell">Email</TableHead>
+              <TableHead>Situação</TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -99,6 +101,20 @@ export function EmployeeTable({ employees, onUpdate }: EmployeeTableProps) {
                 </TableCell>
                 <TableCell className="hidden md:table-cell">
                   {employee.email}
+                </TableCell>
+                <TableCell>
+                  <Badge
+                    variant={
+                      employee.situacao === 'ATIVO' ? 'default' : 'secondary'
+                    }
+                    className={
+                      employee.situacao === 'ATIVO'
+                        ? 'bg-green-600 hover:bg-green-700'
+                        : ''
+                    }
+                  >
+                    {employee.situacao || 'ATIVO'}
+                  </Badge>
                 </TableCell>
                 <TableCell>
                   <DropdownMenu>

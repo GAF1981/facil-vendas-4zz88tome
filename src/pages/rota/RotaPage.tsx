@@ -18,12 +18,12 @@ export default function RotaPage() {
   const [loading, setLoading] = useState(false)
   const { toast } = useToast()
 
-  // Filter State - Default to 'ATIVO' (Requirement) and Projection > 50
+  // Filter State
   const [filters, setFilters] = useState<RotaFilterState>({
     search: '',
     x_na_rota: 'todos',
     agregado: 'todos',
-    vendedor: 'todos',
+    vendedor: [], // Start empty, will be populated on load
     municipio: 'todos',
     tipo_cliente: 'ATIVO',
     grupo_rota: 'todos',
@@ -38,7 +38,7 @@ export default function RotaPage() {
 
   // Sorting State
   const [sortConfig, setSortConfig] = useState<SortConfig>({
-    key: 'projecao', // Default sort by projection for value focus
+    key: 'projecao',
     direction: 'desc',
   })
 
@@ -54,7 +54,20 @@ export default function RotaPage() {
         ])
         setActiveRota(active)
         setLastRota(last)
-        setSellers(empRes.data.filter((e) => e.setor === 'Vendedor'))
+
+        // Per User Story: List ALL employees, but pre-select only ACTIVE ones
+        const allEmployees = empRes.data
+        setSellers(allEmployees)
+
+        // Set default filter to all ACTIVE employees
+        const activeSellerIds = allEmployees
+          .filter((e) => e.situacao === 'ATIVO' || !e.situacao) // Default to ATIVO if undefined
+          .map((e) => e.id.toString())
+
+        setFilters((prev) => ({
+          ...prev,
+          vendedor: activeSellerIds,
+        }))
 
         // Fetch Row Data
         const data = await rotaService.getFullRotaData(active)
@@ -182,8 +195,17 @@ export default function RotaPage() {
         if (row.agregado !== boolVal) return false
       }
 
-      if (filters.vendedor !== 'todos') {
-        if (row.vendedor_id?.toString() !== filters.vendedor) return false
+      // Vendedor Multi-Select Filter Logic
+      if (filters.vendedor.length > 0) {
+        if (
+          !row.vendedor_id ||
+          !filters.vendedor.includes(row.vendedor_id.toString())
+        ) {
+          return false
+        }
+      } else {
+        // If nothing selected, show nothing (filter out everything)
+        return false
       }
 
       if (filters.municipio !== 'todos') {
@@ -206,7 +228,6 @@ export default function RotaPage() {
 
       if (filters.projecao_min && row.projecao < Number(filters.projecao_min))
         return false
-      // Removed Projecao Max Check
 
       if (filters.estoque_min && row.estoque < Number(filters.estoque_min))
         return false
@@ -260,7 +281,6 @@ export default function RotaPage() {
           valB = b.agregado ? 1 : 0
           break
         case 'vendedor':
-          // Sort by Salesperson Name instead of ID
           valA =
             sellers.find((s) => s.id === a.vendedor_id)?.nome_completo || ''
           valB =
@@ -390,7 +410,6 @@ export default function RotaPage() {
       'Agregado',
     ]
 
-    // Requirement: Limit export to 150 rows
     const rowsToExport = sortedRows.slice(0, 150)
 
     const csvContent = [

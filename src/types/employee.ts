@@ -10,6 +10,7 @@ export interface Employee {
   senha?: string // Optional because RPC login doesn't return it for security
   foto_url?: string | null
   created_at?: string
+  situacao: 'ATIVO' | 'INATIVO'
 }
 
 export type EmployeeInsert = Omit<Employee, 'id' | 'created_at'>
@@ -38,6 +39,9 @@ export const employeeSchema = z.object({
     .optional()
     .nullable()
     .or(z.literal('')),
+  situacao: z.enum(['ATIVO', 'INATIVO'], {
+    required_error: 'Situação é obrigatória',
+  }),
 })
 
 // Schema for login

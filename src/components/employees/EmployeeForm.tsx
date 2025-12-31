@@ -51,6 +51,7 @@ export function EmployeeForm({
           setor: initialData.setor || '',
           senha: initialData.senha || '0000',
           foto_url: initialData.foto_url || '',
+          situacao: initialData.situacao || 'ATIVO',
         }
       : {
           nome_completo: '',
@@ -60,6 +61,7 @@ export function EmployeeForm({
           setor: '',
           senha: '',
           foto_url: '',
+          situacao: 'ATIVO',
         },
   })
 
@@ -143,6 +145,31 @@ export function EmployeeForm({
                       value={field.value || ''}
                     />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="situacao"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Situação *</FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a situação" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="ATIVO">ATIVO</SelectItem>
+                      <SelectItem value="INATIVO">INATIVO</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
