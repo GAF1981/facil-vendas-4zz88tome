@@ -26,6 +26,7 @@ import RelatorioDashboard from '@/pages/relatorio/RelatorioDashboard'
 import ProjectionsPage from '@/pages/relatorio/ProjectionsPage'
 import SalesReportsPage from '@/pages/relatorio/SalesReportsPage'
 import StockReportsPage from '@/pages/relatorio/StockReportsPage'
+import CaixaPage from '@/pages/caixa/CaixaPage'
 import { AuthProvider } from '@/hooks/use-auth'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 
@@ -91,9 +92,11 @@ const App = () => (
               <Route path="/relatorio/vendas" element={<SalesReportsPage />} />
               <Route path="/relatorio/estoque" element={<StockReportsPage />} />
 
+              {/* Caixa Module */}
+              <Route path="/caixa" element={<CaixaPage />} />
+
               {/* Other Modules Placeholders */}
               <Route path="/complemento" element={<PlaceholderModule />} />
-              <Route path="/caixa" element={<PlaceholderModule />} />
               <Route path="/inventario" element={<PlaceholderModule />} />
 
               <Route path="/vendas" element={<PlaceholderModule />} />

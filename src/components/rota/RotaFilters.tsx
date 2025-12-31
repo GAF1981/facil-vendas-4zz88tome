@@ -24,10 +24,8 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-  CommandSeparator,
 } from '@/components/ui/command'
 import { cn } from '@/lib/utils'
-import { Badge } from '@/components/ui/badge'
 
 interface RotaFiltersProps {
   filters: RotaFilterState
@@ -122,12 +120,12 @@ export function RotaFilters({
               </div>
               <Button
                 variant="outline"
-                size="icon"
                 onClick={clearFilters}
-                className="h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground"
-                title="Limpar Filtros"
+                className="h-9 shrink-0 px-3 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                title="Limpar todos os filtros"
               >
-                <Eraser className="w-4 h-4" />
+                <Eraser className="w-4 h-4 mr-2" />
+                Limpar Filtros
               </Button>
             </div>
           </div>

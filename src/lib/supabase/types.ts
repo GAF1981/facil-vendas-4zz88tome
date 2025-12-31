@@ -305,6 +305,7 @@ export type Database = {
           nome_completo: string
           senha: string
           setor: string | null
+          situacao: string
         }
         Insert: {
           apelido?: string | null
@@ -316,6 +317,7 @@ export type Database = {
           nome_completo: string
           senha?: string
           setor?: string | null
+          situacao?: string
         }
         Update: {
           apelido?: string | null
@@ -327,6 +329,7 @@ export type Database = {
           nome_completo?: string
           senha?: string
           setor?: string | null
+          situacao?: string
         }
         Relationships: []
       }
