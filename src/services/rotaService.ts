@@ -119,15 +119,17 @@ export const rotaService = {
 
   async getFullRotaData(rota: Rota | null) {
     // 1. Fetch all Clients
+    // Increased limit to 10000 to ensure we get ALL clients
     const { data: clients, error: clientsError } = await supabase
       .from('CLIENTES')
       .select('*')
       .order('CODIGO', { ascending: false })
+      .limit(10000)
 
     if (clientsError) throw clientsError
     if (!clients) return []
 
-    // 2. Fetch Debts
+    // 2. Fetch Debts (Note: cobrancaService has been updated to fetch more rows)
     const allDebts = await cobrancaService.getDebts()
     const debtMap = new Map(allDebts.map((d) => [d.clientId, d]))
 
@@ -159,9 +161,11 @@ export const rotaService = {
     })
 
     // 6. Fetch Products for pricing
+    // Increased limit to 10000 to ensure we have all product prices
     const { data: products } = await supabase
       .from('PRODUTOS')
       .select('CODIGO, PREÇO')
+      .limit(10000)
 
     const priceMap = new Map<number, number>()
     products?.forEach((p) => {
@@ -169,14 +173,14 @@ export const rotaService = {
     })
 
     // 7. Fetch basic Summary Stats (Latest Date and Stock Value)
-    // We fetch more rows to ensure we cover enough history for calculations
+    // We fetch more rows to ensure we cover enough history for calculations for ALL clients
     const { data: dbStats } = await supabase
       .from('BANCO_DE_DADOS')
       .select(
         '"CÓDIGO DO CLIENTE", "DATA DO ACERTO", "SALDO FINAL", "VALOR VENDIDO", "COD. PRODUTO"',
       )
       .order('"DATA DO ACERTO"', { ascending: false })
-      .limit(10000)
+      .limit(50000)
 
     const statsMap = new Map<
       number,
@@ -240,6 +244,7 @@ export const rotaService = {
       return {
         rowNumber: index + 1,
         client,
+        // Default to 0/false/null if no rota item exists (Left Join logic)
         x_na_rota: rotaItem?.x_na_rota || 0,
         boleto: rotaItem?.boleto || false,
         agregado: rotaItem?.agregado || false,

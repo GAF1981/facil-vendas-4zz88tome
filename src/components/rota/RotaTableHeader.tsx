@@ -66,7 +66,7 @@ export function RotaTableHeader({ sortConfig, onSort }: RotaTableHeaderProps) {
         {renderHead('FONE 1', 'fone1', 'w-[120px]')}
         {renderHead('FONE 2', 'fone2', 'w-[120px]')}
 
-        {/* Route Specific & Status Columns (Moved to End) */}
+        {/* Route Specific & Status Columns (Fixed at the end) */}
         {renderHead(
           'N. Pedido',
           'numero_pedido',

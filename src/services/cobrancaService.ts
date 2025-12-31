@@ -12,12 +12,14 @@ import { isBefore, parseISO, startOfDay } from 'date-fns'
 export const cobrancaService = {
   async getDebts(): Promise<ClientDebt[]> {
     // 1. Fetch data from BANCO_DE_DADOS
+    // Increased limit to 50000 to ensure we capture debts for the full client base
     const { data: dbData, error: dbError } = await supabase
       .from('BANCO_DE_DADOS')
       .select(
         '"NÚMERO DO PEDIDO", "CÓDIGO DO CLIENTE", "CLIENTE", "VALOR VENDIDO", "DESCONTO POR GRUPO", "DATA DO ACERTO", "DETALHES_PAGAMENTO", "VALOR DEVIDO", "FORMA", "CODIGO FUNCIONARIO", data_combinada',
       )
       .not('NÚMERO DO PEDIDO', 'is', null)
+      .limit(50000)
 
     if (dbError) throw dbError
 
@@ -27,6 +29,7 @@ export const cobrancaService = {
       .select(
         'id, venda_id, valor_pago, vencimento, valor_registrado, forma_pagamento, forma_cobranca, data_combinada',
       )
+      .limit(50000)
 
     if (recError) throw recError
 
@@ -34,6 +37,7 @@ export const cobrancaService = {
     const { data: cobrancaData, error: cobrancaError } = await supabase
       .from('acoes_cobranca')
       .select('pedido_id')
+      .limit(50000)
 
     if (cobrancaError) throw cobrancaError
 

@@ -187,7 +187,7 @@ export const RotaTableRow = memo(function RotaTableRow({
         )}
       </TableCell>
 
-      {/* Moved Columns */}
+      {/* Moved Columns to End */}
       <TableCell className="text-center font-mono text-[10px] py-0.5 px-2 bg-blue-50/30 border-r text-muted-foreground">
         {row.numero_pedido ? `#${row.numero_pedido}` : '-'}
       </TableCell>
@@ -196,7 +196,7 @@ export const RotaTableRow = memo(function RotaTableRow({
         <Input
           type="number"
           className="h-6 w-full text-center text-[10px] px-0 bg-transparent border-transparent hover:border-input focus:border-input"
-          value={row.x_na_rota}
+          value={row.x_na_rota || 0}
           disabled={disabled}
           onChange={(e) =>
             onUpdateRow(

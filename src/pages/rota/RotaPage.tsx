@@ -60,6 +60,7 @@ export default function RotaPage() {
         setSellers(allEmployees)
 
         // Fetch Row Data
+        // Now returns ALL clients with left-joined rota data
         const data = await rotaService.getFullRotaData(active)
         setRows(data)
       } catch (error) {

@@ -20,6 +20,7 @@ export const reportsService = {
   async getProjectionsReport(): Promise<ProjectionReportRow[]> {
     // Fetch recent transactions
     // Fetching enough data to perform client-side analysis
+    // Increased limit to 20000 to improve projection coverage
     const { data, error } = await supabase
       .from('BANCO_DE_DADOS')
       .select(
@@ -29,7 +30,7 @@ export const reportsService = {
       .not('DATA DO ACERTO', 'is', null)
       .order('DATA DO ACERTO', { ascending: false })
       .order('HORA DO ACERTO', { ascending: false })
-      .limit(5000)
+      .limit(20000)
 
     if (error) throw error
 
