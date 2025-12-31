@@ -152,4 +152,47 @@ export const clientsService = {
     if (error) throw error
     return data
   },
+
+  async getUniqueClientTypes() {
+    const { data, error } = await supabase.rpc('get_unique_client_types')
+    if (error) {
+      console.error('Error fetching client types:', error)
+      return []
+    }
+    return (data as any[]).map((item) => item.tipo).filter(Boolean) as string[]
+  },
+
+  async getUniqueExpositores() {
+    const { data, error } = await supabase.rpc('get_unique_expositores')
+    if (error) {
+      console.error('Error fetching expositores:', error)
+      return []
+    }
+    return (data as any[])
+      .map((item) => item.expositor)
+      .filter(Boolean) as string[]
+  },
+
+  async getAddressByCep(cep: string) {
+    const cleanCep = cep.replace(/\D/g, '')
+    if (cleanCep.length !== 8) return null
+
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`)
+      const data = await response.json()
+
+      if (data.erro) return null
+
+      return {
+        logradouro: data.logradouro,
+        bairro: data.bairro,
+        cidade: data.localidade,
+        uf: data.uf,
+        municipio: `${data.localidade} - ${data.uf}`,
+      }
+    } catch (error) {
+      console.error('Error fetching address:', error)
+      return null
+    }
+  },
 }

@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Loader2, ChevronsUpDown, Check } from 'lucide-react'
+import { Loader2, ChevronsUpDown, Check, Search } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -54,8 +54,11 @@ export function ClientForm({
 }: ClientFormProps) {
   const [loading, setLoading] = useState(false)
   const [routes, setRoutes] = useState<string[]>([])
+  const [clientTypes, setClientTypes] = useState<string[]>([])
+  const [expositores, setExpositores] = useState<string[]>([])
   const [openRoute, setOpenRoute] = useState(false)
   const [searchValue, setSearchValue] = useState('')
+  const [searchingCep, setSearchingCep] = useState(false)
   const { toast } = useToast()
 
   const form = useForm<ClientFormData>({
@@ -64,6 +67,7 @@ export function ClientForm({
       ? {
           ...initialData,
           EMAIL: initialData.EMAIL || '',
+          Desconto: initialData.Desconto || '30%',
         }
       : {
           CODIGO: 0,
@@ -85,7 +89,7 @@ export function ClientForm({
           'FORMA DE PAGAMENTO': '',
           'NOTA FISCAL': 'NÃO',
           EXPOSITOR: '',
-          Desconto: '',
+          Desconto: '30%', // Default 30% for new clients
           'DESCONTO ACESSORIO CELULAR': '',
           'DESCONTO BRINQUEDO': '',
           'DESCONTO ACESSORIO': '',
@@ -97,13 +101,15 @@ export function ClientForm({
         },
   })
 
-  const fetchRoutes = async () => {
-    clientsService.getRoutes().then((data) => setRoutes(data))
-  }
-
   useEffect(() => {
-    // Fetch unique routes
-    fetchRoutes()
+    // Fetch unique options
+    clientsService.getRoutes().then((data) => setRoutes(data))
+    clientsService.getUniqueClientTypes().then((data) => {
+      // Ensure ATIVO is present
+      const types = data.includes('ATIVO') ? data : ['ATIVO', ...data]
+      setClientTypes(types)
+    })
+    clientsService.getUniqueExpositores().then((data) => setExpositores(data))
 
     if (!initialData) {
       clientsService
@@ -122,6 +128,31 @@ export function ClientForm({
         })
     }
   }, [initialData, form, toast])
+
+  const handleCepBlur = async (e: React.FocusEvent<HTMLInputElement>) => {
+    const cep = e.target.value
+    if (unmask(cep).length === 8) {
+      setSearchingCep(true)
+      const addressData = await clientsService.getAddressByCep(cep)
+      setSearchingCep(false)
+
+      if (addressData) {
+        form.setValue('ENDEREÇO', addressData.logradouro)
+        form.setValue('BAIRRO', addressData.bairro)
+        form.setValue('MUNICÍPIO', addressData.municipio)
+        toast({
+          title: 'Endereço encontrado',
+          description: 'Os campos de endereço foram preenchidos.',
+        })
+      } else {
+        toast({
+          title: 'CEP não encontrado',
+          description: 'Verifique o CEP digitado.',
+          variant: 'destructive',
+        })
+      }
+    }
+  }
 
   const onSubmit = async (data: ClientFormData) => {
     setLoading(true)
@@ -191,7 +222,7 @@ export function ClientForm({
                 name="TIPO"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Tipo</FormLabel>
+                    <FormLabel>Tipo Pessoa</FormLabel>
                     <Select
                       onValueChange={field.onChange}
                       defaultValue={field.value || 'Fisica'}
@@ -221,13 +252,24 @@ export function ClientForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Tipo de Cliente *</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Ex: ATIVO"
-                        {...field}
-                        value={field.value || ''}
-                      />
-                    </FormControl>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value || 'ATIVO'}
+                      value={field.value || 'ATIVO'}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o tipo" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {clientTypes.map((type) => (
+                          <SelectItem key={type} value={type}>
+                            {type}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -240,7 +282,7 @@ export function ClientForm({
                 name="CNPJ"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>CPF / CNPJ</FormLabel>
+                    <FormLabel>CPF / CNPJ *</FormLabel>
                     <FormControl>
                       <Input
                         placeholder="000.000.000-00"
@@ -449,16 +491,24 @@ export function ClientForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>CEP</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="00000-000"
-                        {...field}
-                        value={field.value || ''}
-                        onChange={(e) =>
-                          field.onChange(maskCEP(e.target.value))
-                        }
-                      />
-                    </FormControl>
+                    <div className="relative">
+                      <FormControl>
+                        <Input
+                          placeholder="00000-000"
+                          {...field}
+                          value={field.value || ''}
+                          onChange={(e) =>
+                            field.onChange(maskCEP(e.target.value))
+                          }
+                          onBlur={handleCepBlur}
+                        />
+                      </FormControl>
+                      {searchingCep && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        </div>
+                      )}
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -559,13 +609,28 @@ export function ClientForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Expositor</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Info expositor"
-                        {...field}
-                        value={field.value || ''}
-                      />
-                    </FormControl>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value || ''}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o expositor" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {expositores.length === 0 && (
+                          <SelectItem value="none" disabled>
+                            Nenhum expositor disponível
+                          </SelectItem>
+                        )}
+                        {expositores.map((expositor) => (
+                          <SelectItem key={expositor} value={expositor}>
+                            {expositor}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -687,7 +752,11 @@ export function ClientForm({
                         </Command>
                       </PopoverContent>
                     </Popover>
-                    <NewRouteDialog onSuccess={fetchRoutes} />
+                    <NewRouteDialog
+                      onSuccess={() =>
+                        clientsService.getRoutes().then(setRoutes)
+                      }
+                    />
                     <FormMessage />
                   </FormItem>
                 )}

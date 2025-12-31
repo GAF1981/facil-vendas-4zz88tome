@@ -27,7 +27,9 @@ export const clientSchema = z.object({
     .min(1, 'Código deve ser maior que 0'),
   'NOME CLIENTE': z.string().min(2, 'Nome deve ter no mínimo 2 caracteres'),
   'RAZÃO SOCIAL': z.string().optional().nullable(),
-  CNPJ: z.string().optional().nullable(),
+  CNPJ: z
+    .string({ required_error: 'CPF / CNPJ é obrigatório' })
+    .min(1, 'CPF / CNPJ é obrigatório'),
   IE: z.string().optional().nullable(),
   TIPO: z.string().optional().nullable(),
   'TIPO DE CLIENTE': z.string().min(1, 'Tipo de Cliente é obrigatório'), // Updated to be mandatory
