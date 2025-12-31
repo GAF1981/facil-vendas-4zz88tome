@@ -49,18 +49,12 @@ export function RotaFilters({
   }
 
   const clearFilters = () => {
-    // We preserve the default behavior for seller selection (all active)
-    // but here "clear" usually means reset to a clean state.
-    // Let's reset to all ACTIVE sellers as per requirement for "default".
-    const activeSellers = sellers
-      .filter((s) => s.situacao === 'ATIVO')
-      .map((s) => s.id.toString())
-
+    // Reset to neutral state (empty/all)
     setFilters({
       search: '',
       x_na_rota: 'todos',
       agregado: 'todos',
-      vendedor: activeSellers,
+      vendedor: [],
       municipio: 'todos',
       tipo_cliente: 'todos',
       grupo_rota: 'todos',

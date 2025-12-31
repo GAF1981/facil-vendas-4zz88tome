@@ -23,15 +23,15 @@ export default function RotaPage() {
     search: '',
     x_na_rota: 'todos',
     agregado: 'todos',
-    vendedor: [], // Start empty, will be populated on load
+    vendedor: [], // Start empty
     municipio: 'todos',
-    tipo_cliente: 'ATIVO',
+    tipo_cliente: 'todos', // Changed from 'ATIVO' to 'todos' for neutral default
     grupo_rota: 'todos',
     debito_min: '',
     debito_max: '',
     data_acerto_start: '',
     data_acerto_end: '',
-    projecao_min: '50',
+    projecao_min: '', // Changed from '50' to empty for neutral default
     estoque_min: '',
     estoque_max: '',
   })
@@ -55,19 +55,9 @@ export default function RotaPage() {
         setActiveRota(active)
         setLastRota(last)
 
-        // Per User Story: List ALL employees, but pre-select only ACTIVE ones
+        // List ALL employees
         const allEmployees = empRes.data
         setSellers(allEmployees)
-
-        // Set default filter to all ACTIVE employees
-        const activeSellerIds = allEmployees
-          .filter((e) => e.situacao === 'ATIVO' || !e.situacao) // Default to ATIVO if undefined
-          .map((e) => e.id.toString())
-
-        setFilters((prev) => ({
-          ...prev,
-          vendedor: activeSellerIds,
-        }))
 
         // Fetch Row Data
         const data = await rotaService.getFullRotaData(active)
@@ -196,6 +186,7 @@ export default function RotaPage() {
       }
 
       // Vendedor Multi-Select Filter Logic
+      // If filters.vendedor is empty, we show all (no filter applied)
       if (filters.vendedor.length > 0) {
         if (
           !row.vendedor_id ||
@@ -203,9 +194,6 @@ export default function RotaPage() {
         ) {
           return false
         }
-      } else {
-        // If nothing selected, show nothing (filter out everything)
-        return false
       }
 
       if (filters.municipio !== 'todos') {
