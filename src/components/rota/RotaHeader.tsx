@@ -23,15 +23,15 @@ export function RotaHeader({
   const displayRota = activeRota || lastRota
 
   return (
-    <Card className="flex-1 border-l-4 border-l-primary shadow-sm bg-muted/20">
-      <CardContent className="p-2 flex flex-row items-center justify-between gap-2 h-full">
-        <div className="flex items-center gap-2 overflow-hidden">
-          <h2 className="text-sm font-bold tracking-tight whitespace-nowrap">
+    <Card className="w-full border-l-4 border-l-primary shadow-sm bg-muted/20">
+      <CardContent className="p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 overflow-hidden">
+          <h2 className="text-lg font-bold tracking-tight whitespace-nowrap">
             Controle de Rota
           </h2>
           {displayRota ? (
-            <div className="text-xs text-muted-foreground flex items-center gap-2 truncate">
-              <span className="bg-primary/10 text-primary px-1.5 py-0.5 rounded font-mono font-bold">
+            <div className="text-sm text-muted-foreground flex items-center gap-2 truncate">
+              <span className="bg-primary/10 text-primary px-2 py-0.5 rounded font-mono font-bold">
                 #{displayRota.id}
               </span>
               <span className="truncate">
@@ -53,39 +53,39 @@ export function RotaHeader({
               </span>
             </div>
           ) : (
-            <p className="text-xs text-muted-foreground">Sem rota.</p>
+            <p className="text-sm text-muted-foreground">
+              Nenhuma rota ativa ou recente.
+            </p>
           )}
         </div>
 
-        <div className="flex gap-1 shrink-0">
+        <div className="flex gap-2 shrink-0 w-full sm:w-auto">
           {!activeRota ? (
             <Button
               onClick={onStart}
               disabled={loading}
-              size="sm"
-              className="bg-green-600 hover:bg-green-700 h-7 px-2 text-xs"
+              className="bg-green-600 hover:bg-green-700 w-full sm:w-auto"
             >
               {loading ? (
-                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
-                <Play className="mr-1 h-3 w-3" />
+                <Play className="mr-2 h-4 w-4" />
               )}
-              Iniciar
+              Iniciar Nova Rota
             </Button>
           ) : (
             <Button
               onClick={onEnd}
               disabled={loading}
-              size="sm"
               variant="destructive"
-              className="h-7 px-2 text-xs"
+              className="w-full sm:w-auto"
             >
               {loading ? (
-                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
-                <Square className="mr-1 h-3 w-3" />
+                <Square className="mr-2 h-4 w-4" />
               )}
-              Finalizar
+              Finalizar Rota
             </Button>
           )}
         </div>

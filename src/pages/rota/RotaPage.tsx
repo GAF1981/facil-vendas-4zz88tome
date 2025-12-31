@@ -357,9 +357,10 @@ export default function RotaPage() {
   )
 
   return (
-    <div className="flex flex-col h-[calc(100vh-1rem)] gap-1 p-1 animate-fade-in bg-background">
-      <div className="flex-none space-y-1">
-        <div className="flex flex-col lg:flex-row gap-1">
+    <div className="flex flex-col h-screen gap-4 p-4 animate-fade-in bg-background">
+      <div className="flex-none flex flex-col gap-4">
+        {/* Header Section */}
+        <div className="w-full">
           <RotaHeader
             activeRota={activeRota}
             lastRota={lastRota}
@@ -367,6 +368,10 @@ export default function RotaPage() {
             onEnd={handleEndRota}
             loading={loading}
           />
+        </div>
+
+        {/* Filter Strip - Dedicated full width section */}
+        <div className="w-full">
           <RotaFilters
             filters={filters}
             setFilters={setFilters}
@@ -375,10 +380,13 @@ export default function RotaPage() {
             clientTypes={uniqueTypes as string[]}
           />
         </div>
+
+        {/* Legend */}
         <RotaLegend />
       </div>
 
-      <div className="flex-1 overflow-hidden">
+      {/* Table Section */}
+      <div className="flex-1 overflow-hidden border rounded-md shadow-sm">
         <RotaTable
           rows={sortedRows}
           sellers={sellers}
