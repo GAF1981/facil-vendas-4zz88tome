@@ -3,13 +3,14 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Rota } from '@/types/rota'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { Play, Square, Loader2 } from 'lucide-react'
+import { Play, Square, Loader2, Download } from 'lucide-react'
 
 interface RotaHeaderProps {
   activeRota: Rota | null
   lastRota: Rota | null
   onStart: () => void
   onEnd: () => void
+  onExport: () => void
   loading: boolean
 }
 
@@ -18,6 +19,7 @@ export function RotaHeader({
   lastRota,
   onStart,
   onEnd,
+  onExport,
   loading,
 }: RotaHeaderProps) {
   const displayRota = activeRota || lastRota
@@ -59,7 +61,17 @@ export function RotaHeader({
           )}
         </div>
 
-        <div className="flex gap-2 shrink-0 w-full sm:w-auto">
+        <div className="flex flex-wrap gap-2 shrink-0 w-full sm:w-auto">
+          <Button
+            onClick={onExport}
+            variant="outline"
+            className="w-full sm:w-auto"
+            title="Exportar para Excel (CSV)"
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Exportar
+          </Button>
+
           {!activeRota ? (
             <Button
               onClick={onStart}

@@ -45,12 +45,13 @@ export interface RotaFilterState {
   vendedor: string | 'todos'
   municipio: string | 'todos'
   tipo_cliente: string | 'todos'
+  grupo_rota: string | 'todos' // New Rota Filter
   debito_min: string
   debito_max: string
   data_acerto_start: string
   data_acerto_end: string
   projecao_min: string
-  projecao_max: string
+  // projecao_max removed per user story
   estoque_min: string
   estoque_max: string
 }

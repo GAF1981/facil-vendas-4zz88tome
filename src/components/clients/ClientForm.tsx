@@ -72,7 +72,7 @@ export function ClientForm({
           CNPJ: '',
           IE: '',
           TIPO: 'Fisica',
-          'TIPO DE CLIENTE': 'Consumidor Final',
+          'TIPO DE CLIENTE': 'ATIVO', // Default to ATIVO
           ENDEREÇO: '',
           BAIRRO: '',
           MUNICÍPIO: '',
@@ -83,7 +83,7 @@ export function ClientForm({
           'CONTATO 1': '',
           'CONTATO 2': '',
           'FORMA DE PAGAMENTO': '',
-          'NOTA FISCAL': 'NÃO', // Default to NÃO
+          'NOTA FISCAL': 'NÃO',
           EXPOSITOR: '',
           Desconto: '',
           'DESCONTO ACESSORIO CELULAR': '',
@@ -220,10 +220,10 @@ export function ClientForm({
                 name="TIPO DE CLIENTE"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Tipo de Cliente</FormLabel>
+                    <FormLabel>Tipo de Cliente *</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="Ex: Consumidor Final"
+                        placeholder="Ex: ATIVO"
                         {...field}
                         value={field.value || ''}
                       />

@@ -26,12 +26,12 @@ export default function RotaPage() {
     vendedor: 'todos',
     municipio: 'todos',
     tipo_cliente: 'Ativo',
+    grupo_rota: 'todos',
     debito_min: '',
     debito_max: '',
     data_acerto_start: '',
     data_acerto_end: '',
     projecao_min: '50',
-    projecao_max: '',
     estoque_min: '',
     estoque_max: '',
   })
@@ -194,6 +194,10 @@ export default function RotaPage() {
         if (row.client['TIPO DE CLIENTE'] !== filters.tipo_cliente) return false
       }
 
+      if (filters.grupo_rota !== 'todos') {
+        if (row.client['GRUPO ROTA'] !== filters.grupo_rota) return false
+      }
+
       // Ranges
       if (filters.debito_min && row.debito < Number(filters.debito_min))
         return false
@@ -202,8 +206,7 @@ export default function RotaPage() {
 
       if (filters.projecao_min && row.projecao < Number(filters.projecao_min))
         return false
-      if (filters.projecao_max && row.projecao > Number(filters.projecao_max))
-        return false
+      // Removed Projecao Max Check
 
       if (filters.estoque_min && row.estoque < Number(filters.estoque_min))
         return false
@@ -257,8 +260,11 @@ export default function RotaPage() {
           valB = b.agregado ? 1 : 0
           break
         case 'vendedor':
-          valA = a.vendedor_id || 0
-          valB = b.vendedor_id || 0
+          // Sort by Salesperson Name instead of ID
+          valA =
+            sellers.find((s) => s.id === a.vendedor_id)?.nome_completo || ''
+          valB =
+            sellers.find((s) => s.id === b.vendedor_id)?.nome_completo || ''
           break
         case 'debito':
           valA = a.debito
@@ -346,7 +352,7 @@ export default function RotaPage() {
       sorted.reverse()
     }
     return sorted
-  }, [filteredRows, sortConfig])
+  }, [filteredRows, sortConfig, sellers])
 
   // Extract unique values for filters
   const uniqueMunicipios = useMemo(
@@ -359,6 +365,65 @@ export default function RotaPage() {
     ],
     [rows],
   )
+  const uniqueRoutes = useMemo(
+    () => [...new Set(rows.map((r) => r.client['GRUPO ROTA']).filter(Boolean))],
+    [rows],
+  )
+
+  const handleExportExcel = () => {
+    const headers = [
+      'Código',
+      'Nome',
+      'Fantasia',
+      'Rota',
+      'Endereço',
+      'Bairro',
+      'Município',
+      'CEP',
+      'Projeção',
+      'Débito',
+      'Vendedor',
+      'X na Rota',
+      'Agregado',
+    ]
+
+    const csvContent = [
+      headers.join(';'),
+      ...sortedRows.map((row) => {
+        const sellerName =
+          sellers.find((s) => s.id === row.vendedor_id)?.nome_completo || ''
+        return [
+          row.client.CODIGO,
+          `"${(row.client['NOME CLIENTE'] || '').replace(/"/g, '""')}"`,
+          `"${(row.client['RAZÃO SOCIAL'] || '').replace(/"/g, '""')}"`,
+          `"${(row.client['GRUPO ROTA'] || '').replace(/"/g, '""')}"`,
+          `"${(row.client.ENDEREÇO || '').replace(/"/g, '""')}"`,
+          `"${(row.client.BAIRRO || '').replace(/"/g, '""')}"`,
+          `"${(row.client.MUNICÍPIO || '').replace(/"/g, '""')}"`,
+          `"${(row.client['CEP OFICIO'] || '').replace(/"/g, '""')}"`,
+          row.projecao.toFixed(2).replace('.', ','),
+          row.debito.toFixed(2).replace('.', ','),
+          `"${sellerName}"`,
+          row.x_na_rota,
+          row.agregado ? 'Sim' : 'Não',
+        ].join(';')
+      }),
+    ].join('\n')
+
+    const blob = new Blob([`\ufeff${csvContent}`], {
+      type: 'text/csv;charset=utf-8;',
+    })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute(
+      'download',
+      `rota_export_${new Date().toISOString().slice(0, 10)}.csv`,
+    )
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
 
   return (
     <div className="flex flex-col h-screen gap-4 p-4 animate-fade-in bg-background">
@@ -370,6 +435,7 @@ export default function RotaPage() {
             lastRota={lastRota}
             onStart={handleStartRota}
             onEnd={handleEndRota}
+            onExport={handleExportExcel}
             loading={loading}
           />
         </div>
@@ -382,6 +448,7 @@ export default function RotaPage() {
             sellers={sellers}
             municipios={uniqueMunicipios as string[]}
             clientTypes={uniqueTypes as string[]}
+            routes={uniqueRoutes as string[]}
           />
         </div>
 

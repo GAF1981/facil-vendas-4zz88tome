@@ -30,7 +30,7 @@ export const clientSchema = z.object({
   CNPJ: z.string().optional().nullable(),
   IE: z.string().optional().nullable(),
   TIPO: z.string().optional().nullable(),
-  'TIPO DE CLIENTE': z.string().optional().nullable(),
+  'TIPO DE CLIENTE': z.string().min(1, 'Tipo de Cliente é obrigatório'), // Updated to be mandatory
   ENDEREÇO: z.string().optional().nullable(),
   BAIRRO: z.string().optional().nullable(),
   MUNICÍPIO: z.string().optional().nullable(),
