@@ -271,7 +271,7 @@ export const bancoDeDadosService = {
       const { data: paymentsData, error: paymentsError } = await supabase
         .from('RECEBIMENTOS')
         .select(
-          'venda_id, valor_pago, valor_registrado, forma_pagamento, data_pagamento, created_at, FUNCIONARIOS(nome_completo)',
+          'venda_id, valor_pago, valor_registrado, forma_pagamento, vencimento, created_at, FUNCIONARIOS(nome_completo)',
         )
         .in('venda_id', orderIds)
 
@@ -294,7 +294,7 @@ export const bancoDeDadosService = {
             method: p.forma_pagamento,
             value: p.valor_pago || 0,
             registeredValue: p.valor_registrado || 0,
-            date: p.data_pagamento || '',
+            date: p.vencimento || '', // Changed from data_pagamento
             employeeName: p.FUNCIONARIOS?.nome_completo || 'N/A',
             createdAt: p.created_at || '',
           })
@@ -524,9 +524,7 @@ export const bancoDeDadosService = {
             valor_registrado: detail.value, // Captured Separately
             valor_pago: 0, // Future installments are debts, not paid yet
             // Combine date with 12:00 time to ensure valid timestamp
-            data_pagamento: new Date(
-              `${detail.dueDate}T12:00:00`,
-            ).toISOString(),
+            vencimento: new Date(`${detail.dueDate}T12:00:00`).toISOString(),
           })
         })
       } else {
@@ -539,7 +537,7 @@ export const bancoDeDadosService = {
           valor_registrado: payment.value, // Captured Separately
           valor_pago: payment.paidValue, // Manual entry required now
           // Use dueDate if available (set to 12:00 to avoid timezone issues), otherwise now
-          data_pagamento: payment.dueDate
+          vencimento: payment.dueDate
             ? new Date(`${payment.dueDate}T12:00:00`).toISOString()
             : new Date().toISOString(),
         })
