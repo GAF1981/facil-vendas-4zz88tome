@@ -4,6 +4,7 @@ import { parseCurrency } from '@/lib/formatters'
 
 export interface ConfirmationRow {
   orderId: number
+  clientCode: number
   date: string
   employee: string
   monthlyAverage: number | null
@@ -12,12 +13,8 @@ export interface ConfirmationRow {
   paidAmount: number
   registeredAmount: number
   remainingAmount: number
-  methods: {
-    pix: number
-    boleto: number
-    dinheiro: number
-    cheque: number
-  }
+  pixAmount: number
+  pixDescription: string
 }
 
 export const confirmationService = {
@@ -65,6 +62,7 @@ export const confirmationService = {
 
         ordersMap.set(orderId, {
           orderId,
+          clientCode: clientId || 0,
           date: row['DATA DO ACERTO'],
           employee: row['FUNCIONÁRIO'] || 'N/D',
           monthlyAverage,
@@ -73,12 +71,8 @@ export const confirmationService = {
           paidAmount: 0,
           registeredAmount: 0,
           remainingAmount: 0,
-          methods: {
-            pix: 0,
-            boleto: 0,
-            dinheiro: 0,
-            cheque: 0,
-          },
+          pixAmount: 0,
+          pixDescription: '',
         })
       }
 
@@ -98,16 +92,22 @@ export const confirmationService = {
 
       const registered = rec.valor_registrado || 0
       const paid = rec.valor_pago || 0
+      const method = (rec.forma_pagamento || '').toLowerCase()
 
       order.paidAmount += paid
       order.registeredAmount += registered
 
-      const method = (rec.forma_pagamento || '').toLowerCase()
-      // We store the PAID value to know if checkboxes should be shown (per requirement)
-      if (method.includes('pix')) order.methods.pix += paid
-      if (method.includes('boleto')) order.methods.boleto += paid
-      if (method.includes('dinheiro')) order.methods.dinheiro += paid
-      if (method.includes('cheque')) order.methods.cheque += paid
+      // Focus on Pix: Aggregate Pix amount and description
+      if (method.includes('pix')) {
+        order.pixAmount += paid
+        const desc = rec.forma_pagamento || 'Pix'
+        // Add description if not already present to avoid duplicates like "Pix Bradesco, Pix Bradesco"
+        if (!order.pixDescription.includes(desc)) {
+          order.pixDescription = order.pixDescription
+            ? `${order.pixDescription}, ${desc}`
+            : desc
+        }
+      }
     })
 
     // Post-Process
@@ -118,7 +118,8 @@ export const confirmationService = {
           remainingAmount: order.registeredAmount - order.paidAmount,
         }
       })
-      .filter((o) => o.remainingAmount > 0.05)
+      // Filter for orders with remaining amount AND that have Pix payments involved
+      .filter((o) => o.remainingAmount > 0.05 && o.pixAmount > 0)
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
     return result
@@ -128,9 +129,6 @@ export const confirmationService = {
     orderId: number,
     methods: {
       pix?: boolean
-      boleto?: boolean
-      dinheiro?: boolean
-      cheque?: boolean
     },
   ) {
     const { data: receipts, error: fetchError } = await supabase
@@ -147,10 +145,8 @@ export const confirmationService = {
       let shouldUpdate = false
 
       if (methods.pix && method.includes('pix')) shouldUpdate = true
-      if (methods.boleto && method.includes('boleto')) shouldUpdate = true
-      if (methods.dinheiro && method.includes('dinheiro')) shouldUpdate = true
-      if (methods.cheque && method.includes('cheque')) shouldUpdate = true
 
+      // Confirm payment by setting valor_pago to valor_registrado
       if (shouldUpdate && rec.valor_registrado > rec.valor_pago) {
         updates.push(
           supabase
