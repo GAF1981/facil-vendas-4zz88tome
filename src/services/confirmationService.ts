@@ -8,29 +8,29 @@ export interface ConfirmationRow {
   employee: string
   monthlyAverage: number | null
   totalSale: number
-  amountToPay: number // Saldo Final logic adjusted for financial context
+  amountToPay: number
   paidAmount: number
   registeredAmount: number
-  remainingAmount: number // Valor a Confirmar
+  remainingAmount: number
   methods: {
-    pix: boolean
-    boleto: boolean
-    dinheiro: boolean
-    cheque: boolean
+    pix: number
+    boleto: number
+    dinheiro: number
+    cheque: number
   }
 }
 
 export const confirmationService = {
   async getConfirmationData(): Promise<ConfirmationRow[]> {
     // 1. Fetch Orders from BANCO_DE_DADOS
-    // Fetch a large dataset to ensure we cover open payments
     const { data: ordersData, error: ordersError } = await supabase
       .from('BANCO_DE_DADOS')
       .select(
         '"NÚMERO DO PEDIDO", "DATA DO ACERTO", "CLIENTE", "VALOR VENDIDO", "SALDO FINAL", "VALOR DEVIDO", "FUNCIONÁRIO", "CÓDIGO DO CLIENTE"',
       )
       .not('"NÚMERO DO PEDIDO"', 'is', null)
-      .limit(5000) // Increased limit
+      .not('"DATA DO ACERTO"', 'is', null)
+      .limit(5000)
 
     if (ordersError) throw ordersError
 
@@ -46,7 +46,6 @@ export const confirmationService = {
     const projections = await reportsService.getProjectionsReport()
     const projectionMap = new Map<number, number>()
     projections.forEach((p) => {
-      // Create a map of Client ID -> Monthly Average (latest valid)
       if (p.monthlyAverage !== null && !projectionMap.has(p.clientCode)) {
         projectionMap.set(p.clientCode, p.monthlyAverage)
       }
@@ -61,7 +60,6 @@ export const confirmationService = {
       if (!orderId) return
 
       if (!ordersMap.has(orderId)) {
-        // Calculate monthly average for this client
         const clientId = row['CÓDIGO DO CLIENTE']
         const monthlyAverage = projectionMap.get(clientId) || null
 
@@ -71,15 +69,15 @@ export const confirmationService = {
           employee: row['FUNCIONÁRIO'] || 'N/D',
           monthlyAverage,
           totalSale: 0,
-          amountToPay: 0, // Will assume Valor Devido or Calc
+          amountToPay: 0,
           paidAmount: 0,
           registeredAmount: 0,
           remainingAmount: 0,
           methods: {
-            pix: false,
-            boleto: false,
-            dinheiro: false,
-            cheque: false,
+            pix: 0,
+            boleto: 0,
+            dinheiro: 0,
+            cheque: 0,
           },
         })
       }
@@ -87,8 +85,6 @@ export const confirmationService = {
       const order = ordersMap.get(orderId)!
       order.totalSale += parseCurrency(row['VALOR VENDIDO'])
 
-      // Saldo a Pagar Logic: Use VALOR DEVIDO if available (from newer migrations), otherwise fallback
-      // Since it's row-based, sum it up.
       if (row['VALOR DEVIDO'] != null) {
         order.amountToPay += row['VALOR DEVIDO']
       }
@@ -100,39 +96,30 @@ export const confirmationService = {
       const order = ordersMap.get(orderId)
       if (!order) return
 
-      order.paidAmount += rec.valor_pago || 0
-      order.registeredAmount += rec.valor_registrado || 0
+      const registered = rec.valor_registrado || 0
+      const paid = rec.valor_pago || 0
 
-      // Flag methods present
+      order.paidAmount += paid
+      order.registeredAmount += registered
+
       const method = (rec.forma_pagamento || '').toLowerCase()
-      if (method.includes('pix')) order.methods.pix = true
-      if (method.includes('boleto')) order.methods.boleto = true
-      if (method.includes('dinheiro')) order.methods.dinheiro = true
-      if (method.includes('cheque')) order.methods.cheque = true
+      // We store the registered value to know if checkboxes should be shown
+      if (method.includes('pix')) order.methods.pix += registered
+      if (method.includes('boleto')) order.methods.boleto += registered
+      if (method.includes('dinheiro')) order.methods.dinheiro += registered
+      if (method.includes('cheque')) order.methods.cheque += registered
     })
 
     // Post-Process
     const result = Array.from(ordersMap.values())
       .map((order) => {
-        // Fallback for Amount to Pay if Valor Devido wasn't populated (old records)
-        // Assume Amount to Pay is roughly what was registered if Total Sale is 0?
-        // Or if Total Sale > 0 and Amount to Pay is 0, estimate it?
-        // Let's stick to the summed value. If 0, it might be fully paid or old data without VALOR DEVIDO column.
-        // For accurate "Valor a Confirmar", we rely on Registered - Paid.
-
         return {
           ...order,
           remainingAmount: order.registeredAmount - order.paidAmount,
         }
       })
-      // Filter out orders that are fully confirmed (tolerance 0.01)
-      // Actually, user wants to "track and verify", so maybe show all?
-      // Usually "Confirmation" implies checking pending items.
-      // Let's filter to show items where Registered > Paid.
       .filter((o) => o.remainingAmount > 0.05)
-      .sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(), // Newest first
-      )
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
     return result
   },
@@ -146,11 +133,6 @@ export const confirmationService = {
       cheque?: boolean
     },
   ) {
-    // This function will confirm payments for the specified order and methods.
-    // It finds receipts for that order with the matching method where valor_pago < valor_registrado
-    // and updates valor_pago = valor_registrado.
-
-    // 1. Fetch relevant receipts
     const { data: receipts, error: fetchError } = await supabase
       .from('RECEBIMENTOS')
       .select('id, forma_pagamento, valor_registrado, valor_pago')

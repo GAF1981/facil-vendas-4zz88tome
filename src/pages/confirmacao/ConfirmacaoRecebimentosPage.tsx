@@ -10,7 +10,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Loader2, RefreshCw, CheckCircle2 } from 'lucide-react'
+import { Loader2, RefreshCw } from 'lucide-react'
 import {
   confirmationService,
   ConfirmationRow,
@@ -18,6 +18,7 @@ import {
 import { formatCurrency } from '@/lib/formatters'
 import { format, parseISO } from 'date-fns'
 import { useToast } from '@/hooks/use-toast'
+import { cn } from '@/lib/utils'
 
 export default function ConfirmacaoRecebimentosPage() {
   const [data, setData] = useState<ConfirmationRow[]>([])
@@ -70,6 +71,8 @@ export default function ConfirmacaoRecebimentosPage() {
     }
   }
 
+  const columns = ['Pix', 'Boleto', 'Dinheiro', 'Cheque'] as const
+
   return (
     <div className="space-y-6 animate-fade-in p-4 pb-20">
       <div className="flex items-center justify-between">
@@ -110,14 +113,14 @@ export default function ConfirmacaoRecebimentosPage() {
                     <TableHead className="text-right text-red-600 font-bold bg-red-50">
                       A Confirmar
                     </TableHead>
-                    <TableHead className="text-center w-[80px]">Pix</TableHead>
-                    <TableHead className="text-center w-[80px]">
+                    <TableHead className="text-center w-[100px]">Pix</TableHead>
+                    <TableHead className="text-center w-[100px]">
                       Boleto
                     </TableHead>
-                    <TableHead className="text-center w-[80px]">
+                    <TableHead className="text-center w-[100px]">
                       Dinheiro
                     </TableHead>
-                    <TableHead className="text-center w-[80px]">
+                    <TableHead className="text-center w-[100px]">
                       Cheque
                     </TableHead>
                   </TableRow>
@@ -168,17 +171,23 @@ export default function ConfirmacaoRecebimentosPage() {
                         </TableCell>
 
                         {/* Confirmation Checkboxes */}
-                        {['pix', 'boleto', 'dinheiro', 'cheque'].map(
-                          (method) => (
-                            <TableCell key={method} className="text-center">
-                              {row.methods[
-                                method as keyof typeof row.methods
-                              ] ? (
-                                <div className="flex justify-center">
+                        {columns.map((method) => {
+                          const key =
+                            method.toLowerCase() as keyof typeof row.methods
+                          const value = row.methods[key]
+                          const hasValue = value > 0
+
+                          return (
+                            <TableCell key={method} className="text-center p-2">
+                              {hasValue ? (
+                                <div className="flex flex-col items-center gap-1">
+                                  <span className="text-[10px] font-mono text-muted-foreground">
+                                    {formatCurrency(value)}
+                                  </span>
                                   <Checkbox
                                     checked={false} // Always unchecked initially for confirmation action
                                     onCheckedChange={() =>
-                                      handleConfirm(row.orderId, method as any)
+                                      handleConfirm(row.orderId, key)
                                     }
                                     disabled={processing === row.orderId}
                                     title={`Confirmar ${method}`}
@@ -191,8 +200,8 @@ export default function ConfirmacaoRecebimentosPage() {
                                 </span>
                               )}
                             </TableCell>
-                          ),
-                        )}
+                          )
+                        })}
                       </TableRow>
                     ))
                   )}

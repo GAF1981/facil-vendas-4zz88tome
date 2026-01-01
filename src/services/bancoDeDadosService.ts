@@ -83,8 +83,6 @@ export const bancoDeDadosService = {
   async getLastAcerto(
     clienteId: number,
   ): Promise<{ date: string; time: string } | null> {
-    // Explicitly selecting and ordering by columns with spaces
-    // ensuring we map CÓDIGO DO CLIENTE to the passed ID
     const { data, error } = await supabase
       .from('BANCO_DE_DADOS')
       .select('"DATA DO ACERTO", "HORA DO ACERTO"')
@@ -112,7 +110,6 @@ export const bancoDeDadosService = {
     date: string,
     time: string,
   ): Promise<{ items: AcertoItem[]; nextId: number }> {
-    // 1. Fetch DB Items for this client and specific datetime
     const { data: dbItems, error: dbError } = await supabase
       .from('BANCO_DE_DADOS')
       .select('*')
@@ -124,14 +121,12 @@ export const bancoDeDadosService = {
     if (!dbItems || dbItems.length === 0)
       return { items: [], nextId: (await this.getMaxIdVendaItens()) + 1 }
 
-    // 2. Fetch Products to resolve IDs (since DB only stores COD. PRODUTO and MERCADORIA)
     const productCodes = [
       ...new Set(
         dbItems.map((i) => i['COD. PRODUTO']).filter((c) => c != null),
       ),
     ] as number[]
 
-    // Fetch products by Code
     let products: ProductRow[] = []
     if (productCodes.length > 0) {
       const { data: productsData, error: productsError } = await supabase
@@ -143,27 +138,17 @@ export const bancoDeDadosService = {
       if (productsData) products = productsData
     }
 
-    // 3. Prepare IDs
     let currentMaxId = await this.getMaxIdVendaItens()
 
-    // 4. Map DB Items to AcertoItem
     const items: AcertoItem[] = dbItems
       .map((dbItem) => {
-        // Find matching product
         const product = products.find(
           (p) => p.CODIGO === dbItem['COD. PRODUTO'],
         )
-
-        // If product not found by code, we can't reliably link it.
         if (!product) return null
 
         currentMaxId++
 
-        // Mapping Logic:
-        // CODIGO -> COD. PRODUTO
-        // PRODUTO -> MERCADORIA
-        // TIPO -> TIPO
-        // SALDO INICIAL -> SALDO FINAL (from previous record)
         const saldoInicial = dbItem['SALDO FINAL'] || 0
         const contagem = 0
         const quantVendida = saldoInicial - contagem
@@ -196,7 +181,7 @@ export const bancoDeDadosService = {
       .select('"VALOR VENDIDO", "DATA DO ACERTO"')
       .eq('"CÓDIGO DO CLIENTE"', clienteId)
       .order('"DATA DO ACERTO"', { ascending: false })
-      .limit(100) // Last 100 transactions to estimate average
+      .limit(100)
 
     if (error) {
       console.error('Error calculating monthly average:', error)
@@ -212,7 +197,7 @@ export const bancoDeDadosService = {
       const valStr = row['VALOR VENDIDO']
       if (!date || !valStr) return
 
-      const monthKey = date.substring(0, 7) // YYYY-MM
+      const monthKey = date.substring(0, 7)
       const val = parseCurrency(valStr)
 
       monthlyTotals[monthKey] = (monthlyTotals[monthKey] || 0) + val
@@ -226,8 +211,6 @@ export const bancoDeDadosService = {
   },
 
   async getAcertoHistory(clienteId: number) {
-    // 1. Fetch Orders from BANCO_DE_DADOS
-    // Fetch a larger limit to ensure we get complete orders given it's a line-item table
     const { data, error } = await supabase
       .from('BANCO_DE_DADOS')
       .select(
@@ -241,7 +224,6 @@ export const bancoDeDadosService = {
     if (error) throw error
     if (!data || data.length === 0) return []
 
-    // 2. Identify unique Order IDs to fetch relevant payments
     const orderIds = [
       ...new Set(
         data
@@ -250,7 +232,6 @@ export const bancoDeDadosService = {
       ),
     ] as number[]
 
-    // 3. Fetch Payments from RECEBIMENTOS for these orders
     let paymentsMap = new Map<
       number,
       {
@@ -258,8 +239,8 @@ export const bancoDeDadosService = {
         methods: Set<string>
         details: {
           method: string
-          value: number // Valor Pago
-          registeredValue: number // Valor Registrado
+          value: number
+          registeredValue: number
           date: string
           employeeName: string
           createdAt: string
@@ -278,7 +259,6 @@ export const bancoDeDadosService = {
       if (paymentsError) {
         console.error('Error fetching receipts:', paymentsError)
       } else if (paymentsData) {
-        // Aggregate payments by venda_id
         paymentsData.forEach((p: any) => {
           if (!p.venda_id) return
           const existing = paymentsMap.get(p.venda_id) || {
@@ -289,12 +269,11 @@ export const bancoDeDadosService = {
           existing.total += p.valor_pago || 0
           if (p.forma_pagamento) existing.methods.add(p.forma_pagamento)
 
-          // Add detail
           existing.details.push({
             method: p.forma_pagamento,
             value: p.valor_pago || 0,
             registeredValue: p.valor_registrado || 0,
-            date: p.vencimento || '', // Changed from data_pagamento
+            date: p.vencimento || '',
             employeeName: p.FUNCIONARIOS?.nome_completo || 'N/A',
             createdAt: p.created_at || '',
           })
@@ -304,7 +283,6 @@ export const bancoDeDadosService = {
       }
     }
 
-    // 4. Group by Order Number to create "Settlements"
     const ordersMap = new Map<number, any>()
 
     data.forEach((row) => {
@@ -323,18 +301,15 @@ export const bancoDeDadosService = {
       }
 
       const order = ordersMap.get(orderId)
-      // Accumulate sales value for all items in the order
       order.valorVendaTotal += parseCurrency(row['VALOR VENDIDO'])
     })
 
-    // 5. Convert map to array and Sort by Date/Time Descending
     const orders = Array.from(ordersMap.values()).sort((a, b) => {
       const dtA = new Date(`${a.data}T${a.hora || '00:00:00'}`).getTime()
       const dtB = new Date(`${b.data}T${b.hora || '00:00:00'}`).getTime()
       return dtB - dtA
     })
 
-    // 6. Process calculated fields and financial data
     const result = orders.map((order) => {
       const descontoStr = order.desconto || '0'
       const descontoVal = parseCurrency(descontoStr.replace('%', ''))
@@ -342,7 +317,6 @@ export const bancoDeDadosService = {
       const valorDesconto = order.valorVendaTotal * discountFactor
       const saldoAPagar = order.valorVendaTotal - valorDesconto
 
-      // Retrieve "Valor Pago" from RECEBIMENTOS map
       const paymentInfo = paymentsMap.get(order.id)
       const valorPago = paymentInfo ? paymentInfo.total : 0
       const uniqueMethods = paymentInfo
@@ -350,7 +324,6 @@ export const bancoDeDadosService = {
         : '-'
       const paymentDetails = paymentInfo ? paymentInfo.details : []
 
-      // Debito = Saldo a Pagar - Valor Pago (Aggregated from RECEBIMENTOS)
       const debito = saldoAPagar - valorPago
 
       return {
@@ -364,20 +337,17 @@ export const bancoDeDadosService = {
       }
     })
 
-    // Calculate Media Mensal based on intervals
     for (let i = 0; i < result.length; i++) {
       const current = result[i]
       let mediaMensal = null
 
       if (i < result.length - 1) {
         const previous = result[i + 1]
-        // Parse dates safely
         const dateCurrent = parseISO(current.data)
         const datePrev = parseISO(previous.data)
 
         const diffDays = differenceInDays(dateCurrent, datePrev)
 
-        // Formula: VALOR VENDIDO / ((Data Atual - Data Anterior) / 30)
         if (diffDays > 0) {
           const factor = diffDays / 30
           mediaMensal = current.valorVendaTotal / factor
@@ -405,7 +375,7 @@ export const bancoDeDadosService = {
     const dataAcertoStr = format(date, 'yyyy-MM-dd')
     const horaAcerto = format(date, 'HH:mm:ss')
 
-    // 2. Fetch current product prices (Automated Price Lookup)
+    // 2. Fetch current product prices
     const productIds = items.map((i) => i.produtoId)
 
     if (productIds.length === 0) return
@@ -431,6 +401,19 @@ export const bancoDeDadosService = {
       .join(' | ')
 
     const formaPagamento = paymentString || acertoTipo
+
+    // Determine Status NF
+    const nfCadastro = client['NOTA FISCAL'] || 'NÃO'
+    const nfVenda = notaFiscalVenda ? 'SIM' : 'NÃO'
+    let statusNf = 'Pendente'
+
+    if (nfCadastro === 'NÃO' && nfVenda === 'NÃO') {
+      statusNf = 'Resolvida'
+    } else if (nfCadastro === 'SIM' && nfVenda === 'NÃO') {
+      statusNf = 'Pendente'
+    } else if (nfCadastro === 'NÃO' && nfVenda === 'SIM') {
+      statusNf = 'Pendente'
+    }
 
     // 3. Prepare rows
     const rowsToInsert = items.map((item) => {
@@ -459,9 +442,6 @@ export const bancoDeDadosService = {
       const valorConsignadoCustoVal =
         valorConsignadoVendaVal - valorConsignadoVendaVal * discountFactor
 
-      // Calculate VALOR DEVIDO per item
-      // Logic: (Item Sales Value) - (Item Sales Value * Discount)
-      // This distributes the debt proportionally to items
       const itemDebt = valorVendidoVal * (1 - discountFactor)
 
       return {
@@ -493,8 +473,12 @@ export const bancoDeDadosService = {
         'VALOR CONSIGNADO TOTAL (Custo)': formatCurrency(
           valorConsignadoCustoVal,
         ),
-        'VALOR DEVIDO': itemDebt, // Populate new column
+        'VALOR DEVIDO': itemDebt,
         DETALHES_PAGAMENTO: payments,
+        // New Columns
+        nota_fiscal_cadastro: nfCadastro,
+        nota_fiscal_venda: nfVenda,
+        nota_fiscal_emitida: statusNf,
       }
     })
 
@@ -509,7 +493,6 @@ export const bancoDeDadosService = {
     const recebimentosToInsert: RecebimentoInsert[] = []
 
     payments.forEach((payment) => {
-      // If we have installments details, use them to create separate entries
       if (
         payment.installments > 1 &&
         payment.details &&
@@ -521,22 +504,19 @@ export const bancoDeDadosService = {
             cliente_id: client.CODIGO,
             funcionario_id: employee.id,
             forma_pagamento: payment.method,
-            valor_registrado: detail.value, // Captured Separately
-            valor_pago: 0, // Future installments are debts, not paid yet
-            // Combine date with 12:00 time to ensure valid timestamp
+            valor_registrado: detail.value,
+            valor_pago: 0,
             vencimento: new Date(`${detail.dueDate}T12:00:00`).toISOString(),
           })
         })
       } else {
-        // Single payment entry
         recebimentosToInsert.push({
           venda_id: nextPedido,
           cliente_id: client.CODIGO,
           funcionario_id: employee.id,
           forma_pagamento: payment.method,
-          valor_registrado: payment.value, // Captured Separately
-          valor_pago: payment.paidValue, // Manual entry required now
-          // Use dueDate if available (set to 12:00 to avoid timezone issues), otherwise now
+          valor_registrado: payment.value,
+          valor_pago: payment.paidValue,
           vencimento: payment.dueDate
             ? new Date(`${payment.dueDate}T12:00:00`).toISOString()
             : new Date().toISOString(),
@@ -555,7 +535,10 @@ export const bancoDeDadosService = {
       }
     }
 
-    // 6. Insert into NOTA_FISCAL if requested
+    // 6. Insert into NOTA_FISCAL if requested (Legacy Support or redundant now?)
+    // The requirement says "Data Persistence: ... saved into the 'Nota Fiscal Venda' field in the database."
+    // We did that in BANCO_DE_DADOS.
+    // The previous logic inserted into NOTA_FISCAL table. We should keep it if not asked to remove.
     if (notaFiscalVenda) {
       const { error: nfError } = await supabase.from('NOTA_FISCAL').insert({
         venda_id: nextPedido,
@@ -564,9 +547,6 @@ export const bancoDeDadosService = {
 
       if (nfError) {
         console.error('Error inserting nota fiscal record:', nfError)
-        // We log but don't stop transaction?
-        // Ideally should throw, but let's keep it robust as requested "ensure records are captured"
-        throw nfError
       }
     }
   },

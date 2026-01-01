@@ -7,14 +7,10 @@ export const notaFiscalService = {
     clientId: number,
     clientNotaFiscalInfo: string,
   ): Promise<NotaFiscalSettlement[]> {
-    // Fetch all items for the client to aggregate locally
-    // We need to fetch 'nota_fiscal_emitida' explicitly.
-    // Since types might not be generated yet, we cast or assume it comes in the select *
-    // or select explicitly.
     const { data, error } = await supabase
       .from('BANCO_DE_DADOS')
       .select(
-        '"NÚMERO DO PEDIDO", "DATA DO ACERTO", "VALOR VENDIDO", nota_fiscal_emitida',
+        '"NÚMERO DO PEDIDO", "DATA DO ACERTO", "VALOR VENDIDO", nota_fiscal_emitida, nota_fiscal_cadastro, nota_fiscal_venda',
       )
       .eq('"CÓDIGO DO CLIENTE"', clientId)
       .not('"NÚMERO DO PEDIDO"', 'is', null)
@@ -36,9 +32,10 @@ export const notaFiscalService = {
           orderId: orderId,
           dataAcerto: row['DATA DO ACERTO'] || '',
           valorTotalVendido: 0,
-          notaFiscalCadastro: clientNotaFiscalInfo || '',
-          notaFiscalVenda: '', // Placeholder
-          notaFiscalEmitida: row.nota_fiscal_emitida || false,
+          notaFiscalCadastro:
+            row.nota_fiscal_cadastro || clientNotaFiscalInfo || '',
+          notaFiscalVenda: row.nota_fiscal_venda || '',
+          notaFiscalEmitida: row.nota_fiscal_emitida || 'Pendente',
         })
       }
 
@@ -50,9 +47,7 @@ export const notaFiscalService = {
     return Array.from(ordersMap.values())
   },
 
-  async updateIssuanceStatus(orderId: number, status: boolean) {
-    // Update all rows for this order since it's a line-item table but the status is per order
-    // Using quotes for "NÚMERO DO PEDIDO" due to spaces in column name
+  async updateIssuanceStatus(orderId: number, status: string) {
     const { error } = await supabase
       .from('BANCO_DE_DADOS')
       .update({ nota_fiscal_emitida: status } as any)

@@ -16,7 +16,6 @@ import {
   Users,
   Briefcase,
   Scale,
-  PlusCircle,
   ArrowDownCircle,
   FileText,
   Wallet,
@@ -61,11 +60,7 @@ export function AppSidebar() {
       url: '/acerto',
       icon: Scale,
     },
-    {
-      title: 'Complemento',
-      url: '/complemento',
-      icon: PlusCircle,
-    },
+    // Removed Complemento
     {
       title: 'Recebimento',
       url: '/recebimento',

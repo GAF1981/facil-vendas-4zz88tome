@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { ClientSearch } from '@/components/acerto/ClientSearch'
 import { ClientRow } from '@/types/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -17,13 +17,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Badge } from '@/components/ui/badge'
 import { Loader2, FileText, User } from 'lucide-react'
 import { notaFiscalService } from '@/services/notaFiscalService'
 import {
   NotaFiscalSettlement,
   NotaFiscalStatusFilter,
+  NOTA_FISCAL_STATUSES,
 } from '@/types/nota-fiscal'
 import { useToast } from '@/hooks/use-toast'
 import { formatCurrency } from '@/lib/formatters'
@@ -63,13 +62,9 @@ export default function NotaFiscalPage() {
     fetchSettlements(client)
   }
 
-  const handleStatusToggle = async (
-    orderId: number,
-    currentStatus: boolean,
-  ) => {
-    const newStatus = !currentStatus
-
+  const handleStatusChange = async (orderId: number, newStatus: string) => {
     // Optimistic update
+    const previous = settlements
     setSettlements((prev) =>
       prev.map((s) =>
         s.orderId === orderId ? { ...s, notaFiscalEmitida: newStatus } : s,
@@ -80,19 +75,13 @@ export default function NotaFiscalPage() {
       await notaFiscalService.updateIssuanceStatus(orderId, newStatus)
       toast({
         title: 'Status atualizado',
-        description: `Nota Fiscal ${newStatus ? 'marcada como emitida' : 'marcada como não emitida'}.`,
+        description: `Nota Fiscal alterada para ${newStatus}.`,
         duration: 2000,
       })
     } catch (error) {
       console.error(error)
       // Revert on error
-      setSettlements((prev) =>
-        prev.map((s) =>
-          s.orderId === orderId
-            ? { ...s, notaFiscalEmitida: currentStatus }
-            : s,
-        ),
-      )
+      setSettlements(previous)
       toast({
         title: 'Erro ao atualizar',
         description: 'Não foi possível salvar o status.',
@@ -104,9 +93,7 @@ export default function NotaFiscalPage() {
   const filteredSettlements = useMemo(() => {
     return settlements.filter((item) => {
       if (statusFilter === 'all') return true
-      if (statusFilter === 'issued') return item.notaFiscalEmitida
-      if (statusFilter === 'not_issued') return !item.notaFiscalEmitida
-      return true
+      return item.notaFiscalEmitida === statusFilter
     })
   }, [settlements, statusFilter])
 
@@ -193,8 +180,11 @@ export default function NotaFiscalPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas</SelectItem>
-                    <SelectItem value="issued">Emitida</SelectItem>
-                    <SelectItem value="not_issued">Não Emitida</SelectItem>
+                    {NOTA_FISCAL_STATUSES.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {status}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </CardContent>
@@ -214,10 +204,10 @@ export default function NotaFiscalPage() {
                       <TableHead className="w-[100px]">Pedido</TableHead>
                       <TableHead className="w-[120px]">Data Acerto</TableHead>
                       <TableHead className="text-right">Valor Total</TableHead>
-                      <TableHead>Nota Fiscal Cadastro</TableHead>
+                      <TableHead>NF Cadastro</TableHead>
                       <TableHead className="text-center">NF Venda</TableHead>
-                      <TableHead className="text-center w-[150px]">
-                        NF Emitida
+                      <TableHead className="text-center w-[180px]">
+                        Status
                       </TableHead>
                     </TableRow>
                   </TableHeader>
@@ -245,7 +235,7 @@ export default function NotaFiscalPage() {
                             R$ {formatCurrency(item.valorTotalVendido)}
                           </TableCell>
                           <TableCell
-                            className="text-xs text-muted-foreground max-w-[200px] truncate"
+                            className="text-xs text-muted-foreground max-w-[150px] truncate"
                             title={item.notaFiscalCadastro}
                           >
                             {item.notaFiscalCadastro || '-'}
@@ -254,26 +244,23 @@ export default function NotaFiscalPage() {
                             {item.notaFiscalVenda || '-'}
                           </TableCell>
                           <TableCell className="text-center">
-                            <div className="flex justify-center items-center gap-2">
-                              <Checkbox
-                                id={`nf-${item.orderId}`}
-                                checked={item.notaFiscalEmitida}
-                                onCheckedChange={() =>
-                                  handleStatusToggle(
-                                    item.orderId,
-                                    item.notaFiscalEmitida,
-                                  )
-                                }
-                              />
-                              <label
-                                htmlFor={`nf-${item.orderId}`}
-                                className={`text-xs cursor-pointer select-none font-medium ${item.notaFiscalEmitida ? 'text-green-600' : 'text-muted-foreground'}`}
-                              >
-                                {item.notaFiscalEmitida
-                                  ? 'Emitida'
-                                  : 'Pendente'}
-                              </label>
-                            </div>
+                            <Select
+                              value={item.notaFiscalEmitida}
+                              onValueChange={(val) =>
+                                handleStatusChange(item.orderId, val)
+                              }
+                            >
+                              <SelectTrigger className="h-8 w-full">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {NOTA_FISCAL_STATUSES.map((status) => (
+                                  <SelectItem key={status} value={status}>
+                                    {status}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </TableCell>
                         </TableRow>
                       ))

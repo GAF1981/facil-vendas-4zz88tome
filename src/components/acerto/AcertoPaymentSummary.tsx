@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { formatCurrency } from '@/lib/formatters'
-import { Wallet, CreditCard, Calendar, DollarSign, Check } from 'lucide-react'
+import { Wallet, CreditCard, Calendar, DollarSign } from 'lucide-react'
 import {
   PaymentEntry,
   PaymentMethodType,
@@ -143,10 +143,18 @@ export function AcertoPaymentSummary({
     onPaymentsChange(
       payments.map((p) => {
         if (p.method !== method) return p
-        return {
-          ...p,
-          [field]: Number(p[field].toFixed(2)),
+
+        let updated = { ...p, [field]: Number(p[field].toFixed(2)) }
+
+        // Value Synchronization Logic:
+        // If 'Valor Registrado' > 1 AND 'Valor Pago' < 'Valor Registrado', update 'Valor Registrado' to 'Valor Pago'
+        if (field === 'paidValue') {
+          if (updated.value > 1 && updated.paidValue < updated.value) {
+            updated.value = updated.paidValue
+          }
         }
+
+        return updated
       }),
     )
   }
@@ -262,6 +270,7 @@ export function AcertoPaymentSummary({
                 const isFullyPaid =
                   Math.abs(entry.paidValue - entry.value) < 0.01 &&
                   entry.value > 0
+                const isBoleto = entry.method === 'Boleto'
 
                 return (
                   <div
@@ -315,7 +324,7 @@ export function AcertoPaymentSummary({
                           >
                             Valor Pago
                           </Label>
-                          {!disabled && (
+                          {!disabled && !isBoleto && (
                             <div className="flex items-center gap-1.5">
                               <Checkbox
                                 id={`auto-${entry.method}`}
@@ -347,9 +356,11 @@ export function AcertoPaymentSummary({
                               isOverpaid
                                 ? 'border-red-300 bg-red-50 text-red-700 focus-visible:ring-red-200'
                                 : 'border-green-200 bg-green-50/20 text-green-700',
+                              isBoleto &&
+                                'bg-muted text-muted-foreground opacity-70',
                             )}
                             value={entry.paidValue}
-                            disabled={disabled}
+                            disabled={disabled || isBoleto} // Boleto Restriction: Read-only (disabled)
                             onChange={(e) =>
                               handleUpdateEntry(
                                 entry.method,

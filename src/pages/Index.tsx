@@ -3,7 +3,6 @@ import {
   Users,
   Briefcase,
   Scale,
-  PlusCircle,
   ArrowDownCircle,
   FileText,
   Wallet,
@@ -14,129 +13,126 @@ import {
   AlertCircle,
   Package,
   Database,
+  CheckCircle,
 } from 'lucide-react'
 
-const Index = () => {
+export default function Index() {
   const modules = [
     {
       title: 'Clientes',
-      description: 'Gestão de clientes',
       icon: Users,
       to: '/clientes',
+      description: 'Gerenciar cadastro e histórico de clientes',
       color: 'text-blue-600',
     },
     {
       title: 'Funcionários',
-      description: 'Gestão de equipe',
       icon: Briefcase,
       to: '/funcionarios',
+      description: 'Gestão da equipe de vendas',
       color: 'text-indigo-600',
     },
     {
       title: 'Produtos',
-      description: 'Catálogo de produtos',
       icon: Package,
       to: '/produtos',
-      color: 'text-orange-600',
+      description: 'Catálogo de produtos e preços',
+      color: 'text-amber-600',
     },
     {
       title: 'Acerto',
-      description: 'Acertos e ajustes',
       icon: Scale,
       to: '/acerto',
-      color: 'text-teal-600',
+      description: 'Realizar acertos e captações de vendas',
+      color: 'text-green-600',
     },
-    {
-      title: 'Complemento',
-      description: 'Informações extras',
-      icon: PlusCircle,
-      to: '/complemento',
-      color: 'text-cyan-600',
-    },
+    // Removed Complemento
     {
       title: 'Recebimento',
-      description: 'Contas a receber',
       icon: ArrowDownCircle,
       to: '/recebimento',
+      description: 'Registrar recebimentos de valores',
       color: 'text-emerald-600',
     },
     {
+      title: 'Confirmação',
+      icon: CheckCircle,
+      to: '/confirmacao-recebimentos',
+      description: 'Confirmar pagamentos realizados',
+      color: 'text-teal-600',
+    },
+    {
       title: 'Cobrança',
-      description: 'Gestão de inadimplência',
       icon: CreditCard,
       to: '/cobranca',
+      description: 'Gestão de cobranças e inadimplência',
       color: 'text-red-600',
     },
     {
       title: 'Nota Fiscal',
-      description: 'Emissão de NF-e',
       icon: FileText,
       to: '/nota-fiscal',
-      color: 'text-yellow-600',
+      description: 'Controle de emissão de notas fiscais',
+      color: 'text-orange-600',
     },
     {
       title: 'Caixa',
-      description: 'Fluxo de caixa',
       icon: Wallet,
       to: '/caixa',
-      color: 'text-green-600',
+      description: 'Fluxo de caixa e movimentações',
+      color: 'text-cyan-600',
     },
     {
       title: 'Inventário',
-      description: 'Controle de estoque',
       icon: ClipboardList,
       to: '/inventario',
-      color: 'text-purple-600',
+      description: 'Controle de estoque e inventário',
+      color: 'text-violet-600',
     },
     {
       title: 'Rota',
-      description: 'Logística e rotas',
       icon: Map,
       to: '/rota',
-      color: 'text-pink-600',
+      description: 'Planejamento e gestão de rotas',
+      color: 'text-fuchsia-600',
     },
     {
       title: 'Relatório',
-      description: 'Análise e métricas',
       icon: BarChart3,
       to: '/relatorio',
-      color: 'text-sky-600',
+      description: 'Relatórios gerenciais e estatísticas',
+      color: 'text-rose-600',
     },
     {
       title: 'Pendências',
-      description: 'Itens pendentes',
       icon: AlertCircle,
       to: '/pendencias',
-      color: 'text-amber-600',
+      description: 'Acompanhamento de pendências',
+      color: 'text-yellow-600',
     },
     {
       title: 'Backup',
-      description: 'Exportação de dados',
       icon: Database,
       to: '/backup',
-      color: 'text-gray-600',
+      description: 'Exportação e backup de dados',
+      color: 'text-slate-600',
     },
   ]
 
   return (
-    <div className="space-y-6 animate-fade-in pb-10">
-      <div className="flex flex-col items-center justify-center py-6 space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight text-primary">
-          FACIL VENDAS
-        </h1>
-        <p className="text-muted-foreground text-center max-w-lg">
-          Bem-vindo ao sistema central. Selecione um módulo abaixo para começar.
+    <div className="space-y-6 animate-fade-in p-4 pb-20">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-3xl font-bold tracking-tight">Menu Principal</h1>
+        <p className="text-muted-foreground">
+          Bem-vindo ao sistema Fácil Vendas. Selecione um módulo para começar.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 px-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {modules.map((module) => (
           <MobileNavCard
             key={module.title}
-            title={module.title}
-            description={module.description}
-            icon={module.icon}
-            to={module.to}
+            {...module}
             iconColor={module.color}
           />
         ))}
@@ -144,5 +140,3 @@ const Index = () => {
     </div>
   )
 }
-
-export default Index

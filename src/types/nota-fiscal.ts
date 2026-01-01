@@ -3,8 +3,14 @@ export interface NotaFiscalSettlement {
   dataAcerto: string
   valorTotalVendido: number
   notaFiscalCadastro: string
-  notaFiscalVenda: string // Placeholder
-  notaFiscalEmitida: boolean
+  notaFiscalVenda: string
+  notaFiscalEmitida: string // Changed from boolean to string
 }
 
-export type NotaFiscalStatusFilter = 'all' | 'issued' | 'not_issued'
+export type NotaFiscalStatusFilter =
+  | 'all'
+  | 'Emitida'
+  | 'Pendente'
+  | 'Resolvida'
+
+export const NOTA_FISCAL_STATUSES = ['Emitida', 'Pendente', 'Resolvida']
