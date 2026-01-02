@@ -47,28 +47,29 @@ export const inventarioService = {
 
     if (!data) return { data: [], totalCount: 0 }
 
-    // Map data with resilience per row to isolate errors
+    // Map data with resilience per row to isolate errors and prevent UI crashes
+    // Uses optional chaining and fallback values as requested in user story
     const mappedData = data.map((item: any) => {
       try {
-        const saldoFinal = Number(item.saldo_final) || 0
-        const contagem = Number(item.estoque_contagem_carro) || 0
-        const preco = Number(item.preco) || 0
+        const saldoFinal = Number(item?.saldo_final ?? 0)
+        const contagem = Number(item?.estoque_contagem_carro ?? 0)
+        const preco = Number(item?.preco ?? 0)
 
         const diferencaQuantidade = contagem - saldoFinal
         const diferencaValor = diferencaQuantidade * preco
 
         return {
-          id: item.id,
-          codigo_barras: item.codigo_barras,
-          codigo_produto: item.codigo_produto,
-          mercadoria: item.mercadoria || 'Nome Indisponível',
-          tipo: item.tipo,
+          id: Number(item?.id ?? 0),
+          codigo_barras: item?.codigo_barras ?? '',
+          codigo_produto: Number(item?.codigo_produto ?? 0),
+          mercadoria: item?.mercadoria || 'Produto Não Identificado',
+          tipo: item?.tipo ?? 'OUTROS',
           preco: preco,
-          saldo_inicial: Number(item.saldo_inicial) || 0,
-          entrada_estoque_carro: Number(item.entrada_estoque_carro) || 0,
-          entrada_cliente_carro: Number(item.entrada_cliente_carro) || 0,
-          saida_carro_estoque: Number(item.saida_carro_estoque) || 0,
-          saida_carro_cliente: Number(item.saida_carro_cliente) || 0,
+          saldo_inicial: Number(item?.saldo_inicial ?? 0),
+          entrada_estoque_carro: Number(item?.entrada_estoque_carro ?? 0),
+          entrada_cliente_carro: Number(item?.entrada_cliente_carro ?? 0),
+          saida_carro_estoque: Number(item?.saida_carro_estoque ?? 0),
+          saida_carro_cliente: Number(item?.saida_carro_cliente ?? 0),
           saldo_final: saldoFinal,
           estoque_contagem_carro: contagem,
           diferenca_quantidade: diferencaQuantidade,
@@ -76,18 +77,18 @@ export const inventarioService = {
           hasError: false,
         }
       } catch (rowError) {
-        // Enhanced Diagnostic Logging
+        // Enhanced Diagnostic Logging for failed rows
         console.group('Row Parsing Error Isolation')
         console.error(`Error processing row for item ID ${item?.id}:`, rowError)
         console.error('Raw problematic item:', JSON.stringify(item))
         console.groupEnd()
 
-        // Return a safe placeholder instead of crashing
+        // Return a safe placeholder instead of crashing the whole table
         return {
-          id: item?.id || Math.random(),
+          id: item?.id || Math.floor(Math.random() * 1000000),
           codigo_barras: null,
           codigo_produto: item?.codigo_produto || null,
-          mercadoria: item?.mercadoria || 'ERRO DE DADOS',
+          mercadoria: item?.mercadoria || 'ERRO NO ITEM',
           tipo: null,
           preco: 0,
           saldo_inicial: 0,
@@ -104,11 +105,12 @@ export const inventarioService = {
       }
     })
 
-    const totalCount = data[0]?.total_count || 0
+    // Total count is the same for all rows in the page
+    const totalCount = Number(data[0]?.total_count ?? 0)
 
     return {
       data: mappedData,
-      totalCount: Number(totalCount),
+      totalCount: totalCount,
     }
   },
 
@@ -132,20 +134,20 @@ export const inventarioService = {
 
     return {
       initial: {
-        qty: Number(row.total_saldo_inicial_qtd) || 0,
-        value: Number(row.total_saldo_inicial_valor) || 0,
+        qty: Number(row?.total_saldo_inicial_qtd ?? 0),
+        value: Number(row?.total_saldo_inicial_valor ?? 0),
       },
       final: {
-        qty: Number(row.total_saldo_final_qtd) || 0,
-        value: Number(row.total_saldo_final_valor) || 0,
+        qty: Number(row?.total_saldo_final_qtd ?? 0),
+        value: Number(row?.total_saldo_final_valor ?? 0),
       },
       positiveDiff: {
-        qty: Number(row.total_diferenca_positiva_qtd) || 0,
-        value: Number(row.total_diferenca_positiva_valor) || 0,
+        qty: Number(row?.total_diferenca_positiva_qtd ?? 0),
+        value: Number(row?.total_diferenca_positiva_valor ?? 0),
       },
       negativeDiff: {
-        qty: Number(row.total_diferenca_negativa_qtd) || 0,
-        value: Number(row.total_diferenca_negativa_valor) || 0,
+        qty: Number(row?.total_diferenca_negativa_qtd ?? 0),
+        value: Number(row?.total_diferenca_negativa_valor ?? 0),
       },
     }
   },
