@@ -10,6 +10,7 @@ import { PagamentoRow } from '@/types/pagamentos'
 import { formatCurrency } from '@/lib/formatters'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { Badge } from '@/components/ui/badge'
 
 interface PagamentosTableProps {
   data: PagamentoRow[]
@@ -17,14 +18,14 @@ interface PagamentosTableProps {
 
 export function PagamentosTable({ data }: PagamentosTableProps) {
   return (
-    <div className="rounded-md border bg-card overflow-hidden">
+    <div className="rounded-md border bg-card overflow-hidden shadow-sm">
       <Table>
         <TableHeader className="bg-muted/50">
           <TableRow>
-            <TableHead className="w-[120px]">Número do Pedido</TableHead>
-            <TableHead className="w-[100px]">Código Cliente</TableHead>
+            <TableHead className="w-[150px]">Número do Pedido</TableHead>
+            <TableHead className="w-[120px]">Código Cliente</TableHead>
             <TableHead>Nome Cliente</TableHead>
-            <TableHead>Forma de pagamento</TableHead>
+            <TableHead className="w-[180px]">Forma de pagamento</TableHead>
             <TableHead className="text-right">Valor</TableHead>
             <TableHead className="text-right">Data</TableHead>
           </TableRow>
@@ -34,9 +35,14 @@ export function PagamentosTable({ data }: PagamentosTableProps) {
             <TableRow>
               <TableCell
                 colSpan={6}
-                className="h-24 text-center text-muted-foreground"
+                className="h-32 text-center text-muted-foreground"
               >
-                Nenhum pagamento encontrado.
+                <div className="flex flex-col items-center justify-center gap-2">
+                  <p className="font-medium">Nenhum pagamento Pix encontrado</p>
+                  <p className="text-xs">
+                    Não há registros pendentes de conferência para este filtro.
+                  </p>
+                </div>
               </TableCell>
             </TableRow>
           ) : (
@@ -45,21 +51,24 @@ export function PagamentosTable({ data }: PagamentosTableProps) {
                 <TableCell className="font-mono font-medium text-blue-600">
                   {row.id_da_femea ? `#${row.id_da_femea}` : '-'}
                 </TableCell>
-                <TableCell className="font-mono text-xs">
+                <TableCell className="font-mono text-muted-foreground">
                   {row.cliente_id}
                 </TableCell>
                 <TableCell>
                   <span className="font-medium">{row.cliente_nome}</span>
                 </TableCell>
                 <TableCell>
-                  <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-purple-100 text-purple-800 hover:bg-purple-200">
+                  <Badge
+                    variant="outline"
+                    className="bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200"
+                  >
                     {row.forma_pagamento}
-                  </span>
+                  </Badge>
                 </TableCell>
                 <TableCell className="text-right font-medium text-green-600">
                   R$ {formatCurrency(row.valor)}
                 </TableCell>
-                <TableCell className="text-right text-sm">
+                <TableCell className="text-right text-sm text-muted-foreground">
                   {row.data
                     ? format(parseISO(row.data), 'dd/MM/yyyy', {
                         locale: ptBR,

@@ -31,7 +31,7 @@ export default function PagamentosPage() {
       console.error(error)
       toast({
         title: 'Erro ao carregar',
-        description: 'Não foi possível buscar os pagamentos.',
+        description: 'Não foi possível buscar os dados de pagamentos.',
         variant: 'destructive',
       })
     } finally {
@@ -68,7 +68,7 @@ export default function PagamentosPage() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Pagamentos</h1>
             <p className="text-muted-foreground">
-              Conferência de pagamentos realizados.
+              Conferência de recebimentos via Pix.
             </p>
           </div>
         </div>
@@ -84,7 +84,7 @@ export default function PagamentosPage() {
         <CardHeader>
           <CardTitle>Conferência Pagamentos</CardTitle>
           <CardDescription>
-            Lista de transações filtradas para conferência (Pix).
+            Lista de transações filtradas para conferência (Apenas Pix).
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -100,7 +100,7 @@ export default function PagamentosPage() {
             </div>
           </div>
 
-          {loading && data.length === 0 ? (
+          {loading ? (
             <div className="flex justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
