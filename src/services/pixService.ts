@@ -3,7 +3,7 @@ import { PixReceiptRow, PixConferenceFormData } from '@/types/pix'
 
 export const pixService = {
   async getPixReceipts(): Promise<PixReceiptRow[]> {
-    // Fetch receipts where forma_pagamento includes 'Pix'
+    // Fetch receipts where forma_pagamento is 'Pix'
     // Joining with CLIENTES for name
     // Joining with PIX table to get conference details
     const { data, error } = await supabase
@@ -23,7 +23,7 @@ export const pixService = {
         )
       `,
       )
-      .ilike('forma_pagamento', '%Pix%')
+      .eq('forma_pagamento', 'Pix')
       .order('created_at', { ascending: false })
       .limit(1000)
 
