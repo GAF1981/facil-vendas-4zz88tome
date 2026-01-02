@@ -139,6 +139,7 @@ export const inventarioService = {
     productCode: number,
     balance: number,
     funcionarioId?: number | null,
+    productName: string = '',
   ): Promise<void> {
     // Updates SALDO FINAL instead of CONTAGEM as per new requirement
     let query = supabase
@@ -167,10 +168,36 @@ export const inventarioService = {
 
       if (updateError) throw updateError
     } else {
-      console.warn(
-        'No history record found for product to update balance. Balance not saved.',
-      )
-      // We don't throw here to avoid breaking bulk updates if one item fails to find history
+      // If no history record found, insert a new one to establish balance
+      const now = new Date()
+      const dateStr = now.toISOString().split('T')[0]
+      const timeStr = now.toLocaleTimeString()
+
+      const { error: insertError } = await supabase
+        .from('BANCO_DE_DADOS')
+        .insert({
+          'COD. PRODUTO': productCode,
+          'CODIGO FUNCIONARIO': funcionarioId,
+          'SALDO FINAL': balance,
+          CONTAGEM: balance, // Initial count matches balance
+          'DATA DO ACERTO': dateStr,
+          'HORA DO ACERTO': timeStr,
+          MERCADORIA: productName,
+          TIPO: 'CONTAGEM_FINAL',
+          'SALDO INICIAL': 0,
+        } as any)
+
+      if (insertError) {
+        console.error(
+          'Error creating new balance record for product:',
+          productCode,
+          insertError,
+        )
+        // We log but maybe shouldn't throw to avoid breaking the whole batch if one fails?
+        // But for "Robust" saving, we should probably throw or handle it.
+        // Throwing here will be caught by Promise.all and fail the batch save.
+        throw insertError
+      }
     }
   },
 
@@ -178,6 +205,7 @@ export const inventarioService = {
     items: {
       productId: number
       productCode: number | null
+      productName: string
       quantity: number
       price: number
     }[],
@@ -209,6 +237,7 @@ export const inventarioService = {
           item.productCode,
           item.quantity,
           funcionarioId,
+          item.productName,
         )
       }
       return Promise.resolve()

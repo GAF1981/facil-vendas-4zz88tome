@@ -149,13 +149,14 @@ export default function ContagemPage() {
     }
 
     const itemsToSave = Object.entries(counts)
-      .filter(([_, qty]) => qty >= 0) // Save all entries, even 0 if intended? Usually we save > 0 or all touched. Let's save all present in state.
+      .filter(([_, qty]) => qty >= 0) // Save all entries, even 0 if intended
       .map(([idStr, qty]) => {
         const id = parseInt(idStr)
         const product = allProducts.find((p) => p.ID === id)
         return {
           productId: id,
           productCode: product?.CODIGO || null,
+          productName: product?.PRODUTO || '',
           quantity: qty,
           price: product ? parseCurrency(product.PREÇO) : 0,
         }
@@ -185,7 +186,15 @@ export default function ContagemPage() {
         className: 'bg-green-600 text-white',
       })
 
-      // Optionally clear counts or keep them? Keeping them allows further editing.
+      // We clear counts to indicate success and avoid double submission
+      // But maybe user wants to keep seeing them?
+      // For now, clearing seems safer to show "Saved".
+      // Or we can just leave them. The requirement says "clearing the dirty state".
+      // Since we don't track dirty state per se, just counts, clearing counts would reset the view.
+      // But clearing counts might be annoying if they want to review.
+      // Let's assume the user might want to continue or verify.
+      // However, to be "Success Notification ... clearing the dirty state", I will clear counts.
+      setCounts({})
     } catch (error) {
       console.error(error)
       toast({
