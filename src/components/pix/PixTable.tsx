@@ -43,7 +43,7 @@ export function PixTable({ data, onConfer }: PixTableProps) {
                 colSpan={10}
                 className="h-24 text-center text-muted-foreground"
               >
-                Nenhum recebimento via Pix encontrado.
+                Nenhum recebimento encontrado.
               </TableCell>
             </TableRow>
           ) : (

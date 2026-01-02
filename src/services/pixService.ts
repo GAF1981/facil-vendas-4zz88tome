@@ -3,7 +3,7 @@ import { PixReceiptRow, PixConferenceFormData } from '@/types/pix'
 
 export const pixService = {
   async getPixReceipts(): Promise<PixReceiptRow[]> {
-    // Fetch receipts where forma_pagamento is 'Pix'
+    // Fetch all receipts regardless of payment method
     // Joining with CLIENTES for name
     // Joining with PIX table to get conference details
     // Selecting "ID_da_fêmea" specifically
@@ -24,7 +24,6 @@ export const pixService = {
         )
       `,
       )
-      .ilike('forma_pagamento', 'pix') // Case-insensitive filter
       .order('created_at', { ascending: false })
       .limit(1000)
 
@@ -67,6 +66,7 @@ export const pixService = {
         banco_pix: data.banco_pix,
         data_pix_realizado: new Date(data.data_pix_realizado).toISOString(),
         confirmado_por: employeeName,
+        venda_id: vendaId,
       },
       { onConflict: 'recebimento_id' },
     )

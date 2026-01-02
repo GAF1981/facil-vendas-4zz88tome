@@ -36,7 +36,7 @@ export default function PixPage() {
       console.error(error)
       toast({
         title: 'Erro ao carregar',
-        description: 'Não foi possível buscar os recebimentos Pix.',
+        description: 'Não foi possível buscar os recebimentos.',
         variant: 'destructive',
       })
     } finally {
@@ -97,9 +97,9 @@ export default function PixPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Conferência de Recebimentos via Pix</CardTitle>
+          <CardTitle>Conferência de Recebimentos</CardTitle>
           <CardDescription>
-            Visualize e confira todos os pagamentos identificados como Pix.
+            Visualize e confira todos os pagamentos para registro de Pix.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
