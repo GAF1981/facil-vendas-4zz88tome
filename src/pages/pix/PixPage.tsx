@@ -44,8 +44,12 @@ export default function PixPage() {
     try {
       const result = await pixService.getPixReceipts()
       setData(result)
-      // Apply filters after fetch
-      applyFilters(result, filters)
+      // Apply filters after fetch (or keep current if reloading)
+      // We pass the current filter state to applyFilters
+      // However, we need to call setFilteredData with the result of applyFilters
+      // This is better handled in a useEffect or by calling applyFilters immediately
+      // But applyFilters depends on the 'data' state if we pass it, or we can pass result directly
+      setFilteredData(applyFiltersLogic(result, filters))
     } catch (error) {
       console.error(error)
       toast({
@@ -58,7 +62,11 @@ export default function PixPage() {
     }
   }
 
-  const applyFilters = (rows: PixReceiptRow[], currentFilters: PixFilters) => {
+  // Extracted logic to use both in useEffect and fetchData
+  const applyFiltersLogic = (
+    rows: PixReceiptRow[],
+    currentFilters: PixFilters,
+  ) => {
     let res = [...rows]
 
     if (currentFilters.orderId) {
@@ -89,7 +97,7 @@ export default function PixPage() {
       }
     }
 
-    setFilteredData(res)
+    return res
   }
 
   useEffect(() => {
@@ -97,7 +105,7 @@ export default function PixPage() {
   }, [])
 
   useEffect(() => {
-    applyFilters(data, filters)
+    setFilteredData(applyFiltersLogic(data, filters))
   }, [filters, data])
 
   const handleFilterChange = (key: keyof PixFilters, value: string) => {

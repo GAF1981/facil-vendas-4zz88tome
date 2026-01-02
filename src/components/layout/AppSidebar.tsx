@@ -70,7 +70,7 @@ export function AppSidebar() {
       url: '/pix',
       icon: QrCode,
     },
-    // Confirmação removed from sidebar
+    // Confirmação Removed
     {
       title: 'Cobrança',
       url: '/cobranca',

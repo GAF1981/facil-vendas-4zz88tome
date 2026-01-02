@@ -11,19 +11,17 @@ export interface PixEntry {
 }
 
 export interface PixReceiptRow {
-  id: number // recebimento_id
-  venda_id: number
-  // Mapped from ID_da_fêmea
-  id_da_femea: number | null
-  cliente_id: number
-  forma_pagamento: string
-  valor_pago: number
-  valor_registrado: number | null
-  vencimento: string | null
-  created_at: string | null
-  // Client info
-  cliente_nome: string
-  // Pix info (if any)
+  id: number // recebimento.id
+  venda_id: number // recebimento.venda_id
+  id_da_femea: number | null // recebimento.ID_da_fêmea
+  cliente_id: number // recebimento.cliente_id
+  forma_pagamento: string // recebimento.forma_pagamento
+  valor_pago: number // recebimento.valor_pago
+  valor_registrado: number | null // recebimento.valor_registrado
+  vencimento: string | null // recebimento.vencimento
+  created_at: string | null // recebimento.created_at
+  cliente_nome: string // Joined
+  // Pix specific data (Left Join - nullable)
   pix_id?: number
   nome_no_pix?: string
   banco_pix?: string
