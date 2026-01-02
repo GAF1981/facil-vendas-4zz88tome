@@ -16,6 +16,7 @@ import {
   CheckCircle,
   QrCode,
   Banknote,
+  ClipboardList as ClipboardListIcon,
 } from 'lucide-react'
 
 export default function Index() {
@@ -68,6 +69,13 @@ export default function Index() {
       to: '/pix',
       description: 'Conferência de recebimentos via Pix',
       color: 'text-purple-600',
+    },
+    {
+      title: 'Controle',
+      icon: ClipboardListIcon,
+      to: '/controle',
+      description: 'Monitoramento de todos os recebimentos',
+      color: 'text-cyan-600',
     },
     {
       title: 'Confirmação',
