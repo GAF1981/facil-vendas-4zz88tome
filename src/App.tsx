@@ -29,6 +29,7 @@ import SalesReportsPage from '@/pages/relatorio/SalesReportsPage'
 import StockReportsPage from '@/pages/relatorio/StockReportsPage'
 import CaixaPage from '@/pages/caixa/CaixaPage'
 import PixPage from '@/pages/pix/PixPage'
+import PagamentosPage from '@/pages/pagamentos/PagamentosPage'
 import { AuthProvider } from '@/hooks/use-auth'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 
@@ -76,6 +77,9 @@ const App = () => (
 
               {/* Pix Module */}
               <Route path="/pix" element={<PixPage />} />
+
+              {/* Pagamentos Module - NEW */}
+              <Route path="/pagamentos" element={<PagamentosPage />} />
 
               {/* Cobranca Module */}
               <Route path="/cobranca" element={<CobrancaPage />} />

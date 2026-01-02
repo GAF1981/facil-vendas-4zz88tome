@@ -49,6 +49,8 @@ export function Header() {
         return 'Complemento'
       case 'recebimento':
         return 'Recebimento'
+      case 'pagamentos':
+        return 'Pagamentos'
       case 'nota-fiscal':
         return 'Nota Fiscal'
       case 'caixa':

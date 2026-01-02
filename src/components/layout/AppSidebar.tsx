@@ -28,6 +28,7 @@ import {
   Database,
   CheckCircle,
   QrCode,
+  Banknote,
 } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 
@@ -65,6 +66,11 @@ export function AppSidebar() {
       title: 'Recebimento',
       url: '/recebimento',
       icon: ArrowDownCircle,
+    },
+    {
+      title: 'Pagamentos',
+      url: '/pagamentos',
+      icon: Banknote,
     },
     {
       title: 'Pix',

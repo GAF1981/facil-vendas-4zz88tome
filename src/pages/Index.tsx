@@ -15,6 +15,7 @@ import {
   Database,
   CheckCircle,
   QrCode,
+  Banknote,
 } from 'lucide-react'
 
 export default function Index() {
@@ -53,6 +54,13 @@ export default function Index() {
       to: '/recebimento',
       description: 'Registrar recebimentos de valores',
       color: 'text-emerald-600',
+    },
+    {
+      title: 'Pagamentos',
+      icon: Banknote,
+      to: '/pagamentos',
+      description: 'Conferência de pagamentos (Pix)',
+      color: 'text-indigo-600',
     },
     {
       title: 'Pix',
