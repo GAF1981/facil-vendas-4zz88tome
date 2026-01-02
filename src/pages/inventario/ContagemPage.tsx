@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import {
   Card,
   CardContent,
@@ -17,6 +17,7 @@ import {
   DollarSign,
   Filter,
   AlertTriangle,
+  ScanBarcode,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { productsService } from '@/services/productsService'
@@ -50,6 +51,9 @@ export default function ContagemPage() {
   const [counts, setCounts] = useState<Record<number, number>>({})
   const { toast } = useToast()
   const [activeSession, setActiveSession] = useState<any>(null)
+
+  // Ref for the search input to allow programmatic focus
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
   // Filter State
   const [filterType, setFilterType] = useState<'all' | 'gt0' | 'eq'>('all')
@@ -100,9 +104,9 @@ export default function ContagemPage() {
       const lower = searchTerm.toLowerCase()
       result = result.filter(
         (p) =>
-          p.PRODUTO?.toLowerCase().includes(lower) ||
-          p.CODIGO?.toString().includes(lower) ||
-          p['CÓDIGO BARRAS']?.toString().includes(lower),
+          (p.PRODUTO?.toLowerCase() || '').includes(lower) ||
+          (p.CODIGO?.toString() || '').includes(lower) ||
+          (p['CÓDIGO BARRAS']?.toString() || '').includes(lower),
       )
     }
 
@@ -158,24 +162,24 @@ export default function ContagemPage() {
       return
     }
 
-    const itemsToSave = Object.entries(counts)
-      .filter(([_, qty]) => qty >= 0) // Save all entries, even 0 if intended
-      .map(([idStr, qty]) => {
-        const id = parseInt(idStr)
-        const product = allProducts.find((p) => p.ID === id)
-        return {
-          productId: id,
-          productCode: product?.CODIGO || null,
-          productName: product?.PRODUTO || '',
-          quantity: qty,
-          price: product ? parseCurrency(product.PREÇO) : 0,
-        }
-      })
+    // Prepare all items that have a count (even 0, if they were modified/loaded)
+    // We iterate over the 'counts' state which holds the current truth
+    const itemsToSave = Object.entries(counts).map(([idStr, qty]) => {
+      const id = parseInt(idStr)
+      const product = allProducts.find((p) => p.ID === id)
+      return {
+        productId: id,
+        productCode: product?.CODIGO || null,
+        productName: product?.PRODUTO || '',
+        quantity: qty,
+        price: product ? parseCurrency(product.PREÇO) : 0,
+      }
+    })
 
     if (itemsToSave.length === 0) {
       toast({
         title: 'Atenção',
-        description: 'Nenhuma contagem válida foi encontrada para salvar.',
+        description: 'Nenhuma contagem encontrada para salvar.',
         variant: 'default',
       })
       return
@@ -193,36 +197,25 @@ export default function ContagemPage() {
 
       toast({
         title: 'Sucesso',
-        description: `${itemsToSave.length} itens processados. O saldo final foi atualizado com sucesso.`,
+        description: `${itemsToSave.length} itens salvos na tabela de Contagem de Estoque Final.`,
         className: 'bg-green-600 text-white',
       })
     } catch (error: any) {
       console.error('Save error:', error)
-
-      let errorMessage =
-        'Ocorreu um erro ao processar a contagem. Tente novamente.'
-
-      if (error?.message?.includes('duplicate key')) {
-        errorMessage = 'Erro de duplicidade de chave ao salvar os dados.'
-      } else if (
-        error?.message?.includes('type text') ||
-        error?.message?.includes('type date')
-      ) {
-        errorMessage =
-          'Erro de tipo de dados no banco (Data/Hora). Contate o suporte técnico.'
-      } else if (error?.message?.includes('network')) {
-        errorMessage = 'Erro de conexão. Verifique sua internet.'
-      } else if (error?.message) {
-        errorMessage = `Erro: ${error.message}`
-      }
-
       toast({
         title: 'Falha ao Salvar',
-        description: errorMessage,
+        description:
+          error.message || 'Ocorreu um erro ao processar a contagem.',
         variant: 'destructive',
       })
     } finally {
       setSaving(false)
+    }
+  }
+
+  const focusSearch = () => {
+    if (searchInputRef.current) {
+      searchInputRef.current.focus()
     }
   }
 
@@ -261,14 +254,14 @@ export default function ContagemPage() {
           size="lg"
           onClick={handleBulkSave}
           disabled={saving || !activeSession}
-          className="bg-green-600 hover:bg-green-700 font-bold shadow-md transition-all hover:scale-105 min-w-[200px]"
+          className="bg-green-600 hover:bg-green-700 font-bold shadow-md transition-all hover:scale-105 min-w-[240px]"
         >
           {saving ? (
             <Loader2 className="mr-2 h-5 w-5 animate-spin" />
           ) : (
             <Save className="mr-2 h-5 w-5" />
           )}
-          {saving ? 'Gravando...' : 'Gravar Contagem Final'}
+          {saving ? 'Gravando...' : 'Gravar Contagem de Estoque Final'}
         </Button>
       </div>
 
@@ -312,8 +305,8 @@ export default function ContagemPage() {
         <CardHeader>
           <CardTitle>Produtos para Contagem</CardTitle>
           <CardDescription>
-            Insira a quantidade física encontrada para cada produto. Os dados
-            são salvos localmente até que você clique em "Gravar".
+            Utilize o campo de busca para encontrar produtos por Código de
+            Barras, Código Interno ou Nome.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -322,11 +315,22 @@ export default function ContagemPage() {
             <div className="w-full md:w-1/3 relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar produto, código ou EAN..."
-                className="pl-9"
+                ref={searchInputRef}
+                placeholder="Buscar (Scan de Código de Barras)..."
+                className="pl-9 pr-10"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                autoFocus
               />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-1 top-1 h-8 w-8 text-muted-foreground"
+                onClick={focusSearch}
+                title="Focar para Leitor"
+              >
+                <ScanBarcode className="h-4 w-4" />
+              </Button>
             </div>
             <div className="w-full md:w-auto flex items-center gap-2">
               <Filter className="h-4 w-4 text-muted-foreground" />
@@ -388,7 +392,7 @@ export default function ContagemPage() {
                         colSpan={5}
                         className="h-32 text-center text-muted-foreground"
                       >
-                        Nenhum produto encontrado com os filtros atuais.
+                        Nenhum produto encontrado.
                       </TableCell>
                     </TableRow>
                   ) : (

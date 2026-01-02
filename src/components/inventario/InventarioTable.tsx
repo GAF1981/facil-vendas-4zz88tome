@@ -106,22 +106,22 @@ export function InventarioTable({
               <TableHead className="text-center bg-green-50/50 text-green-700">
                 Movimentação
                 <br />
-                <span className="text-[10px]">(Estoque &rarr; Carro)</span>
+                <span className="text-[10px]">(Estoque para Carro)</span>
               </TableHead>
               <TableHead className="text-center bg-green-50/50 text-green-700">
                 Movimentação
                 <br />
-                <span className="text-[10px]">(Cliente &rarr; Carro)</span>
+                <span className="text-[10px]">(Cliente para Carro)</span>
               </TableHead>
               <TableHead className="text-center bg-red-50/50 text-red-700">
                 Movimentação
                 <br />
-                <span className="text-[10px]">(Carro &rarr; Estoque)</span>
+                <span className="text-[10px]">(Carro para Estoque)</span>
               </TableHead>
               <TableHead className="text-center bg-red-50/50 text-red-700">
                 Movimentação
                 <br />
-                <span className="text-[10px]">(Carro &rarr; Cliente)</span>
+                <span className="text-[10px]">(Carro para Cliente)</span>
               </TableHead>
 
               <SortableHead

@@ -23,7 +23,6 @@ import { Employee } from '@/types/employee'
 import { ProductRow } from '@/types/product'
 import { Loader2 } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
-import { useToast } from '@/hooks/use-toast'
 
 interface MovementDialogProps {
   open: boolean
@@ -47,7 +46,6 @@ export function MovementDialog({
   const [loading, setLoading] = useState(false)
   const [loadingEmployees, setLoadingEmployees] = useState(false)
   const [keepEmployee, setKeepEmployee] = useState(false)
-  const { toast } = useToast()
 
   // Product Search State
   const [searchProduct, setSearchProduct] = useState('')
@@ -127,7 +125,6 @@ export function MovementDialog({
         setSelectedProduct(null)
         setQuantity('')
         setSearchProduct('')
-        // Toast is handled by parent, but we might want to show visual feedback here if needed
       } else {
         onOpenChange(false)
       }
@@ -194,7 +191,7 @@ export function MovementDialog({
                   htmlFor="keep-employee"
                   className="text-sm font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                 >
-                  Fixar funcionário para o próximo lançamento
+                  Manter funcionário selecionado (Fixar)
                 </Label>
               </div>
             </div>

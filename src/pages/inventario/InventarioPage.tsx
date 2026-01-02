@@ -18,13 +18,15 @@ import {
   Hash,
   PlayCircle,
   StopCircle,
-  ScanBarcode,
   Truck,
   RotateCcw,
   AlertCircle,
   AlertTriangle,
   Eraser,
   Search,
+  ScanBarcode,
+  PackagePlus,
+  Clock,
 } from 'lucide-react'
 import { InventarioTable } from '@/components/inventario/InventarioTable'
 import { InventarioSummary } from '@/components/inventario/InventarioSummary'
@@ -169,33 +171,11 @@ export default function InventarioPage() {
     fetchSummaryData()
   }, [fetchSummaryData])
 
-  // Diagnostic Logger
-  useEffect(() => {
-    if (tableError || summaryError) {
-      console.group('Inventario Page Diagnostics')
-      console.error('Errors detected on page:', {
-        tableError,
-        summaryError,
-      })
-      console.info('Current Context Params:', {
-        sessionId: activeSession?.['ID INVENTÁRIO'] || 'N/A',
-        employeeId: activeSession?.['CODIGO FUNCIONARIO'] || 'N/A',
-        page,
-        pageSize,
-        searchTerm,
-        timestamp: new Date().toISOString(),
-      })
-      console.groupEnd()
-    }
-  }, [tableError, summaryError, activeSession, page, pageSize, searchTerm])
-
   const handleClearCache = () => {
     setPage(1)
     setSearchTerm('')
     setTableData([])
     setSummaryData(undefined)
-    // Re-trigger fetches by resetting states indirectly or calling explicilty
-    // Simply refreshing session is a good way to "soft reset" context
     fetchSession().then(() => {
       fetchTableData()
       fetchSummaryData()
@@ -347,6 +327,16 @@ export default function InventarioPage() {
             <RotateCcw className="h-4 w-4" />
             Devolução
           </Button>
+          <Button
+            variant="outline"
+            className="gap-2 text-purple-700 border-purple-200 bg-purple-50 hover:bg-purple-100"
+            asChild
+          >
+            <Link to="/produtos/novo">
+              <PackagePlus className="h-4 w-4" />
+              Inserir Mercadorias
+            </Link>
+          </Button>
           <div className="w-px h-8 bg-gray-200 mx-2 hidden md:block" />
           <Button asChild className="gap-2 bg-blue-600 hover:bg-blue-700">
             <Link to="/inventario/contagem">
@@ -367,7 +357,7 @@ export default function InventarioPage() {
             )}
             {activeSession.TIPO === 'GERAL'
               ? 'Fechar Inventário Geral'
-              : 'Fechar Inventário'}
+              : 'Fechar Inventário de Funcionário'}
           </Button>
         </>
       )
@@ -402,60 +392,74 @@ export default function InventarioPage() {
 
   return (
     <div className="space-y-6 animate-fade-in pb-10">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-violet-100 text-violet-700 rounded-lg shrink-0">
-            <ClipboardList className="w-6 h-6" />
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-violet-100 text-violet-700 rounded-lg shrink-0">
+              <ClipboardList className="w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">
+                {getHeaderTitle()}
+              </h1>
+              <p className="text-muted-foreground">
+                Visão geral do estoque, movimentações e conferência.
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Inventário</h1>
-            <p className="text-muted-foreground">
-              Visão geral do estoque, movimentações e conferência.
-            </p>
-            {activeSession && (
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm text-violet-700 bg-violet-50 px-3 py-1.5 rounded-md border border-violet-100">
-                <div className="flex items-center gap-1 font-mono">
-                  <Hash className="h-3.5 w-3.5" />
-                  ID: {activeSession['ID INVENTÁRIO']}
-                </div>
-                <div className="flex items-center gap-1">
-                  <Calendar className="h-3.5 w-3.5" />
-                  Início:{' '}
-                  {safeFormatDate(
-                    activeSession['Data de Início de Inventário'],
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={handleClearCache}
-            className="text-orange-700 border-orange-200 hover:bg-orange-50"
-            title="Limpar Cache e Recarregar"
-          >
-            <Eraser className="mr-2 h-4 w-4" />
-            Limpar Cache
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={handleClearCache}
+              className="text-orange-700 border-orange-200 hover:bg-orange-50"
+              title="Limpar Cache e Recarregar"
+            >
+              <Eraser className="mr-2 h-4 w-4" />
+              Limpar Cache
+            </Button>
 
-          <Button variant="outline" size="icon" asChild>
-            <Link to="/">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
-          <Button
-            variant="outline"
-            onClick={handleRefresh}
-            disabled={tableLoading || summaryLoading}
-          >
-            <RefreshCw
-              className={`mr-2 h-4 w-4 ${tableLoading || summaryLoading ? 'animate-spin' : ''}`}
-            />
-            Atualizar
-          </Button>
+            <Button variant="outline" size="icon" asChild>
+              <Link to="/">
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleRefresh}
+              disabled={tableLoading || summaryLoading}
+            >
+              <RefreshCw
+                className={`mr-2 h-4 w-4 ${tableLoading || summaryLoading ? 'animate-spin' : ''}`}
+              />
+              Atualizar
+            </Button>
+          </div>
         </div>
+
+        {activeSession && (
+          <div className="flex flex-wrap items-center gap-4 text-sm text-violet-700 bg-violet-50 px-4 py-2 rounded-md border border-violet-100 shadow-sm">
+            <div className="flex items-center gap-1.5 font-mono font-semibold">
+              <Hash className="h-4 w-4" />
+              ID INVENTÁRIO: {activeSession['ID INVENTÁRIO']}
+            </div>
+            <div className="w-px h-4 bg-violet-200 hidden sm:block" />
+            <div className="flex items-center gap-1.5">
+              <Calendar className="h-4 w-4" />
+              Data de Início:{' '}
+              {safeFormatDate(activeSession['Data de Início de Inventário'])}
+            </div>
+            <div className="w-px h-4 bg-violet-200 hidden sm:block" />
+            <div className="flex items-center gap-1.5 text-muted-foreground">
+              <Clock className="h-4 w-4" />
+              Data de Fechamento:{' '}
+              {activeSession['Data de Fechamento de Inventário']
+                ? safeFormatDate(
+                    activeSession['Data de Fechamento de Inventário'],
+                  )
+                : 'Em Aberto'}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Independent Summary Section */}
@@ -495,7 +499,7 @@ export default function InventarioPage() {
         <CardHeader>
           <div className="flex justify-between items-center">
             <div>
-              <CardTitle>{getHeaderTitle()}</CardTitle>
+              <CardTitle>Inventário de Mercadorias</CardTitle>
               <CardDescription>
                 Acompanhamento detalhado de entradas, saídas e saldo final.
               </CardDescription>
