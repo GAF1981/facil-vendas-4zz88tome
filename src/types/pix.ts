@@ -43,4 +43,5 @@ export interface PixFilters {
   orderId: string
   name: string
   bank: string
+  status: string
 }

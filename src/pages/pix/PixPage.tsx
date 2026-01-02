@@ -31,6 +31,7 @@ export default function PixPage() {
     orderId: '',
     name: '',
     bank: 'todos',
+    status: 'todos',
   })
   const [selectedReceipt, setSelectedReceipt] = useState<PixReceiptRow | null>(
     null,
@@ -80,6 +81,14 @@ export default function PixPage() {
       res = res.filter((row) => row.banco_pix === currentFilters.bank)
     }
 
+    if (currentFilters.status && currentFilters.status !== 'todos') {
+      if (currentFilters.status === 'SIM') {
+        res = res.filter((row) => !!row.confirmado_por)
+      } else if (currentFilters.status === 'NÃO') {
+        res = res.filter((row) => !row.confirmado_por)
+      }
+    }
+
     setFilteredData(res)
   }
 
@@ -96,7 +105,7 @@ export default function PixPage() {
   }
 
   const clearFilters = () => {
-    setFilters({ orderId: '', name: '', bank: 'todos' })
+    setFilters({ orderId: '', name: '', bank: 'todos', status: 'todos' })
   }
 
   const handleConfer = (receipt: PixReceiptRow) => {
@@ -136,7 +145,7 @@ export default function PixPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
             <div className="space-y-2">
               <Label htmlFor="orderId">Número do Pedido</Label>
               <Input
@@ -169,6 +178,22 @@ export default function PixPage() {
                   <SelectItem value="BS2">BS2</SelectItem>
                   <SelectItem value="CORA">CORA</SelectItem>
                   <SelectItem value="OUTROS">OUTROS</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="status">Conferido</Label>
+              <Select
+                value={filters.status}
+                onValueChange={(v) => handleFilterChange('status', v)}
+              >
+                <SelectTrigger id="status">
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="SIM">SIM</SelectItem>
+                  <SelectItem value="NÃO">NÃO</SelectItem>
                 </SelectContent>
               </Select>
             </div>
