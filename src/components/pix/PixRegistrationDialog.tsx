@@ -97,12 +97,13 @@ export function PixRegistrationDialog({
         nome_no_pix: values.nome_no_pix,
         banco_pix: values.banco_pix,
         data_realizada: values.data_realizada.toISOString(),
-        confirmado_por: employee.nome_completo,
+        confirmado_por:
+          employee.nome_completo || employee.apelido || 'Funcionário',
       })
 
       toast({
         title: 'Sucesso',
-        description: 'Conferência de Pix registrada com sucesso.',
+        description: 'Conferência salva com sucesso!',
         className: 'bg-green-600 text-white',
       })
       setOpen(false)
@@ -210,7 +211,7 @@ export function PixRegistrationDialog({
               name="data_realizada"
               render={({ field }) => (
                 <FormItem className="flex flex-col">
-                  <FormLabel>Data da Transferência</FormLabel>
+                  <FormLabel>Data do Pix Realizado</FormLabel>
                   <Popover>
                     <PopoverTrigger asChild>
                       <FormControl>

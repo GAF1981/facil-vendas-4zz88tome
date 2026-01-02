@@ -10,13 +10,14 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Loader2, RefreshCw, Search, QrCode } from 'lucide-react'
+import { Loader2, RefreshCw, Search, QrCode, CheckCircle2 } from 'lucide-react'
 import { pixService } from '@/services/pixService'
 import { PixRecebimentoRow } from '@/types/pix'
 import { useToast } from '@/hooks/use-toast'
 import { formatCurrency } from '@/lib/formatters'
 import { format } from 'date-fns'
 import { PixRegistrationDialog } from '@/components/pix/PixRegistrationDialog'
+import { Badge } from '@/components/ui/badge'
 
 export default function PixPage() {
   const [data, setData] = useState<PixRecebimentoRow[]>([])
@@ -104,6 +105,7 @@ export default function PixPage() {
                   <TableHead className="w-[80px]">Cód.</TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
+                  <TableHead className="text-center">Status</TableHead>
                   <TableHead>Nome no Pix</TableHead>
                   <TableHead>Banco Pix</TableHead>
                   <TableHead>Data Realizada</TableHead>
@@ -114,7 +116,7 @@ export default function PixPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="h-24 text-center">
+                    <TableCell colSpan={10} className="h-24 text-center">
                       <div className="flex justify-center items-center">
                         <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
                         Carregando...
@@ -124,7 +126,7 @@ export default function PixPage() {
                 ) : filteredData.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={9}
+                      colSpan={10}
                       className="h-24 text-center text-muted-foreground"
                     >
                       Nenhum registro encontrado.
@@ -144,6 +146,24 @@ export default function PixPage() {
                       </TableCell>
                       <TableCell className="text-right font-mono font-medium">
                         R$ {formatCurrency(row.value)}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {row.isConfirmed ? (
+                          <Badge
+                            variant="outline"
+                            className="bg-green-50 text-green-700 border-green-200"
+                          >
+                            <CheckCircle2 className="w-3 h-3 mr-1" />
+                            Confirmado
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant="outline"
+                            className="text-muted-foreground"
+                          >
+                            Pendente
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell className="text-sm">
                         {row.pixDetails?.nome_no_pix || '-'}

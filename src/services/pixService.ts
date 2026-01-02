@@ -12,6 +12,7 @@ export const pixService = {
         cliente_id,
         forma_pagamento,
         valor_pago,
+        pix_recebimento_confirmado,
         PIX (
           id,
           recebimento_id,
@@ -44,6 +45,7 @@ export const pixService = {
         ] || 'Cliente não encontrado',
       paymentMethod: row.forma_pagamento,
       value: row.valor_pago,
+      isConfirmed: row.pix_recebimento_confirmado,
       // Handle the relation which comes as an array from Supabase
       pixDetails:
         Array.isArray(row.PIX) && row.PIX.length > 0
@@ -53,6 +55,7 @@ export const pixService = {
   },
 
   async registerPixConference(details: Omit<PixDetails, 'id' | 'created_at'>) {
+    // 1. Upsert PIX record
     const { data, error } = await supabase
       .from('PIX')
       .upsert(
@@ -69,6 +72,23 @@ export const pixService = {
       .single()
 
     if (error) throw error
+
+    // 2. Update RECEBIMENTOS status
+    const { error: updateError } = await supabase
+      .from('RECEBIMENTOS')
+      .update({ pix_recebimento_confirmado: true })
+      .eq('id', details.recebimento_id)
+
+    if (updateError) {
+      console.error('Failed to update receipt status', updateError)
+      // We still return data as PIX was saved, but we log the error.
+      // Ideally this should be a transaction but Supabase JS doesn't support transactions on client directly without RPC.
+      // Throwing here to alert the UI that something wasn't fully successful.
+      throw new Error(
+        'Pix salvo, mas falha ao atualizar status do recebimento.',
+      )
+    }
+
     return data
   },
 }

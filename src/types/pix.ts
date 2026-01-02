@@ -15,5 +15,6 @@ export interface PixRecebimentoRow {
   clientName: string // Added field for customer name
   paymentMethod: string
   value: number
+  isConfirmed?: boolean | null
   pixDetails?: PixDetails | null
 }
