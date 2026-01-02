@@ -15,3 +15,18 @@ export interface InventarioItem {
   diferenca_quantidade: number
   diferenca_valor: number
 }
+
+export interface InventorySession {
+  id: number
+  tipo: 'GERAL' | 'FUNCIONARIO'
+  funcionario_id: number | null
+  data_inicio: string
+  data_fim: string | null
+  status: 'ABERTO' | 'FECHADO'
+  created_at: string
+}
+
+export type InventorySessionInsert = Omit<
+  InventorySession,
+  'id' | 'created_at' | 'data_fim' | 'data_inicio'
+>
