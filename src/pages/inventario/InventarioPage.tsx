@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import {
   ClipboardList,
   RefreshCw,
@@ -23,6 +24,7 @@ import {
   Truck,
   RotateCcw,
   Filter,
+  AlertCircle,
 } from 'lucide-react'
 import { InventarioTable } from '@/components/inventario/InventarioTable'
 import { InventarioSummary } from '@/components/inventario/InventarioSummary'
@@ -38,6 +40,7 @@ import { ptBR } from 'date-fns/locale'
 export default function InventarioPage() {
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<InventarioItem[]>([])
+  const [error, setError] = useState<string | null>(null)
   const { toast } = useToast()
   const navigate = useNavigate()
 
@@ -63,6 +66,7 @@ export default function InventarioPage() {
     sessionId?: number | null,
   ) => {
     setLoading(true)
+    setError(null)
     try {
       const targetId =
         funcionarioId ?? activeSession?.['CODIGO FUNCIONARIO'] ?? undefined
@@ -75,6 +79,9 @@ export default function InventarioPage() {
       setData(result)
     } catch (error) {
       console.error(error)
+      const errorMessage =
+        error instanceof Error ? error.message : 'Erro desconhecido'
+      setError(errorMessage)
       toast({
         title: 'Erro ao carregar',
         description: 'Não foi possível buscar os dados de inventário.',
@@ -96,6 +103,7 @@ export default function InventarioPage() {
       )
     } catch (error) {
       console.error(error)
+      // Even if session fetch fails, try to fetch generic data
       fetchData()
     }
   }
@@ -106,6 +114,7 @@ export default function InventarioPage() {
 
   const handleStartGeneralInventory = async () => {
     setActionLoading(true)
+    setError(null)
     try {
       const session = await inventarioService.startSession('GERAL')
       setActiveSession(session)
@@ -130,6 +139,7 @@ export default function InventarioPage() {
   const handleStartEmployeeInventory = (employeeId: number) => {
     const start = async () => {
       setActionLoading(true)
+      setError(null)
       try {
         const session = await inventarioService.startSession(
           'FUNCIONARIO',
@@ -160,6 +170,7 @@ export default function InventarioPage() {
   const handleCloseInventory = async () => {
     if (!activeSession) return
     setActionLoading(true)
+    setError(null)
     try {
       await inventarioService.closeSession(activeSession['ID INVENTÁRIO'])
       setActiveSession(null)
@@ -412,89 +423,118 @@ export default function InventarioPage() {
         </div>
       </div>
 
-      <InventarioSummary data={data} />
-
-      <div className="flex flex-col xl:flex-row gap-4 justify-between items-start xl:items-center bg-muted/20 p-4 rounded-lg border">
-        <div className="flex flex-wrap items-center gap-4 w-full xl:w-auto">
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium">Filtros:</span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Label htmlFor="min-initial" className="text-xs whitespace-nowrap">
-              Saldo Inicial &ge;
-            </Label>
-            <Input
-              id="min-initial"
-              type="number"
-              className="h-8 w-20"
-              placeholder="0"
-              value={minInitialBalance}
-              onChange={(e) => setMinInitialBalance(e.target.value)}
-            />
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Label htmlFor="min-final" className="text-xs whitespace-nowrap">
-              Saldo Final &ge;
-            </Label>
-            <Input
-              id="min-final"
-              type="number"
-              className="h-8 w-20"
-              placeholder="0"
-              value={minFinalBalance}
-              onChange={(e) => setMinFinalBalance(e.target.value)}
-            />
-          </div>
-
-          <div className="flex items-center space-x-2 border-l pl-4 ml-2">
-            <Switch
-              id="has-values"
-              checked={showOnlyWithValues}
-              onCheckedChange={setShowOnlyWithValues}
-            />
-            <Label htmlFor="has-values" className="cursor-pointer">
-              Com Saldo (Inicial ou Final &gt; 0)
-            </Label>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2 justify-end w-full xl:w-auto">
-          {renderActionButtons()}
-        </div>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <div>
-              <CardTitle>{getHeaderTitle()}</CardTitle>
-              <CardDescription>
-                Acompanhamento detalhado de entradas, saídas e saldo final.
-              </CardDescription>
+      {error ? (
+        <Alert variant="destructive" className="animate-fade-in">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Erro de Carregamento</AlertTitle>
+          <AlertDescription>
+            Ocorreu um problema ao buscar os dados do inventário: {error}
+            <div className="mt-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fetchSession()}
+                className="border-red-200 hover:bg-red-50 text-red-900"
+              >
+                <RefreshCw className="mr-2 h-3 w-3" />
+                Tentar Novamente
+              </Button>
             </div>
-            <div className="text-xs text-muted-foreground">
-              {processedData.length} itens listados
+          </AlertDescription>
+        </Alert>
+      ) : (
+        <>
+          <InventarioSummary data={data} />
+
+          <div className="flex flex-col xl:flex-row gap-4 justify-between items-start xl:items-center bg-muted/20 p-4 rounded-lg border">
+            <div className="flex flex-wrap items-center gap-4 w-full xl:w-auto">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Filtros:</span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Label
+                  htmlFor="min-initial"
+                  className="text-xs whitespace-nowrap"
+                >
+                  Saldo Inicial &ge;
+                </Label>
+                <Input
+                  id="min-initial"
+                  type="number"
+                  className="h-8 w-20"
+                  placeholder="0"
+                  value={minInitialBalance}
+                  onChange={(e) => setMinInitialBalance(e.target.value)}
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Label
+                  htmlFor="min-final"
+                  className="text-xs whitespace-nowrap"
+                >
+                  Saldo Final &ge;
+                </Label>
+                <Input
+                  id="min-final"
+                  type="number"
+                  className="h-8 w-20"
+                  placeholder="0"
+                  value={minFinalBalance}
+                  onChange={(e) => setMinFinalBalance(e.target.value)}
+                />
+              </div>
+
+              <div className="flex items-center space-x-2 border-l pl-4 ml-2">
+                <Switch
+                  id="has-values"
+                  checked={showOnlyWithValues}
+                  onCheckedChange={setShowOnlyWithValues}
+                />
+                <Label htmlFor="has-values" className="cursor-pointer">
+                  Com Saldo (Inicial ou Final &gt; 0)
+                </Label>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2 justify-end w-full xl:w-auto">
+              {renderActionButtons()}
             </div>
           </div>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="flex justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          ) : (
-            <InventarioTable
-              data={processedData}
-              onSort={handleSort}
-              sortKey={sortKey}
-              sortDirection={sortDirection}
-            />
-          )}
-        </CardContent>
-      </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle>{getHeaderTitle()}</CardTitle>
+                  <CardDescription>
+                    Acompanhamento detalhado de entradas, saídas e saldo final.
+                  </CardDescription>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {processedData.length} itens listados
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              ) : (
+                <InventarioTable
+                  data={processedData}
+                  onSort={handleSort}
+                  sortKey={sortKey}
+                  sortDirection={sortDirection}
+                />
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
 
       <EmployeeSelectionDialog
         open={isEmployeeDialogOpen}

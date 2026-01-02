@@ -826,6 +826,24 @@ export type Database = {
           projecao: number
         }[]
       }
+      get_inventory_data: {
+        Args: { p_funcionario_id: number; p_session_id: number }
+        Returns: {
+          codigo_barras: string
+          codigo_produto: number
+          contagem: number
+          entrada_cliente_carro: number
+          entrada_estoque_carro: number
+          id: number
+          mercadoria: string
+          preco: number
+          saida_carro_cliente: number
+          saida_carro_estoque: number
+          saldo_final: number
+          saldo_inicial: number
+          tipo: string
+        }[]
+      }
       get_unique_client_routes: {
         Args: never
         Returns: {
@@ -862,6 +880,7 @@ export type Database = {
           setor: string
         }[]
       }
+      parse_currency_sql: { Args: { p_value: string }; Returns: number }
       process_inventory_batch: {
         Args: { p_funcionario_id: number; p_items: Json; p_session_id: number }
         Returns: undefined
