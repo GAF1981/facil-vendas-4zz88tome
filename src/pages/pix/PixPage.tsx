@@ -8,18 +8,30 @@ import {
 } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { QrCode, Search, RefreshCw, Loader2 } from 'lucide-react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Label } from '@/components/ui/label'
+import { QrCode, RefreshCw, Loader2, Eraser } from 'lucide-react'
 import { PixTable } from '@/components/pix/PixTable'
 import { PixConferenceDialog } from '@/components/pix/PixConferenceDialog'
 import { pixService } from '@/services/pixService'
-import { PixReceiptRow } from '@/types/pix'
+import { PixReceiptRow, PixFilters } from '@/types/pix'
 import { useToast } from '@/hooks/use-toast'
 
 export default function PixPage() {
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<PixReceiptRow[]>([])
   const [filteredData, setFilteredData] = useState<PixReceiptRow[]>([])
-  const [searchTerm, setSearchTerm] = useState('')
+  const [filters, setFilters] = useState<PixFilters>({
+    orderId: '',
+    name: '',
+    bank: 'todos',
+  })
   const [selectedReceipt, setSelectedReceipt] = useState<PixReceiptRow | null>(
     null,
   )
@@ -31,7 +43,8 @@ export default function PixPage() {
     try {
       const result = await pixService.getPixReceipts()
       setData(result)
-      setFilteredData(result)
+      // Apply filters after fetch
+      applyFilters(result, filters)
     } catch (error) {
       console.error(error)
       toast({
@@ -44,27 +57,47 @@ export default function PixPage() {
     }
   }
 
+  const applyFilters = (rows: PixReceiptRow[], currentFilters: PixFilters) => {
+    let res = [...rows]
+
+    if (currentFilters.orderId) {
+      res = res.filter((row) =>
+        (row.id_da_femea?.toString() || row.venda_id.toString()).includes(
+          currentFilters.orderId,
+        ),
+      )
+    }
+
+    if (currentFilters.name) {
+      const lowerName = currentFilters.name.toLowerCase()
+      res = res.filter(
+        (row) =>
+          row.nome_no_pix && row.nome_no_pix.toLowerCase().includes(lowerName),
+      )
+    }
+
+    if (currentFilters.bank && currentFilters.bank !== 'todos') {
+      res = res.filter((row) => row.banco_pix === currentFilters.bank)
+    }
+
+    setFilteredData(res)
+  }
+
   useEffect(() => {
     fetchData()
   }, [])
 
   useEffect(() => {
-    if (!searchTerm.trim()) {
-      setFilteredData(data)
-      return
-    }
-    const lower = searchTerm.toLowerCase()
-    const filtered = data.filter(
-      (row) =>
-        row.cliente_nome.toLowerCase().includes(lower) ||
-        (row.id_da_femea?.toString() || row.venda_id.toString()).includes(
-          lower,
-        ) ||
-        row.cliente_id.toString().includes(lower) ||
-        (row.nome_no_pix && row.nome_no_pix.toLowerCase().includes(lower)),
-    )
-    setFilteredData(filtered)
-  }, [searchTerm, data])
+    applyFilters(data, filters)
+  }, [filters, data])
+
+  const handleFilterChange = (key: keyof PixFilters, value: string) => {
+    setFilters((prev) => ({ ...prev, [key]: value }))
+  }
+
+  const clearFilters = () => {
+    setFilters({ orderId: '', name: '', bank: 'todos' })
+  }
 
   const handleConfer = (receipt: PixReceiptRow) => {
     setSelectedReceipt(receipt)
@@ -97,22 +130,56 @@ export default function PixPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Conferência de Recebimentos</CardTitle>
+          <CardTitle>Filtros de Busca</CardTitle>
           <CardDescription>
-            Visualize e confira todos os pagamentos para registro de Pix.
+            Utilize os campos abaixo para filtrar os pagamentos Pix.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center gap-2 max-w-md">
-            <div className="relative flex-1">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+            <div className="space-y-2">
+              <Label htmlFor="orderId">Número do Pedido</Label>
               <Input
-                placeholder="Buscar por cliente, pedido ou nome no Pix..."
-                className="pl-8"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                id="orderId"
+                placeholder="Ex: 12345"
+                value={filters.orderId}
+                onChange={(e) => handleFilterChange('orderId', e.target.value)}
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="pixName">Nome no Pix</Label>
+              <Input
+                id="pixName"
+                placeholder="Ex: Maria Silva"
+                value={filters.name}
+                onChange={(e) => handleFilterChange('name', e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="bank">Banco Pix</Label>
+              <Select
+                value={filters.bank}
+                onValueChange={(v) => handleFilterChange('bank', v)}
+              >
+                <SelectTrigger id="bank">
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="BS2">BS2</SelectItem>
+                  <SelectItem value="CORA">CORA</SelectItem>
+                  <SelectItem value="OUTROS">OUTROS</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              variant="secondary"
+              onClick={clearFilters}
+              className="w-full"
+            >
+              <Eraser className="mr-2 h-4 w-4" />
+              Limpar Filtros
+            </Button>
           </div>
 
           {loading && data.length === 0 ? (

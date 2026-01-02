@@ -31,6 +31,7 @@ import CaixaPage from '@/pages/caixa/CaixaPage'
 import PixPage from '@/pages/pix/PixPage'
 import PagamentosPage from '@/pages/pagamentos/PagamentosPage'
 import ControlePage from '@/pages/controle/ControlePage'
+import InventarioPage from '@/pages/inventario/InventarioPage' // Import Inventario
 import { AuthProvider } from '@/hooks/use-auth'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 
@@ -112,9 +113,10 @@ const App = () => (
               {/* Caixa Module */}
               <Route path="/caixa" element={<CaixaPage />} />
 
-              {/* Other Modules Placeholders */}
+              {/* Inventario Module */}
+              <Route path="/inventario" element={<InventarioPage />} />
+
               <Route path="/complemento" element={<PlaceholderModule />} />
-              <Route path="/inventario" element={<PlaceholderModule />} />
 
               <Route path="/vendas" element={<PlaceholderModule />} />
             </Route>

@@ -13,7 +13,6 @@ import {
   AlertCircle,
   Package,
   Database,
-  CheckCircle,
   QrCode,
 } from 'lucide-react'
 
@@ -61,13 +60,7 @@ export default function Index() {
       description: 'Conferência de recebimentos via Pix',
       color: 'text-purple-600',
     },
-    {
-      title: 'Confirmação',
-      icon: CheckCircle,
-      to: '/confirmacao-recebimentos',
-      description: 'Confirmar pagamentos realizados',
-      color: 'text-teal-600',
-    },
+    // Confirmação Removed
     {
       title: 'Cobrança',
       icon: CreditCard,

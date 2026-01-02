@@ -38,3 +38,9 @@ export const pixConferenceSchema = z.object({
 })
 
 export type PixConferenceFormData = z.infer<typeof pixConferenceSchema>
+
+export interface PixFilters {
+  orderId: string
+  name: string
+  bank: string
+}

@@ -12,6 +12,7 @@ import { PixReceiptRow } from '@/types/pix'
 import { formatCurrency } from '@/lib/formatters'
 import { format, parseISO } from 'date-fns'
 import { CheckCircle2, AlertCircle } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 interface PixTableProps {
   data: PixReceiptRow[]
@@ -33,6 +34,7 @@ export function PixTable({ data, onConfer }: PixTableProps) {
             <TableHead>Banco Pix</TableHead>
             <TableHead>Data do Pix Realizado</TableHead>
             <TableHead>Conferido por</TableHead>
+            <TableHead className="text-center">Conferido</TableHead>
             <TableHead className="text-right">Ação</TableHead>
           </TableRow>
         </TableHeader>
@@ -40,7 +42,7 @@ export function PixTable({ data, onConfer }: PixTableProps) {
           {data.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={10}
+                colSpan={11}
                 className="h-24 text-center text-muted-foreground"
               >
                 Nenhum recebimento encontrado.
@@ -75,16 +77,30 @@ export function PixTable({ data, onConfer }: PixTableProps) {
                   )}
                 </TableCell>
 
-                {/* Data do Pix Realizado - Displays confirmado_por */}
+                {/* Data do Pix Realizado mapped from data_pix_realizado */}
                 <TableCell className="text-sm">
-                  {row.confirmado_por || '-'}
-                </TableCell>
-
-                {/* Conferido por - Displays data_pix_realizado */}
-                <TableCell className="text-sm text-muted-foreground">
                   {row.data_pix_realizado
                     ? format(parseISO(row.data_pix_realizado), 'dd/MM/yyyy')
                     : '-'}
+                </TableCell>
+
+                {/* Conferido por mapped from confirmado_por */}
+                <TableCell className="text-sm text-muted-foreground">
+                  {row.confirmado_por || '-'}
+                </TableCell>
+
+                {/* Conferido Status */}
+                <TableCell className="text-center">
+                  <Badge
+                    variant={row.confirmado_por ? 'default' : 'secondary'}
+                    className={cn(
+                      row.confirmado_por
+                        ? 'bg-green-100 text-green-700 hover:bg-green-200 border-green-200'
+                        : 'bg-red-50 text-red-600 hover:bg-red-100 border-red-200',
+                    )}
+                  >
+                    {row.confirmado_por ? 'SIM' : 'NÃO'}
+                  </Badge>
                 </TableCell>
 
                 <TableCell className="text-right">
@@ -106,7 +122,7 @@ export function PixTable({ data, onConfer }: PixTableProps) {
                     ) : (
                       <>
                         <AlertCircle className="mr-2 h-3.5 w-3.5" />
-                        Registrar Conferência
+                        Conferir
                       </>
                     )}
                   </Button>

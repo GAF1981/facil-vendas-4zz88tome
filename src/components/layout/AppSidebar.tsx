@@ -26,7 +26,6 @@ import {
   AlertCircle,
   Package,
   Database,
-  CheckCircle,
   QrCode,
 } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
@@ -71,11 +70,7 @@ export function AppSidebar() {
       url: '/pix',
       icon: QrCode,
     },
-    {
-      title: 'Confirmação',
-      url: '/confirmacao-recebimentos',
-      icon: CheckCircle,
-    },
+    // Confirmação removed from sidebar
     {
       title: 'Cobrança',
       url: '/cobranca',
