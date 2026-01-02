@@ -8,8 +8,8 @@ import {
 } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { ArrowLeft, Search, Save, Loader2, Package, Plus } from 'lucide-react'
-import { Link, useNavigate } from 'react-router-dom'
+import { ArrowLeft, Search, Save, Loader2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { productsService } from '@/services/productsService'
 import { inventarioService } from '@/services/inventarioService'
 import { ProductRow } from '@/types/product'
@@ -22,7 +22,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { useUserStore } from '@/stores/useUserStore'
 
 export default function ContagemPage() {
   const [searchTerm, setSearchTerm] = useState('')
@@ -31,9 +30,6 @@ export default function ContagemPage() {
   const [savingId, setSavingId] = useState<number | null>(null)
   const [counts, setCounts] = useState<Record<number, number>>({})
   const { toast } = useToast()
-  const navigate = useNavigate()
-  // Assuming counting is done for the context of the user if they are an employee,
-  // or generally if they are admin. For now, we will try to match the active session context.
   const [activeSession, setActiveSession] = useState<any>(null)
 
   useEffect(() => {
@@ -89,16 +85,16 @@ export default function ContagemPage() {
     setSavingId(product.ID)
     try {
       const targetEmployeeId = activeSession?.['CODIGO FUNCIONARIO'] || null
-      // We assume updating the count on the latest record
-      await inventarioService.updateItemCount(
+      // Updates SALDO FINAL instead of CONTAGEM
+      await inventarioService.updateItemBalance(
         product.CODIGO!,
         count,
         targetEmployeeId,
       )
 
       toast({
-        title: 'Contagem Salva',
-        description: `Produto: ${product.PRODUTO} | Quantidade: ${count}`,
+        title: 'Saldo Final Atualizado',
+        description: `Produto: ${product.PRODUTO} | Saldo: ${count}`,
         className: 'bg-green-600 text-white',
       })
     } catch (error) {
@@ -106,17 +102,12 @@ export default function ContagemPage() {
       toast({
         title: 'Erro ao salvar',
         description:
-          'Não foi possível atualizar a contagem. Verifique se existe histórico para este produto.',
+          'Não foi possível atualizar o saldo. Verifique se existe histórico para este produto.',
         variant: 'destructive',
       })
     } finally {
       setSavingId(null)
     }
-  }
-
-  const handleInsertMercadoria = () => {
-    // If "Inserir Mercadoria" implies adding a product to the catalog
-    navigate('/produtos/novo')
   }
 
   return (
@@ -130,19 +121,15 @@ export default function ContagemPage() {
           </Button>
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
-              Fazer Contagem
+              Contagem de Saldo Final
             </h1>
             <p className="text-muted-foreground">
               {activeSession
-                ? `Contagem para sessão #${activeSession['ID INVENTÁRIO']}`
-                : 'Busque produtos e atualize a contagem do estoque.'}
+                ? `Atualização de saldo para sessão #${activeSession['ID INVENTÁRIO']}`
+                : 'Busque produtos e atualize o saldo final do estoque.'}
             </p>
           </div>
         </div>
-        <Button onClick={handleInsertMercadoria} variant="secondary">
-          <Plus className="mr-2 h-4 w-4" />
-          Inserir Mercadoria (Catálogo)
-        </Button>
       </div>
 
       <Card>
@@ -172,7 +159,7 @@ export default function ContagemPage() {
                   <TableHead>Produto</TableHead>
                   <TableHead className="hidden md:table-cell">Barras</TableHead>
                   <TableHead className="w-[150px] text-center">
-                    Contagem
+                    Saldo Final (Novo)
                   </TableHead>
                   <TableHead className="w-[100px]"></TableHead>
                 </TableRow>

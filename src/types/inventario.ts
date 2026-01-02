@@ -39,3 +39,11 @@ export type InventorySessionInsert = Omit<
   InventorySession,
   'id' | 'created_at' | 'data_fim' | 'data_inicio'
 >
+
+export interface MovementInsert {
+  TIPO: 'REPOSICAO' | 'DEVOLUCAO'
+  funcionario_id: number
+  produto_id: number
+  quantidade: number
+  session_id: number
+}

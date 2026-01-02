@@ -17,6 +17,8 @@ import {
   PlayCircle,
   StopCircle,
   ScanBarcode,
+  Truck,
+  RotateCcw,
 } from 'lucide-react'
 import { InventarioTable } from '@/components/inventario/InventarioTable'
 import { inventarioService } from '@/services/inventarioService'
@@ -24,6 +26,7 @@ import { InventarioItem, DatasDeInventario } from '@/types/inventario'
 import { useToast } from '@/hooks/use-toast'
 import { Link, useNavigate } from 'react-router-dom'
 import { EmployeeSelectionDialog } from '@/components/inventario/EmployeeSelectionDialog'
+import { MovementDialog } from '@/components/inventario/MovementDialog'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
@@ -39,11 +42,13 @@ export default function InventarioPage() {
   const [isEmployeeDialogOpen, setIsEmployeeDialogOpen] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
 
+  // Movement Dialogs State
+  const [isReposicaoOpen, setIsReposicaoOpen] = useState(false)
+  const [isDevolucaoOpen, setIsDevolucaoOpen] = useState(false)
+
   const fetchData = async (funcionarioId?: number) => {
     setLoading(true)
     try {
-      // If we have an active session, use its ID. If passed specifically, use that.
-      // If active session is GERAL, no ID.
       const targetId =
         funcionarioId ?? activeSession?.['CODIGO FUNCIONARIO'] ?? undefined
       const result = await inventarioService.getInventory(targetId)
@@ -64,11 +69,9 @@ export default function InventarioPage() {
     try {
       const session = await inventarioService.getActiveSession()
       setActiveSession(session)
-      // If there is an active session, fetch data based on it
       if (session) {
         fetchData(session['CODIGO FUNCIONARIO'] ?? undefined)
       } else {
-        // Default general load
         fetchData()
       }
     } catch (error) {
@@ -140,7 +143,7 @@ export default function InventarioPage() {
     try {
       await inventarioService.closeSession(activeSession['ID INVENTÁRIO'])
       setActiveSession(null)
-      fetchData(undefined) // Reset to general view
+      fetchData(undefined)
       toast({
         title: 'Inventário Finalizado',
         description: 'A sessão de inventário foi encerrada com sucesso.',
@@ -158,6 +161,40 @@ export default function InventarioPage() {
     }
   }
 
+  const handleMovement = async (
+    type: 'REPOSICAO' | 'DEVOLUCAO',
+    employeeId: number,
+    productId: number,
+    quantity: number,
+  ) => {
+    if (!activeSession) return
+    try {
+      await inventarioService.createMovement({
+        TIPO: type,
+        funcionario_id: employeeId,
+        produto_id: productId,
+        quantidade: quantity,
+        session_id: activeSession['ID INVENTÁRIO'],
+      })
+      toast({
+        title:
+          type === 'REPOSICAO'
+            ? 'Reposição Registrada'
+            : 'Devolução Registrada',
+        description: 'A movimentação foi salva com sucesso.',
+        className: 'bg-green-600 text-white',
+      })
+      fetchData(activeSession['CODIGO FUNCIONARIO'] ?? undefined)
+    } catch (error) {
+      console.error(error)
+      toast({
+        title: 'Erro na movimentação',
+        description: 'Não foi possível salvar a movimentação.',
+        variant: 'destructive',
+      })
+    }
+  }
+
   const getHeaderTitle = () => {
     if (activeSession?.TIPO === 'GERAL') return 'Inventário Estoque Geral'
     if (activeSession?.TIPO === 'FUNCIONARIO') return 'Inventário Funcionário'
@@ -168,10 +205,27 @@ export default function InventarioPage() {
     if (activeSession) {
       return (
         <>
+          <Button
+            variant="outline"
+            className="gap-2 text-blue-700 border-blue-200 bg-blue-50 hover:bg-blue-100"
+            onClick={() => setIsReposicaoOpen(true)}
+          >
+            <Truck className="h-4 w-4" />
+            Reposição
+          </Button>
+          <Button
+            variant="outline"
+            className="gap-2 text-red-700 border-red-200 bg-red-50 hover:bg-red-100"
+            onClick={() => setIsDevolucaoOpen(true)}
+          >
+            <RotateCcw className="h-4 w-4" />
+            Devolução
+          </Button>
+          <div className="w-px h-8 bg-gray-200 mx-2 hidden md:block" />
           <Button asChild className="gap-2 bg-blue-600 hover:bg-blue-700">
             <Link to="/inventario/contagem">
               <ScanBarcode className="h-4 w-4" />
-              Fazer Contagem
+              Contagem de Saldo Final
             </Link>
           </Button>
           <Button
@@ -187,7 +241,7 @@ export default function InventarioPage() {
             )}
             {activeSession.TIPO === 'GERAL'
               ? 'Fechar Inventário Geral'
-              : 'Fechar Inventário de Funcionário'}
+              : 'Fechar Inventário'}
           </Button>
         </>
       )
@@ -247,19 +301,6 @@ export default function InventarioPage() {
                     { locale: ptBR },
                   )}
                 </div>
-                {activeSession['Data de Fechamento de Inventário'] && (
-                  <div className="flex items-center gap-1 text-muted-foreground">
-                    <StopCircle className="h-3.5 w-3.5" />
-                    Fim:{' '}
-                    {format(
-                      parseISO(
-                        activeSession['Data de Fechamento de Inventário'],
-                      ),
-                      'dd/MM/yyyy HH:mm',
-                      { locale: ptBR },
-                    )}
-                  </div>
-                )}
               </div>
             )}
           </div>
@@ -285,7 +326,7 @@ export default function InventarioPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-3 justify-end">
+      <div className="flex flex-wrap gap-3 justify-end items-center">
         {renderActionButtons()}
       </div>
 
@@ -316,6 +357,24 @@ export default function InventarioPage() {
         onOpenChange={setIsEmployeeDialogOpen}
         onConfirm={handleStartEmployeeInventory}
         loading={actionLoading}
+      />
+
+      <MovementDialog
+        open={isReposicaoOpen}
+        onOpenChange={setIsReposicaoOpen}
+        type="REPOSICAO"
+        onConfirm={(empId, prodId, qty) =>
+          handleMovement('REPOSICAO', empId, prodId, qty)
+        }
+      />
+
+      <MovementDialog
+        open={isDevolucaoOpen}
+        onOpenChange={setIsDevolucaoOpen}
+        type="DEVOLUCAO"
+        onConfirm={(empId, prodId, qty) =>
+          handleMovement('DEVOLUCAO', empId, prodId, qty)
+        }
       />
     </div>
   )

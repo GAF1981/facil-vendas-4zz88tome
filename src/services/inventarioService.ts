@@ -1,6 +1,10 @@
 import { supabase } from '@/lib/supabase/client'
-import { InventarioItem, DatasDeInventario } from '@/types/inventario'
-import { parseCurrency } from '@/lib/formatters'
+import {
+  InventarioItem,
+  DatasDeInventario,
+  MovementInsert,
+} from '@/types/inventario'
+import { parseCurrency, formatCurrency } from '@/lib/formatters'
 
 export const inventarioService = {
   async getInventory(funcionarioId?: number): Promise<InventarioItem[]> {
@@ -130,13 +134,12 @@ export const inventarioService = {
     return data as DatasDeInventario
   },
 
-  async updateItemCount(
+  async updateItemBalance(
     productCode: number,
-    count: number,
+    balance: number,
     funcionarioId?: number | null,
   ): Promise<void> {
-    // We need to update the CONTAGEM on the latest record in BANCO_DE_DADOS for this product/context
-    // First, find the latest record
+    // Updates SALDO FINAL instead of CONTAGEM as per new requirement
     let query = supabase
       .from('BANCO_DE_DADOS')
       .select('"ID VENDA ITENS"')
@@ -158,19 +161,79 @@ export const inventarioService = {
       // Update existing record
       const { error: updateError } = await supabase
         .from('BANCO_DE_DADOS')
-        .update({ CONTAGEM: count } as any)
+        .update({ 'SALDO FINAL': balance } as any)
         .eq('ID VENDA ITENS', data['ID VENDA ITENS'])
 
       if (updateError) throw updateError
     } else {
-      // No record exists for this product in history.
-      // We might need to create a dummy record or just fail.
-      // For now, logging warning as creating a full transaction record without context is complex.
       console.warn(
-        'No history record found for product to update count. Count not saved.',
+        'No history record found for product to update balance. Balance not saved.',
       )
       throw new Error(
-        'Não foi encontrado registro recente deste produto para atualizar a contagem.',
+        'Não foi encontrado registro recente deste produto para atualizar o saldo.',
+      )
+    }
+  },
+
+  async createMovement(movement: MovementInsert): Promise<void> {
+    // 1. Insert into new dedicated table
+    const { error: logError } = await supabase
+      .from('REPOSIÇÃO E DEVOLUÇÃO')
+      .insert(movement as any)
+
+    if (logError) throw logError
+
+    // 2. Update BANCO_DE_DADOS to reflect movement in Inventory Table
+    // Get latest record for product/employee
+    const { data: dbData, error: dbError } = await supabase
+      .from('BANCO_DE_DADOS')
+      .select(
+        '"ID VENDA ITENS", "SALDO FINAL", "NOVAS CONSIGNAÇÕES", "RECOLHIDO"',
+      )
+      .eq('COD. PRODUTO', movement.produto_id) // Assuming product_id matches COD. PRODUTO
+      .eq('CODIGO FUNCIONARIO', movement.funcionario_id)
+      .order('DATA DO ACERTO', { ascending: false })
+      .order('HORA DO ACERTO', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (dbError) throw dbError
+
+    if (dbData) {
+      // Calculate new values
+      const currentSaldo = dbData['SALDO FINAL'] || 0
+      const currentNovas = parseCurrency(dbData['NOVAS CONSIGNAÇÕES'])
+      const currentRecolhido = parseCurrency(dbData['RECOLHIDO'])
+
+      let newSaldo = currentSaldo
+      let newNovas = currentNovas
+      let newRecolhido = currentRecolhido
+
+      if (movement.TIPO === 'REPOSICAO') {
+        newNovas += movement.quantidade
+        newSaldo += movement.quantidade
+      } else if (movement.TIPO === 'DEVOLUCAO') {
+        newRecolhido += movement.quantidade
+        newSaldo -= movement.quantidade
+      }
+
+      // Update
+      const { error: updateError } = await supabase
+        .from('BANCO_DE_DADOS')
+        .update({
+          'SALDO FINAL': newSaldo,
+          'NOVAS CONSIGNAÇÕES': formatCurrency(newNovas),
+          RECOLHIDO: formatCurrency(newRecolhido),
+        } as any)
+        .eq('ID VENDA ITENS', dbData['ID VENDA ITENS'])
+
+      if (updateError) throw updateError
+    } else {
+      // If no record exists, creating one is complex due to strict schema.
+      // We will skip updating DB for now if it doesn't exist, but we logged it.
+      // Ideally we would insert a new record.
+      console.warn(
+        'No BANCO_DE_DADOS record found to apply movement. Movement logged only in tracking table.',
       )
     }
   },

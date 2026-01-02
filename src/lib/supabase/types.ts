@@ -300,6 +300,30 @@ export type Database = {
         }
         Relationships: []
       }
+      'DATAS DE INVENTÁRIO': {
+        Row: {
+          'CODIGO FUNCIONARIO': number | null
+          'Data de Fechamento de Inventário': string | null
+          'Data de Início de Inventário': string | null
+          'ID INVENTÁRIO': number
+          TIPO: string | null
+        }
+        Insert: {
+          'CODIGO FUNCIONARIO'?: number | null
+          'Data de Fechamento de Inventário'?: string | null
+          'Data de Início de Inventário'?: string | null
+          'ID INVENTÁRIO'?: number
+          TIPO?: string | null
+        }
+        Update: {
+          'CODIGO FUNCIONARIO'?: number | null
+          'Data de Fechamento de Inventário'?: string | null
+          'Data de Início de Inventário'?: string | null
+          'ID INVENTÁRIO'?: number
+          TIPO?: string | null
+        }
+        Relationships: []
+      }
       FUNCIONARIOS: {
         Row: {
           apelido: string | null

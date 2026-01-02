@@ -30,22 +30,22 @@ export function InventarioTable({ data }: InventarioTableProps) {
                 Saldo Inicial
               </TableHead>
               <TableHead className="text-center bg-green-50/50 text-green-700">
-                Entrada
+                Movimentação
                 <br />
                 <span className="text-[10px]">(Estoque &rarr; Carro)</span>
               </TableHead>
               <TableHead className="text-center bg-green-50/50 text-green-700">
-                Entrada
+                Movimentação
                 <br />
                 <span className="text-[10px]">(Cliente &rarr; Carro)</span>
               </TableHead>
               <TableHead className="text-center bg-red-50/50 text-red-700">
-                Saída
+                Movimentação
                 <br />
                 <span className="text-[10px]">(Carro &rarr; Estoque)</span>
               </TableHead>
               <TableHead className="text-center bg-red-50/50 text-red-700">
-                Saída
+                Movimentação
                 <br />
                 <span className="text-[10px]">(Carro &rarr; Cliente)</span>
               </TableHead>
