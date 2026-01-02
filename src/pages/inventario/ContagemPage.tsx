@@ -58,11 +58,19 @@ export default function ContagemPage() {
     const init = async () => {
       try {
         setLoading(true)
-        // Check session
+        // 1. Check session
         const session = await inventarioService.getActiveSession()
         setActiveSession(session)
 
-        // Fetch ALL products for client-side filtering and summary
+        // 2. Load existing counts for this session if available
+        if (session) {
+          const loadedCounts = await inventarioService.getSessionCounts(
+            session['ID INVENTÁRIO'],
+          )
+          setCounts(loadedCounts)
+        }
+
+        // 3. Fetch ALL products for client-side filtering and summary
         // Using a large page size to effectively get all
         const { data } = await productsService.getProducts(1, 10000, '')
         setAllProducts(data)
@@ -79,7 +87,7 @@ export default function ContagemPage() {
       }
     }
     init()
-  }, [])
+  }, [toast])
 
   // Filtering Logic
   useEffect(() => {
@@ -163,14 +171,11 @@ export default function ContagemPage() {
       })
 
     if (itemsToSave.length === 0) {
-      // Allow saving empty batch to clear everything?
-      // User story implies saving counts. If empty, maybe we shouldn't save.
-      // But if user wants to clear everything, they might want to save empty.
-      // For safety, let's require at least one item or confirmation.
-      // But given UI, usually users save what they count.
       toast({
-        title: 'Nada para salvar',
-        description: 'Nenhuma contagem foi realizada.',
+        title: 'Atenção',
+        description:
+          'Nenhuma contagem foi realizada. Insira quantidades para salvar.',
+        variant: 'default',
       })
       return
     }
@@ -187,17 +192,17 @@ export default function ContagemPage() {
 
       toast({
         title: 'Sucesso',
-        description: 'Contagem de estoque final salva com sucesso.',
+        description: `${itemsToSave.length} itens foram processados e o saldo final foi atualizado com sucesso.`,
         className: 'bg-green-600 text-white',
       })
-
-      // Clear counts to indicate success and start fresh or prevent double submit
-      setCounts({})
+      // We don't clear counts here because user might want to continue editing
+      // Or we could reload to be safe, but local state is now synced
     } catch (error) {
       console.error(error)
       toast({
         title: 'Erro ao salvar',
-        description: 'Não foi possível salvar a contagem em lote.',
+        description:
+          'Ocorreu um erro ao processar a contagem em lote. Tente novamente.',
         variant: 'destructive',
       })
     } finally {
@@ -325,76 +330,84 @@ export default function ContagemPage() {
           </div>
 
           <div className="rounded-md border overflow-hidden">
-            <Table>
-              <TableHeader className="bg-muted/50">
-                <TableRow>
-                  <TableHead className="w-[80px]">Cód.</TableHead>
-                  <TableHead>Produto</TableHead>
-                  <TableHead className="hidden md:table-cell">Barras</TableHead>
-                  <TableHead className="text-right">Preço</TableHead>
-                  <TableHead className="w-[150px] text-center bg-yellow-50/50 text-yellow-800 font-bold border-l">
-                    Saldo Final
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
+            <div className="overflow-x-auto">
+              <Table className="min-w-[800px]">
+                <TableHeader className="bg-muted/50">
                   <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center">
-                      <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
-                    </TableCell>
+                    <TableHead className="w-[80px]">Cód.</TableHead>
+                    <TableHead>Produto</TableHead>
+                    <TableHead className="hidden md:table-cell">
+                      Barras
+                    </TableHead>
+                    <TableHead className="text-right">Preço</TableHead>
+                    <TableHead className="w-[180px] text-center bg-yellow-50/50 text-yellow-800 font-bold border-l">
+                      Saldo Final (Qtd)
+                    </TableHead>
                   </TableRow>
-                ) : filteredProducts.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={5}
-                      className="h-24 text-center text-muted-foreground"
-                    >
-                      Nenhum produto encontrado com os filtros atuais.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredProducts.map((product) => (
-                    <TableRow key={product.ID} className="hover:bg-muted/30">
-                      <TableCell className="font-mono">
-                        {product.CODIGO || '-'}
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        <div className="flex flex-col">
-                          <span>{product.PRODUTO}</span>
-                          <span className="text-xs text-muted-foreground md:hidden">
-                            {product['CÓDIGO BARRAS']}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell font-mono text-xs">
-                        {product['CÓDIGO BARRAS'] || '-'}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        R$ {formatCurrency(parseCurrency(product.PREÇO))}
-                      </TableCell>
-                      <TableCell className="border-l bg-yellow-50/10 p-2">
-                        <Input
-                          type="number"
-                          min="0"
-                          className={cn(
-                            'text-center font-bold text-lg h-10 transition-colors',
-                            (counts[product.ID] || 0) > 0
-                              ? 'bg-yellow-100 border-yellow-300 text-yellow-900'
-                              : '',
-                          )}
-                          placeholder="0"
-                          value={counts[product.ID] ?? ''}
-                          onChange={(e) =>
-                            handleCountChange(product.ID, e.target.value)
-                          }
-                        />
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="h-24 text-center">
+                        <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                  ) : filteredProducts.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={5}
+                        className="h-24 text-center text-muted-foreground"
+                      >
+                        Nenhum produto encontrado com os filtros atuais.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredProducts.map((product) => (
+                      <TableRow key={product.ID} className="hover:bg-muted/30">
+                        <TableCell className="font-mono">
+                          {product.CODIGO || '-'}
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          <div className="flex flex-col">
+                            <span>{product.PRODUTO}</span>
+                            <span className="text-xs text-muted-foreground md:hidden">
+                              {product['CÓDIGO BARRAS']}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell font-mono text-xs">
+                          {product['CÓDIGO BARRAS'] || '-'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          R$ {formatCurrency(parseCurrency(product.PREÇO))}
+                        </TableCell>
+                        <TableCell className="border-l bg-yellow-50/10 p-2">
+                          <Input
+                            type="number"
+                            min="0"
+                            className={cn(
+                              'text-center font-bold text-lg h-10 transition-colors',
+                              (counts[product.ID] || 0) > 0
+                                ? 'bg-yellow-100 border-yellow-300 text-yellow-900'
+                                : '',
+                            )}
+                            placeholder="0"
+                            value={
+                              counts[product.ID] !== undefined
+                                ? counts[product.ID]
+                                : ''
+                            }
+                            onChange={(e) =>
+                              handleCountChange(product.ID, e.target.value)
+                            }
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </div>
 
           <div className="flex justify-between items-center text-sm text-muted-foreground">

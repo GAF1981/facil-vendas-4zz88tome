@@ -117,6 +117,7 @@ export type Database = {
           RECOLHIDO: string | null
           'SALDO FINAL': number | null
           'SALDO INICIAL': number | null
+          session_id: number | null
           TIPO: string | null
           'VALOR CONSIGNADO TOTAL (Custo)': string | null
           'VALOR CONSIGNADO TOTAL (Preço Venda)': string | null
@@ -150,6 +151,7 @@ export type Database = {
           RECOLHIDO?: string | null
           'SALDO FINAL'?: number | null
           'SALDO INICIAL'?: number | null
+          session_id?: number | null
           TIPO?: string | null
           'VALOR CONSIGNADO TOTAL (Custo)'?: string | null
           'VALOR CONSIGNADO TOTAL (Preço Venda)'?: string | null
@@ -183,6 +185,7 @@ export type Database = {
           RECOLHIDO?: string | null
           'SALDO FINAL'?: number | null
           'SALDO INICIAL'?: number | null
+          session_id?: number | null
           TIPO?: string | null
           'VALOR CONSIGNADO TOTAL (Custo)'?: string | null
           'VALOR CONSIGNADO TOTAL (Preço Venda)'?: string | null
@@ -190,7 +193,15 @@ export type Database = {
           'VALOR VENDA PRODUTO'?: string | null
           'VALOR VENDIDO'?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'BANCO_DE_DADOS_session_id_fkey'
+            columns: ['session_id']
+            isOneToOne: false
+            referencedRelation: 'DATAS DE INVENTÁRIO'
+            referencedColumns: ['ID INVENTÁRIO']
+          },
+        ]
       }
       CLIENTES: {
         Row: {
@@ -850,6 +861,10 @@ export type Database = {
           nome_completo: string
           setor: string
         }[]
+      }
+      process_inventory_batch: {
+        Args: { p_funcionario_id: number; p_items: Json; p_session_id: number }
+        Returns: undefined
       }
       verify_employee_credentials: {
         Args: { p_email: string; p_senha: string }

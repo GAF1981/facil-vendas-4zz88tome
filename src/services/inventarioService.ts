@@ -138,6 +138,25 @@ export const inventarioService = {
     return data as DatasDeInventario | null
   },
 
+  async getSessionCounts(sessionId: number): Promise<Record<number, number>> {
+    const { data, error } = await supabase
+      .from('CONTAGEM DE ESTOQUE FINAL')
+      .select('produto_id, quantidade')
+      .eq('session_id', sessionId)
+
+    if (error) {
+      console.error('Error fetching session counts:', error)
+      return {}
+    }
+
+    const counts: Record<number, number> = {}
+    data?.forEach((row) => {
+      counts[row.produto_id] = row.quantidade
+    })
+
+    return counts
+  },
+
   async startSession(
     tipo: 'GERAL' | 'FUNCIONARIO',
     funcionarioId?: number,
@@ -263,9 +282,8 @@ export const inventarioService = {
         prevSaldoFinal = dbData['SALDO FINAL'] || 0
       } else {
         // If not found by exact match, try finding any latest record for product
-        // (This might be redundant if the query above already covered it, but query above filtered by employee)
-        // Ideally we fetch global product state if employee specific not found?
-        // For now, assume 0 if no history.
+        // Logic handled in createMovement is basic, process_inventory_batch has robust logic.
+        // For movements, we rely on existing employee record usually.
       }
 
       let newSaldo = prevSaldoFinal
@@ -293,7 +311,7 @@ export const inventarioService = {
       const { error: insertError } = await supabase
         .from('BANCO_DE_DADOS')
         .insert({
-          'COD. PRODUTO': movement.produto_id, // Map ID to COD. PRODUTO (assuming relation)
+          'COD. PRODUTO': movement.produto_id, // Map ID to COD. PRODUTO
           'CODIGO FUNCIONARIO': movement.funcionario_id,
           'SALDO FINAL': newSaldo,
           'SALDO INICIAL': prevSaldoFinal,
