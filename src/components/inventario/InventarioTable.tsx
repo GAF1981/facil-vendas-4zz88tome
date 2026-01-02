@@ -9,12 +9,40 @@ import {
 import { InventarioItem } from '@/types/inventario'
 import { formatCurrency } from '@/lib/formatters'
 import { cn } from '@/lib/utils'
+import { ArrowUpDown } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 interface InventarioTableProps {
   data: InventarioItem[]
+  onSort?: (key: keyof InventarioItem) => void
+  sortKey?: keyof InventarioItem | null
+  sortDirection?: 'asc' | 'desc'
 }
 
-export function InventarioTable({ data }: InventarioTableProps) {
+export function InventarioTable({
+  data,
+  onSort,
+  sortKey,
+  sortDirection,
+}: InventarioTableProps) {
+  const renderSortIcon = (key: keyof InventarioItem) => {
+    if (sortKey !== key)
+      return <ArrowUpDown className="ml-2 h-3 w-3 opacity-50" />
+    return (
+      <ArrowUpDown
+        className={cn(
+          'ml-2 h-3 w-3',
+          sortDirection === 'asc' ? 'text-primary' : 'text-primary',
+          'opacity-100',
+        )}
+      />
+    )
+  }
+
+  const handleSort = (key: keyof InventarioItem) => {
+    if (onSort) onSort(key)
+  }
+
   return (
     <div className="rounded-md border bg-card overflow-hidden shadow-sm">
       <div className="overflow-x-auto">
@@ -26,8 +54,15 @@ export function InventarioTable({ data }: InventarioTableProps) {
               <TableHead className="min-w-[200px]">Mercadoria</TableHead>
               <TableHead className="w-[80px]">Tipo</TableHead>
               <TableHead className="text-right">Preço</TableHead>
-              <TableHead className="text-center bg-blue-50/50 text-blue-700">
-                Saldo Inicial
+              <TableHead className="text-center bg-blue-50/50 text-blue-700 p-0">
+                <Button
+                  variant="ghost"
+                  onClick={() => handleSort('saldo_inicial')}
+                  className="w-full h-12 rounded-none hover:bg-blue-100/50 hover:text-blue-800 font-semibold text-blue-700"
+                >
+                  Saldo Inicial
+                  {renderSortIcon('saldo_inicial')}
+                </Button>
               </TableHead>
               <TableHead className="text-center bg-green-50/50 text-green-700">
                 Movimentação
@@ -49,8 +84,15 @@ export function InventarioTable({ data }: InventarioTableProps) {
                 <br />
                 <span className="text-[10px]">(Carro &rarr; Cliente)</span>
               </TableHead>
-              <TableHead className="text-center font-bold bg-muted/50 min-w-[100px] border-x border-border/50">
-                Saldo Final
+              <TableHead className="text-center font-bold bg-muted/50 min-w-[120px] border-x border-border/50 p-0">
+                <Button
+                  variant="ghost"
+                  onClick={() => handleSort('saldo_final')}
+                  className="w-full h-12 rounded-none hover:bg-muted/80 font-bold"
+                >
+                  Saldo Final
+                  {renderSortIcon('saldo_final')}
+                </Button>
               </TableHead>
               <TableHead className="text-center font-bold bg-yellow-50/50 text-yellow-700 min-w-[100px]">
                 Contagem
@@ -85,45 +127,51 @@ export function InventarioTable({ data }: InventarioTableProps) {
                   <TableCell className="text-right font-medium text-xs">
                     R$ {formatCurrency(item.preco)}
                   </TableCell>
-                  <TableCell className="text-center bg-blue-50/20">
+                  <TableCell className="text-center bg-blue-50/20 font-mono">
                     {item.saldo_inicial}
                   </TableCell>
-                  <TableCell className="text-center bg-green-50/20 text-green-700">
+                  <TableCell className="text-center bg-green-50/20 text-green-700 font-mono">
                     {item.entrada_estoque_carro}
                   </TableCell>
-                  <TableCell className="text-center bg-green-50/20 text-green-700">
+                  <TableCell className="text-center bg-green-50/20 text-green-700 font-mono">
                     {item.entrada_cliente_carro}
                   </TableCell>
-                  <TableCell className="text-center bg-red-50/20 text-red-700">
+                  <TableCell className="text-center bg-red-50/20 text-red-700 font-mono">
                     {item.saida_carro_estoque}
                   </TableCell>
-                  <TableCell className="text-center bg-red-50/20 text-red-700">
+                  <TableCell className="text-center bg-red-50/20 text-red-700 font-mono">
                     {item.saida_carro_cliente}
                   </TableCell>
-                  <TableCell className="text-center font-bold bg-muted/20 border-x border-border/50">
+                  <TableCell className="text-center font-bold bg-muted/20 border-x border-border/50 font-mono">
                     {item.saldo_final}
                   </TableCell>
-                  <TableCell className="text-center font-bold bg-yellow-50/20 text-yellow-700">
+                  <TableCell className="text-center font-bold bg-yellow-50/20 text-yellow-700 font-mono">
                     {item.estoque_contagem_carro}
                   </TableCell>
                   <TableCell
                     className={cn(
-                      'text-center font-bold',
-                      item.diferenca_quantidade !== 0
-                        ? 'text-red-600'
-                        : 'text-gray-400',
+                      'text-center font-bold font-mono',
+                      item.diferenca_quantidade > 0
+                        ? 'text-green-600'
+                        : item.diferenca_quantidade < 0
+                          ? 'text-red-600'
+                          : 'text-gray-400',
                     )}
                   >
+                    {item.diferenca_quantidade > 0 ? '+' : ''}
                     {item.diferenca_quantidade}
                   </TableCell>
                   <TableCell
                     className={cn(
                       'text-right font-bold text-xs',
-                      item.diferenca_valor !== 0
-                        ? 'text-red-600'
-                        : 'text-gray-400',
+                      item.diferenca_quantidade > 0
+                        ? 'text-green-600'
+                        : item.diferenca_quantidade < 0
+                          ? 'text-red-600'
+                          : 'text-gray-400',
                     )}
                   >
+                    {item.diferenca_valor > 0 ? '+' : ''}
                     R$ {formatCurrency(item.diferenca_valor)}
                   </TableCell>
                 </TableRow>

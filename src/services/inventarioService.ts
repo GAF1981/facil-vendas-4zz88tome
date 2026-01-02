@@ -11,109 +11,48 @@ export const inventarioService = {
     funcionarioId?: number,
     sessionId?: number,
   ): Promise<InventarioItem[]> {
-    // 1. Fetch all Products
-    const { data: products, error: prodError } = await supabase
-      .from('PRODUTOS')
-      .select('*')
-      .order('PRODUTO', { ascending: true })
+    // Use the new RPC to get aggregated data efficiently
+    const { data, error } = await supabase.rpc('get_inventory_data', {
+      p_session_id: sessionId ?? null,
+      p_funcionario_id: funcionarioId ?? null,
+    })
 
-    if (prodError) throw prodError
-    if (!products) return []
-
-    // 2. Fetch latest DB state for each product (Aggregation Logic)
-    let query = supabase
-      .from('BANCO_DE_DADOS')
-      .select(
-        '"COD. PRODUTO", "SALDO INICIAL", "SALDO FINAL", "CONTAGEM", "NOVAS CONSIGNAÇÕES", "RECOLHIDO", "QUANTIDADE VENDIDA", "DATA DO ACERTO", "HORA DO ACERTO", "CODIGO FUNCIONARIO", "session_id"',
-      )
-
-    // If fetching for a specific employee, filter DB records
-    if (funcionarioId) {
-      query = query.eq('CODIGO FUNCIONARIO', funcionarioId)
+    if (error) {
+      console.error('Error fetching inventory data:', error)
+      throw error
     }
 
-    const { data: dbData, error: dbError } = await query
-      .order('DATA DO ACERTO', { ascending: false })
-      .order('HORA DO ACERTO', { ascending: false })
-      .limit(10000)
+    if (!data) return []
 
-    if (dbError) throw dbError
+    // Map RPC result to InventarioItem type
+    // Calculated fields like diferenca_quantidade and diferenca_valor are computed here
+    return data.map((item: any) => {
+      const saldoFinal = Number(item.saldo_final) || 0
+      const contagem = Number(item.contagem) || 0
+      const preco = Number(item.preco) || 0
 
-    // Map DB data by Product Code
-    const dbMap = new Map<number, any>()
-    dbData?.forEach((row: any) => {
-      const codProd = row['COD. PRODUTO']
-      if (codProd && !dbMap.has(codProd)) {
-        // Since it's sorted by Date DESC, the first occurrence is the latest
-        dbMap.set(codProd, row)
-      }
-    })
-
-    // 3. Map Products to Inventory Items
-    const inventory: InventarioItem[] = products.map((prod) => {
-      const dbRow = prod.CODIGO ? dbMap.get(prod.CODIGO) : null
-      const price = parseCurrency(prod.PREÇO)
-
-      let saldoInicial = 0
-      let saldoFinal = 0
-      let contagem = 0
-      let entradaEstoqueCarro = 0
-      let saidaCarroEstoque = 0
-      let saidaCarroCliente = 0
-
-      if (dbRow) {
-        // Logic for Inventory Continuity:
-        // If the latest record belongs to the current session, use it as is.
-        // If it belongs to a previous session (or undefined session), carry over the final balance as initial balance for current view.
-        const isCurrentSession = sessionId && dbRow.session_id === sessionId
-
-        if (isCurrentSession) {
-          saldoInicial = dbRow['SALDO INICIAL'] || 0
-          saldoFinal = dbRow['SALDO FINAL'] || 0
-          contagem = dbRow['CONTAGEM'] || 0
-          entradaEstoqueCarro = parseCurrency(dbRow['NOVAS CONSIGNAÇÕES'])
-          saidaCarroEstoque = parseCurrency(dbRow['RECOLHIDO'])
-          saidaCarroCliente = parseCurrency(dbRow['QUANTIDADE VENDIDA'])
-        } else {
-          // Carry Over Logic
-          // If we haven't touched this product in the current session yet,
-          // the "Initial Balance" for this session is the "Final Balance" of the last record.
-          saldoInicial = dbRow['SALDO FINAL'] || 0
-          saldoFinal = dbRow['SALDO FINAL'] || 0
-          contagem = 0 // Not counted in this session yet
-          // Reset movements for the view of the new session
-          entradaEstoqueCarro = 0
-          saidaCarroEstoque = 0
-          saidaCarroCliente = 0
-        }
-      }
-
-      // Calculated Difference
-      const diffQty = contagem > 0 ? saldoFinal - contagem : 0
-      const diffVal = diffQty * price
+      // User Story: "Dif. (Qtd): Automated calculation of Contagem minus Saldo Final."
+      const diferencaQuantidade = contagem - saldoFinal
+      const diferencaValor = diferencaQuantidade * preco
 
       return {
-        id: prod.ID,
-        codigo_barras: prod['CÓDIGO BARRAS']
-          ? prod['CÓDIGO BARRAS'].toString()
-          : null,
-        codigo_produto: prod.CODIGO,
-        mercadoria: prod.PRODUTO || 'N/D',
-        tipo: prod.TIPO,
-        preco: price,
-        saldo_inicial: saldoInicial,
-        entrada_estoque_carro: entradaEstoqueCarro,
-        entrada_cliente_carro: 0,
-        saida_carro_estoque: saidaCarroEstoque,
-        saida_carro_cliente: saidaCarroCliente,
+        id: item.id,
+        codigo_barras: item.codigo_barras,
+        codigo_produto: item.codigo_produto,
+        mercadoria: item.mercadoria,
+        tipo: item.tipo,
+        preco: preco,
+        saldo_inicial: Number(item.saldo_inicial) || 0,
+        entrada_estoque_carro: Number(item.entrada_estoque_carro) || 0,
+        entrada_cliente_carro: Number(item.entrada_cliente_carro) || 0,
+        saida_carro_estoque: Number(item.saida_carro_estoque) || 0,
+        saida_carro_cliente: Number(item.saida_carro_cliente) || 0,
         saldo_final: saldoFinal,
         estoque_contagem_carro: contagem,
-        diferenca_quantidade: diffQty,
-        diferenca_valor: diffVal,
+        diferenca_quantidade: diferencaQuantidade,
+        diferenca_valor: diferencaValor,
       }
     })
-
-    return inventory
   },
 
   async getActiveSession(): Promise<DatasDeInventario | null> {

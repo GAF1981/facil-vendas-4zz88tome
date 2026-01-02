@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import {
   Card,
   CardContent,
@@ -7,6 +7,9 @@ import {
   CardDescription,
 } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import {
   ClipboardList,
   RefreshCw,
@@ -19,8 +22,10 @@ import {
   ScanBarcode,
   Truck,
   RotateCcw,
+  Filter,
 } from 'lucide-react'
 import { InventarioTable } from '@/components/inventario/InventarioTable'
+import { InventarioSummary } from '@/components/inventario/InventarioSummary'
 import { inventarioService } from '@/services/inventarioService'
 import { InventarioItem, DatasDeInventario } from '@/types/inventario'
 import { useToast } from '@/hooks/use-toast'
@@ -45,6 +50,13 @@ export default function InventarioPage() {
   // Movement Dialogs State
   const [isReposicaoOpen, setIsReposicaoOpen] = useState(false)
   const [isDevolucaoOpen, setIsDevolucaoOpen] = useState(false)
+
+  // Filters & Sort State
+  const [sortKey, setSortKey] = useState<keyof InventarioItem | null>(null)
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [minInitialBalance, setMinInitialBalance] = useState<string>('')
+  const [minFinalBalance, setMinFinalBalance] = useState<string>('')
+  const [showOnlyWithValues, setShowOnlyWithValues] = useState(false)
 
   const fetchData = async (
     funcionarioId?: number,
@@ -151,8 +163,6 @@ export default function InventarioPage() {
     try {
       await inventarioService.closeSession(activeSession['ID INVENTÁRIO'])
       setActiveSession(null)
-      // Fetch without session ID to show latest state (which is now previous session)
-      // or show empty state? usually show latest available.
       fetchData(undefined, null)
       toast({
         title: 'Inventário Finalizado',
@@ -207,6 +217,66 @@ export default function InventarioPage() {
       })
     }
   }
+
+  const handleSort = (key: keyof InventarioItem) => {
+    if (sortKey === key) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortKey(key)
+      setSortDirection('asc')
+    }
+  }
+
+  const processedData = useMemo(() => {
+    let filtered = [...data]
+
+    // Apply Filters
+    if (minInitialBalance) {
+      const min = parseFloat(minInitialBalance)
+      if (!isNaN(min)) {
+        filtered = filtered.filter((item) => item.saldo_inicial >= min)
+      }
+    }
+
+    if (minFinalBalance) {
+      const min = parseFloat(minFinalBalance)
+      if (!isNaN(min)) {
+        filtered = filtered.filter((item) => item.saldo_final >= min)
+      }
+    }
+
+    if (showOnlyWithValues) {
+      filtered = filtered.filter(
+        (item) => item.saldo_inicial > 0 || item.saldo_final > 0,
+      )
+    }
+
+    // Apply Sort
+    if (sortKey) {
+      filtered.sort((a, b) => {
+        const aVal = a[sortKey]
+        const bVal = b[sortKey]
+
+        // Handle nulls
+        if (aVal === null) return 1
+        if (bVal === null) return -1
+
+        if (aVal === bVal) return 0
+
+        const comparison = aVal > bVal ? 1 : -1
+        return sortDirection === 'asc' ? comparison : -comparison
+      })
+    }
+
+    return filtered
+  }, [
+    data,
+    sortKey,
+    sortDirection,
+    minInitialBalance,
+    minFinalBalance,
+    showOnlyWithValues,
+  ])
 
   const getHeaderTitle = () => {
     if (activeSession?.TIPO === 'GERAL') return 'Inventário Estoque Geral'
@@ -342,8 +412,58 @@ export default function InventarioPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-3 justify-end items-center">
-        {renderActionButtons()}
+      <InventarioSummary data={data} />
+
+      <div className="flex flex-col xl:flex-row gap-4 justify-between items-start xl:items-center bg-muted/20 p-4 rounded-lg border">
+        <div className="flex flex-wrap items-center gap-4 w-full xl:w-auto">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium">Filtros:</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Label htmlFor="min-initial" className="text-xs whitespace-nowrap">
+              Saldo Inicial &ge;
+            </Label>
+            <Input
+              id="min-initial"
+              type="number"
+              className="h-8 w-20"
+              placeholder="0"
+              value={minInitialBalance}
+              onChange={(e) => setMinInitialBalance(e.target.value)}
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Label htmlFor="min-final" className="text-xs whitespace-nowrap">
+              Saldo Final &ge;
+            </Label>
+            <Input
+              id="min-final"
+              type="number"
+              className="h-8 w-20"
+              placeholder="0"
+              value={minFinalBalance}
+              onChange={(e) => setMinFinalBalance(e.target.value)}
+            />
+          </div>
+
+          <div className="flex items-center space-x-2 border-l pl-4 ml-2">
+            <Switch
+              id="has-values"
+              checked={showOnlyWithValues}
+              onCheckedChange={setShowOnlyWithValues}
+            />
+            <Label htmlFor="has-values" className="cursor-pointer">
+              Com Saldo (Inicial ou Final &gt; 0)
+            </Label>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2 justify-end w-full xl:w-auto">
+          {renderActionButtons()}
+        </div>
       </div>
 
       <Card>
@@ -355,6 +475,9 @@ export default function InventarioPage() {
                 Acompanhamento detalhado de entradas, saídas e saldo final.
               </CardDescription>
             </div>
+            <div className="text-xs text-muted-foreground">
+              {processedData.length} itens listados
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -363,7 +486,12 @@ export default function InventarioPage() {
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : (
-            <InventarioTable data={data} />
+            <InventarioTable
+              data={processedData}
+              onSort={handleSort}
+              sortKey={sortKey}
+              sortDirection={sortDirection}
+            />
           )}
         </CardContent>
       </Card>
