@@ -46,12 +46,20 @@ export default function InventarioPage() {
   const [isReposicaoOpen, setIsReposicaoOpen] = useState(false)
   const [isDevolucaoOpen, setIsDevolucaoOpen] = useState(false)
 
-  const fetchData = async (funcionarioId?: number) => {
+  const fetchData = async (
+    funcionarioId?: number,
+    sessionId?: number | null,
+  ) => {
     setLoading(true)
     try {
       const targetId =
         funcionarioId ?? activeSession?.['CODIGO FUNCIONARIO'] ?? undefined
-      const result = await inventarioService.getInventory(targetId)
+      const targetSessionId = sessionId ?? activeSession?.['ID INVENTÁRIO']
+
+      const result = await inventarioService.getInventory(
+        targetId,
+        targetSessionId,
+      )
       setData(result)
     } catch (error) {
       console.error(error)
@@ -69,11 +77,11 @@ export default function InventarioPage() {
     try {
       const session = await inventarioService.getActiveSession()
       setActiveSession(session)
-      if (session) {
-        fetchData(session['CODIGO FUNCIONARIO'] ?? undefined)
-      } else {
-        fetchData()
-      }
+      // If we have an active session, pass its ID to ensure continuity logic works
+      fetchData(
+        session?.['CODIGO FUNCIONARIO'] ?? undefined,
+        session?.['ID INVENTÁRIO'],
+      )
     } catch (error) {
       console.error(error)
       fetchData()
@@ -89,7 +97,7 @@ export default function InventarioPage() {
     try {
       const session = await inventarioService.startSession('GERAL')
       setActiveSession(session)
-      fetchData()
+      fetchData(undefined, session['ID INVENTÁRIO'])
       toast({
         title: 'Inventário Geral Iniciado',
         description: `Sessão #${session['ID INVENTÁRIO']} iniciada.`,
@@ -117,7 +125,7 @@ export default function InventarioPage() {
         )
         setActiveSession(session)
         setIsEmployeeDialogOpen(false)
-        fetchData(employeeId)
+        fetchData(employeeId, session['ID INVENTÁRIO'])
         toast({
           title: 'Inventário de Funcionário Iniciado',
           description: `Sessão #${session['ID INVENTÁRIO']} iniciada para funcionário ${employeeId}.`,
@@ -143,7 +151,9 @@ export default function InventarioPage() {
     try {
       await inventarioService.closeSession(activeSession['ID INVENTÁRIO'])
       setActiveSession(null)
-      fetchData(undefined)
+      // Fetch without session ID to show latest state (which is now previous session)
+      // or show empty state? usually show latest available.
+      fetchData(undefined, null)
       toast({
         title: 'Inventário Finalizado',
         description: 'A sessão de inventário foi encerrada com sucesso.',
@@ -184,7 +194,10 @@ export default function InventarioPage() {
         description: 'A movimentação foi salva com sucesso.',
         className: 'bg-green-600 text-white',
       })
-      fetchData(activeSession['CODIGO FUNCIONARIO'] ?? undefined)
+      fetchData(
+        activeSession['CODIGO FUNCIONARIO'] ?? undefined,
+        activeSession['ID INVENTÁRIO'],
+      )
     } catch (error) {
       console.error(error)
       toast({
@@ -314,7 +327,10 @@ export default function InventarioPage() {
           <Button
             variant="outline"
             onClick={() =>
-              fetchData(activeSession?.['CODIGO FUNCIONARIO'] ?? undefined)
+              fetchData(
+                activeSession?.['CODIGO FUNCIONARIO'] ?? undefined,
+                activeSession?.['ID INVENTÁRIO'],
+              )
             }
             disabled={loading}
           >

@@ -163,6 +163,11 @@ export default function ContagemPage() {
       })
 
     if (itemsToSave.length === 0) {
+      // Allow saving empty batch to clear everything?
+      // User story implies saving counts. If empty, maybe we shouldn't save.
+      // But if user wants to clear everything, they might want to save empty.
+      // For safety, let's require at least one item or confirmation.
+      // But given UI, usually users save what they count.
       toast({
         title: 'Nada para salvar',
         description: 'Nenhuma contagem foi realizada.',
@@ -186,14 +191,7 @@ export default function ContagemPage() {
         className: 'bg-green-600 text-white',
       })
 
-      // We clear counts to indicate success and avoid double submission
-      // But maybe user wants to keep seeing them?
-      // For now, clearing seems safer to show "Saved".
-      // Or we can just leave them. The requirement says "clearing the dirty state".
-      // Since we don't track dirty state per se, just counts, clearing counts would reset the view.
-      // But clearing counts might be annoying if they want to review.
-      // Let's assume the user might want to continue or verify.
-      // However, to be "Success Notification ... clearing the dirty state", I will clear counts.
+      // Clear counts to indicate success and start fresh or prevent double submit
       setCounts({})
     } catch (error) {
       console.error(error)

@@ -8,7 +8,10 @@ import {
 import { parseCurrency, formatCurrency } from '@/lib/formatters'
 
 export const inventarioService = {
-  async getInventory(funcionarioId?: number): Promise<InventarioItem[]> {
+  async getInventory(
+    funcionarioId?: number,
+    sessionId?: number,
+  ): Promise<InventarioItem[]> {
     // 1. Fetch all Products
     const { data: products, error: prodError } = await supabase
       .from('PRODUTOS')
@@ -22,7 +25,7 @@ export const inventarioService = {
     let query = supabase
       .from('BANCO_DE_DADOS')
       .select(
-        '"COD. PRODUTO", "SALDO INICIAL", "SALDO FINAL", "CONTAGEM", "NOVAS CONSIGNAÇÕES", "RECOLHIDO", "QUANTIDADE VENDIDA", "DATA DO ACERTO", "HORA DO ACERTO", "CODIGO FUNCIONARIO"',
+        '"COD. PRODUTO", "SALDO INICIAL", "SALDO FINAL", "CONTAGEM", "NOVAS CONSIGNAÇÕES", "RECOLHIDO", "QUANTIDADE VENDIDA", "DATA DO ACERTO", "HORA DO ACERTO", "CODIGO FUNCIONARIO", "session_id"',
       )
 
     // If fetching for a specific employee, filter DB records
@@ -52,18 +55,50 @@ export const inventarioService = {
       const dbRow = prod.CODIGO ? dbMap.get(prod.CODIGO) : null
       const price = parseCurrency(prod.PREÇO)
 
-      const saldoInicial = dbRow?.['SALDO INICIAL'] || 0
-      const saldoFinal = dbRow?.['SALDO FINAL'] || 0
-      const contagem = dbRow?.['CONTAGEM'] || 0
+      let saldoInicial = 0
+      let saldoFinal = 0
+      let contagem = 0
+      let entradaEstoqueCarro = 0
+      let saidaCarroEstoque = 0
+      let saidaCarroCliente = 0
 
-      // Map Movements
-      const entradaEstoqueCarro = parseCurrency(dbRow?.['NOVAS CONSIGNAÇÕES'])
-      const saidaCarroEstoque = parseCurrency(dbRow?.['RECOLHIDO'])
-      const saidaCarroCliente = parseCurrency(dbRow?.['QUANTIDADE VENDIDA'])
+      if (dbRow) {
+        // Logic for Inventory Continuity:
+        // If the latest record belongs to the current session, use it as is.
+        // If it belongs to a previous session (or undefined session), carry over the final balance as initial balance for current view.
+        const isCurrentSession = sessionId && dbRow.session_id === sessionId
+
+        if (isCurrentSession) {
+          saldoInicial = dbRow['SALDO INICIAL'] || 0
+          saldoFinal = dbRow['SALDO FINAL'] || 0
+          contagem = dbRow['CONTAGEM'] || 0
+          entradaEstoqueCarro = parseCurrency(dbRow['NOVAS CONSIGNAÇÕES'])
+          saidaCarroEstoque = parseCurrency(dbRow['RECOLHIDO'])
+          saidaCarroCliente = parseCurrency(dbRow['QUANTIDADE VENDIDA'])
+        } else {
+          // Carry Over Logic
+          // If we haven't touched this product in the current session yet,
+          // the "Initial Balance" for this session is the "Final Balance" of the last record.
+          // And "Final Balance" remains same until moved/counted.
+          // Movements are 0 for this new session.
+          saldoInicial = dbRow['SALDO FINAL'] || 0
+          saldoFinal = dbRow['SALDO FINAL'] || 0
+          contagem = 0 // Not counted in this session yet
+          // Reset movements for the view of the new session
+          entradaEstoqueCarro = 0
+          saidaCarroEstoque = 0
+          saidaCarroCliente = 0
+        }
+      }
+
       const entradaClienteCarro = 0
 
       // Calculated Difference
-      const diffQty = saldoFinal - contagem
+      // If contagem is 0 (not counted), difference implies missing everything?
+      // Usually difference is only relevant if counted.
+      // If contagem > 0 or if we want to show full loss if not counted?
+      // For now, simple diff.
+      const diffQty = contagem > 0 ? saldoFinal - contagem : 0
       const diffVal = diffQty * price
 
       return {
@@ -135,72 +170,6 @@ export const inventarioService = {
     return data as DatasDeInventario
   },
 
-  async updateItemBalance(
-    productCode: number,
-    balance: number,
-    funcionarioId?: number | null,
-    productName: string = '',
-  ): Promise<void> {
-    // Updates SALDO FINAL instead of CONTAGEM as per new requirement
-    let query = supabase
-      .from('BANCO_DE_DADOS')
-      .select('"ID VENDA ITENS"')
-      .eq('COD. PRODUTO', productCode)
-
-    if (funcionarioId) {
-      query = query.eq('CODIGO FUNCIONARIO', funcionarioId)
-    }
-
-    const { data, error } = await query
-      .order('DATA DO ACERTO', { ascending: false })
-      .order('HORA DO ACERTO', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (error) throw error
-
-    if (data) {
-      // Update existing record
-      const { error: updateError } = await supabase
-        .from('BANCO_DE_DADOS')
-        .update({ 'SALDO FINAL': balance } as any)
-        .eq('ID VENDA ITENS', data['ID VENDA ITENS'])
-
-      if (updateError) throw updateError
-    } else {
-      // If no history record found, insert a new one to establish balance
-      const now = new Date()
-      const dateStr = now.toISOString().split('T')[0]
-      const timeStr = now.toLocaleTimeString()
-
-      const { error: insertError } = await supabase
-        .from('BANCO_DE_DADOS')
-        .insert({
-          'COD. PRODUTO': productCode,
-          'CODIGO FUNCIONARIO': funcionarioId,
-          'SALDO FINAL': balance,
-          CONTAGEM: balance, // Initial count matches balance
-          'DATA DO ACERTO': dateStr,
-          'HORA DO ACERTO': timeStr,
-          MERCADORIA: productName,
-          TIPO: 'CONTAGEM_FINAL',
-          'SALDO INICIAL': 0,
-        } as any)
-
-      if (insertError) {
-        console.error(
-          'Error creating new balance record for product:',
-          productCode,
-          insertError,
-        )
-        // We log but maybe shouldn't throw to avoid breaking the whole batch if one fails?
-        // But for "Robust" saving, we should probably throw or handle it.
-        // Throwing here will be caught by Promise.all and fail the batch save.
-        throw insertError
-      }
-    }
-  },
-
   async saveFinalCounts(
     items: {
       productId: number
@@ -212,38 +181,16 @@ export const inventarioService = {
     sessionId: number | null,
     funcionarioId: number | null,
   ): Promise<void> {
-    if (items.length === 0) return
+    if (!sessionId) throw new Error('Session ID is required for saving counts.')
 
-    // 1. Insert into new table CONTAGEM DE ESTOQUE FINAL
-    const insertPayload: ContagemEstoqueFinalInsert[] = items.map((item) => ({
-      produto_id: item.productId,
-      quantidade: item.quantity,
-      session_id: sessionId,
-      valor_unitario_snapshot: item.price,
-    }))
-
-    const { error: insertError } = await supabase
-      .from('CONTAGEM DE ESTOQUE FINAL')
-      .insert(insertPayload)
-
-    if (insertError) throw insertError
-
-    // 2. Update BANCO_DE_DADOS for each item to reflect the new balance
-    // We process this in batches to avoid overwhelming the connection, although client-side looping is slow.
-    // Ideally this should be a backend function, but we do it here to maintain feature parity.
-    const updatePromises = items.map((item) => {
-      if (item.productCode) {
-        return this.updateItemBalance(
-          item.productCode,
-          item.quantity,
-          funcionarioId,
-          item.productName,
-        )
-      }
-      return Promise.resolve()
+    // Use RPC for atomic batch processing
+    const { error } = await supabase.rpc('process_inventory_batch', {
+      p_session_id: sessionId,
+      p_items: items,
+      p_funcionario_id: funcionarioId,
     })
 
-    await Promise.all(updatePromises)
+    if (error) throw error
   },
 
   async createMovement(movement: MovementInsert): Promise<void> {
@@ -259,7 +206,7 @@ export const inventarioService = {
     const { data: dbData, error: dbError } = await supabase
       .from('BANCO_DE_DADOS')
       .select(
-        '"ID VENDA ITENS", "SALDO FINAL", "NOVAS CONSIGNAÇÕES", "RECOLHIDO"',
+        '"ID VENDA ITENS", "SALDO FINAL", "SALDO INICIAL", "NOVAS CONSIGNAÇÕES", "RECOLHIDO", "session_id"',
       )
       .eq('COD. PRODUTO', movement.produto_id) // Assuming product_id matches COD. PRODUTO
       .eq('CODIGO FUNCIONARIO', movement.funcionario_id)
@@ -270,7 +217,15 @@ export const inventarioService = {
 
     if (dbError) throw dbError
 
-    if (dbData) {
+    const now = new Date()
+    const dateStr = now.toISOString().split('T')[0]
+    const timeStr = now.toLocaleTimeString()
+
+    // Determine if we update existing record or create new one based on session
+    const isCurrentSession =
+      dbData && movement.session_id && dbData.session_id === movement.session_id
+
+    if (isCurrentSession) {
       // Calculate new values
       const currentSaldo = dbData['SALDO FINAL'] || 0
       const currentNovas = parseCurrency(dbData['NOVAS CONSIGNAÇÕES'])
@@ -295,17 +250,64 @@ export const inventarioService = {
           'SALDO FINAL': newSaldo,
           'NOVAS CONSIGNAÇÕES': formatCurrency(newNovas),
           RECOLHIDO: formatCurrency(newRecolhido),
+          'DATA DO ACERTO': dateStr, // Update timestamp
+          'HORA DO ACERTO': timeStr,
         } as any)
         .eq('ID VENDA ITENS', dbData['ID VENDA ITENS'])
 
       if (updateError) throw updateError
     } else {
-      // If no record exists, creating one is complex due to strict schema.
-      // We will skip updating DB for now if it doesn't exist, but we logged it.
-      // Ideally we would insert a new record.
-      console.warn(
-        'No BANCO_DE_DADOS record found to apply movement. Movement logged only in tracking table.',
-      )
+      // Create NEW record for this session, linking to previous
+      let prevSaldoFinal = 0
+      if (dbData) {
+        prevSaldoFinal = dbData['SALDO FINAL'] || 0
+      } else {
+        // If not found by exact match, try finding any latest record for product
+        // (This might be redundant if the query above already covered it, but query above filtered by employee)
+        // Ideally we fetch global product state if employee specific not found?
+        // For now, assume 0 if no history.
+      }
+
+      let newSaldo = prevSaldoFinal
+      let newNovas = 0
+      let newRecolhido = 0
+
+      if (movement.TIPO === 'REPOSICAO') {
+        newNovas = movement.quantidade
+        newSaldo += movement.quantidade
+      } else if (movement.TIPO === 'DEVOLUCAO') {
+        newRecolhido = movement.quantidade
+        newSaldo -= movement.quantidade
+      }
+
+      // We need product name for insertion
+      const { data: prod } = await supabase
+        .from('PRODUTOS')
+        .select('PRODUTO')
+        .eq('ID', movement.produto_id) // Map ID to ID
+        .single()
+
+      const prodName = prod?.PRODUTO || ''
+
+      // Insert
+      const { error: insertError } = await supabase
+        .from('BANCO_DE_DADOS')
+        .insert({
+          'COD. PRODUTO': movement.produto_id, // Map ID to COD. PRODUTO (assuming relation)
+          'CODIGO FUNCIONARIO': movement.funcionario_id,
+          'SALDO FINAL': newSaldo,
+          'SALDO INICIAL': prevSaldoFinal,
+          'NOVAS CONSIGNAÇÕES': formatCurrency(newNovas),
+          RECOLHIDO: formatCurrency(newRecolhido),
+          CONTAGEM: 0,
+          'DATA DO ACERTO': dateStr,
+          'HORA DO ACERTO': timeStr,
+          MERCADORIA: prodName,
+          TIPO: 'MOVIMENTACAO',
+          session_id: movement.session_id,
+        } as any)
+
+      if (insertError) throw insertError
     }
   },
 }
