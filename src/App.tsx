@@ -31,7 +31,8 @@ import CaixaPage from '@/pages/caixa/CaixaPage'
 import PixPage from '@/pages/pix/PixPage'
 import PagamentosPage from '@/pages/pagamentos/PagamentosPage'
 import ControlePage from '@/pages/controle/ControlePage'
-import InventarioPage from '@/pages/inventario/InventarioPage' // Import Inventario
+import InventarioPage from '@/pages/inventario/InventarioPage'
+import ContagemPage from '@/pages/inventario/ContagemPage' // New Page
 import { AuthProvider } from '@/hooks/use-auth'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 
@@ -50,7 +51,6 @@ const App = () => (
             <Route element={<GlobalLayout />}>
               <Route path="/" element={<Index />} />
               <Route path="/dashboard" element={<DashboardPage />} />
-
               <Route path="/clientes" element={<ClientsPage />} />
               <Route path="/clientes/novo" element={<ClientFormPage />} />
               <Route path="/clientes/:id" element={<ClientFormPage />} />
@@ -58,49 +58,36 @@ const App = () => (
                 path="/clientes/:id/historico"
                 element={<ClientHistoryPage />}
               />
-
               <Route path="/funcionarios" element={<EmployeesPage />} />
               <Route path="/funcionarios/novo" element={<EmployeeFormPage />} />
               <Route path="/funcionarios/:id" element={<EmployeeFormPage />} />
-
               <Route path="/produtos" element={<ProductsPage />} />
               <Route path="/produtos/novo" element={<ProductFormPage />} />
               <Route path="/produtos/:id" element={<ProductFormPage />} />
-
               {/* Acerto Module */}
               <Route path="/acerto" element={<AcertoPage />} />
-
               {/* Recebimento Module */}
               <Route path="/recebimento" element={<RecebimentoPage />} />
               <Route
                 path="/confirmacao-recebimentos"
                 element={<ConfirmacaoRecebimentosPage />}
               />
-
               {/* Pix Module */}
               <Route path="/pix" element={<PixPage />} />
-
               {/* Pagamentos Module */}
               <Route path="/pagamentos" element={<PagamentosPage />} />
-
               {/* Controle Module - NEW */}
               <Route path="/controle" element={<ControlePage />} />
-
               {/* Cobranca Module */}
               <Route path="/cobranca" element={<CobrancaPage />} />
-
               {/* Nota Fiscal Module */}
               <Route path="/nota-fiscal" element={<NotaFiscalPage />} />
-
               {/* Pendencias Module */}
               <Route path="/pendencias" element={<PendenciasPage />} />
-
               {/* Rota Module */}
               <Route path="/rota" element={<RotaPage />} />
-
               {/* Backup & Export Module */}
               <Route path="/backup" element={<BackupPage />} />
-
               {/* Reports Module */}
               <Route path="/relatorio" element={<RelatorioDashboard />} />
               <Route
@@ -109,15 +96,16 @@ const App = () => (
               />
               <Route path="/relatorio/vendas" element={<SalesReportsPage />} />
               <Route path="/relatorio/estoque" element={<StockReportsPage />} />
-
               {/* Caixa Module */}
               <Route path="/caixa" element={<CaixaPage />} />
-
               {/* Inventario Module */}
               <Route path="/inventario" element={<InventarioPage />} />
-
+              <Route
+                path="/inventario/contagem"
+                element={<ContagemPage />}
+              />{' '}
+              {/* New Route */}
               <Route path="/complemento" element={<PlaceholderModule />} />
-
               <Route path="/vendas" element={<PlaceholderModule />} />
             </Route>
           </Route>

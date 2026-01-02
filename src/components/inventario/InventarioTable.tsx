@@ -53,7 +53,7 @@ export function InventarioTable({ data }: InventarioTableProps) {
                 Saldo Final
               </TableHead>
               <TableHead className="text-center font-bold bg-yellow-50/50 text-yellow-700">
-                Contagem Carro
+                Contagem
               </TableHead>
               <TableHead className="text-center">Dif. (Qtd)</TableHead>
               <TableHead className="text-right">Dif. (Valor)</TableHead>

@@ -16,6 +16,7 @@ export interface InventarioItem {
   diferenca_valor: number
 }
 
+// Deprecated in favor of DatasDeInventario but kept for reference if needed
 export interface InventorySession {
   id: number
   tipo: 'GERAL' | 'FUNCIONARIO'
@@ -24,6 +25,14 @@ export interface InventorySession {
   data_fim: string | null
   status: 'ABERTO' | 'FECHADO'
   created_at: string
+}
+
+export interface DatasDeInventario {
+  'ID INVENTÁRIO': number
+  'Data de Início de Inventário': string
+  'Data de Fechamento de Inventário': string | null
+  TIPO: 'GERAL' | 'FUNCIONARIO' | null
+  'CODIGO FUNCIONARIO': number | null
 }
 
 export type InventorySessionInsert = Omit<

@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase/client'
-import { InventarioItem, InventorySession } from '@/types/inventario'
+import { InventarioItem, DatasDeInventario } from '@/types/inventario'
 import { parseCurrency } from '@/lib/formatters'
 
 export const inventarioService = {
@@ -85,47 +85,93 @@ export const inventarioService = {
     return inventory
   },
 
-  async getActiveSession(): Promise<InventorySession | null> {
+  async getActiveSession(): Promise<DatasDeInventario | null> {
     const { data, error } = await supabase
-      .from('sessoes_inventario')
+      .from('DATAS DE INVENTÁRIO')
       .select('*')
-      .eq('status', 'ABERTO')
+      .is('Data de Fechamento de Inventário', null)
+      .order('Data de Início de Inventário', { ascending: false })
+      .limit(1)
       .maybeSingle()
 
     if (error) throw error
-    return data as InventorySession | null
+    return data as DatasDeInventario | null
   },
 
   async startSession(
     tipo: 'GERAL' | 'FUNCIONARIO',
     funcionarioId?: number,
-  ): Promise<InventorySession> {
+  ): Promise<DatasDeInventario> {
     const { data, error } = await supabase
-      .from('sessoes_inventario')
+      .from('DATAS DE INVENTÁRIO')
       .insert({
-        tipo,
-        funcionario_id: funcionarioId,
-        status: 'ABERTO',
+        TIPO: tipo,
+        'CODIGO FUNCIONARIO': funcionarioId,
+        'Data de Início de Inventário': new Date().toISOString(),
       })
       .select()
       .single()
 
     if (error) throw error
-    return data as InventorySession
+    return data as DatasDeInventario
   },
 
-  async closeSession(id: number): Promise<InventorySession> {
+  async closeSession(id: number): Promise<DatasDeInventario> {
     const { data, error } = await supabase
-      .from('sessoes_inventario')
+      .from('DATAS DE INVENTÁRIO')
       .update({
-        status: 'FECHADO',
-        data_fim: new Date().toISOString(),
-      })
-      .eq('id', id)
+        'Data de Fechamento de Inventário': new Date().toISOString(),
+      } as any)
+      .eq('ID INVENTÁRIO', id)
       .select()
       .single()
 
     if (error) throw error
-    return data as InventorySession
+    return data as DatasDeInventario
+  },
+
+  async updateItemCount(
+    productCode: number,
+    count: number,
+    funcionarioId?: number | null,
+  ): Promise<void> {
+    // We need to update the CONTAGEM on the latest record in BANCO_DE_DADOS for this product/context
+    // First, find the latest record
+    let query = supabase
+      .from('BANCO_DE_DADOS')
+      .select('"ID VENDA ITENS"')
+      .eq('COD. PRODUTO', productCode)
+
+    if (funcionarioId) {
+      query = query.eq('CODIGO FUNCIONARIO', funcionarioId)
+    }
+
+    const { data, error } = await query
+      .order('DATA DO ACERTO', { ascending: false })
+      .order('HORA DO ACERTO', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (error) throw error
+
+    if (data) {
+      // Update existing record
+      const { error: updateError } = await supabase
+        .from('BANCO_DE_DADOS')
+        .update({ CONTAGEM: count } as any)
+        .eq('ID VENDA ITENS', data['ID VENDA ITENS'])
+
+      if (updateError) throw updateError
+    } else {
+      // No record exists for this product in history.
+      // We might need to create a dummy record or just fail.
+      // For now, logging warning as creating a full transaction record without context is complex.
+      console.warn(
+        'No history record found for product to update count. Count not saved.',
+      )
+      throw new Error(
+        'Não foi encontrado registro recente deste produto para atualizar a contagem.',
+      )
+    }
   },
 }

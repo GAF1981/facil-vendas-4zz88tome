@@ -612,6 +612,44 @@ export type Database = {
           },
         ]
       }
+      sessoes_inventario: {
+        Row: {
+          created_at: string
+          data_fim: string | null
+          data_inicio: string
+          funcionario_id: number | null
+          id: number
+          status: string
+          tipo: string
+        }
+        Insert: {
+          created_at?: string
+          data_fim?: string | null
+          data_inicio?: string
+          funcionario_id?: number | null
+          id?: number
+          status?: string
+          tipo: string
+        }
+        Update: {
+          created_at?: string
+          data_fim?: string | null
+          data_inicio?: string
+          funcionario_id?: number | null
+          id?: number
+          status?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'sessoes_inventario_funcionario_id_fkey'
+            columns: ['funcionario_id']
+            isOneToOne: false
+            referencedRelation: 'FUNCIONARIOS'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       system_logs: {
         Row: {
           created_at: string
