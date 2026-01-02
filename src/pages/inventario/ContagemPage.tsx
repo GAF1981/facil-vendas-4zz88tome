@@ -193,7 +193,7 @@ export default function ContagemPage() {
 
       toast({
         title: 'Sucesso',
-        description: `${itemsToSave.length} itens processados. O saldo final foi atualizado.`,
+        description: `${itemsToSave.length} itens processados. O saldo final foi atualizado com sucesso.`,
         className: 'bg-green-600 text-white',
       })
     } catch (error: any) {
@@ -201,8 +201,15 @@ export default function ContagemPage() {
 
       let errorMessage =
         'Ocorreu um erro ao processar a contagem. Tente novamente.'
+
       if (error?.message?.includes('duplicate key')) {
         errorMessage = 'Erro de duplicidade de chave ao salvar os dados.'
+      } else if (
+        error?.message?.includes('type text') ||
+        error?.message?.includes('type date')
+      ) {
+        errorMessage =
+          'Erro de tipo de dados no banco (Data/Hora). Contate o suporte técnico.'
       } else if (error?.message?.includes('network')) {
         errorMessage = 'Erro de conexão. Verifique sua internet.'
       } else if (error?.message) {
