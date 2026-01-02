@@ -74,8 +74,8 @@ const App = () => (
                 element={<ConfirmacaoRecebimentosPage />}
               />
 
-              {/* New Pix Confirmation Module */}
-              <Route path="/pix-recebimento" element={<PixPage />} />
+              {/* Pix Management Module */}
+              <Route path="/pix" element={<PixPage />} />
 
               {/* Cobranca Module */}
               <Route path="/cobranca" element={<CobrancaPage />} />

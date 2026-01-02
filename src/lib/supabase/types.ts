@@ -112,6 +112,7 @@ export type Database = {
           nota_fiscal_venda: string | null
           'NOVAS CONSIGNAÇÕES': string | null
           'NÚMERO DO PEDIDO': number | null
+          pix_acerto_confirmado: boolean | null
           'PREÇO VENDIDO': string | null
           'QUANTIDADE VENDIDA': string | null
           RECOLHIDO: string | null
@@ -145,6 +146,7 @@ export type Database = {
           nota_fiscal_venda?: string | null
           'NOVAS CONSIGNAÇÕES'?: string | null
           'NÚMERO DO PEDIDO'?: number | null
+          pix_acerto_confirmado?: boolean | null
           'PREÇO VENDIDO'?: string | null
           'QUANTIDADE VENDIDA'?: string | null
           RECOLHIDO?: string | null
@@ -178,6 +180,7 @@ export type Database = {
           nota_fiscal_venda?: string | null
           'NOVAS CONSIGNAÇÕES'?: string | null
           'NÚMERO DO PEDIDO'?: number | null
+          pix_acerto_confirmado?: boolean | null
           'PREÇO VENDIDO'?: string | null
           'QUANTIDADE VENDIDA'?: string | null
           RECOLHIDO?: string | null
@@ -450,6 +453,7 @@ export type Database = {
           forma_pagamento: string
           funcionario_id: number
           id: number
+          pix_recebimento_confirmado: boolean | null
           valor_pago: number
           valor_registrado: number | null
           vencimento: string | null
@@ -463,6 +467,7 @@ export type Database = {
           forma_pagamento: string
           funcionario_id: number
           id?: number
+          pix_recebimento_confirmado?: boolean | null
           valor_pago: number
           valor_registrado?: number | null
           vencimento?: string | null
@@ -476,6 +481,7 @@ export type Database = {
           forma_pagamento?: string
           funcionario_id?: number
           id?: number
+          pix_recebimento_confirmado?: boolean | null
           valor_pago?: number
           valor_registrado?: number | null
           vencimento?: string | null

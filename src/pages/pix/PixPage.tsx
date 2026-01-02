@@ -13,26 +13,40 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Loader2, RefreshCw, Search, QrCode } from 'lucide-react'
 import { pixService } from '@/services/pixService'
-import { PixTransactionRow } from '@/types/pix'
+import { PixAcertoRow, PixRecebimentoRow } from '@/types/pix'
 import { useToast } from '@/hooks/use-toast'
 import { formatCurrency } from '@/lib/formatters'
+import { useUserStore } from '@/stores/useUserStore'
+import { cn } from '@/lib/utils'
+
+type Tab = 'acerto' | 'recebimento'
 
 export default function PixPage() {
-  const [transactions, setTransactions] = useState<PixTransactionRow[]>([])
-  const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState<Tab>('acerto')
+  const [acertoData, setAcertoData] = useState<PixAcertoRow[]>([])
+  const [recebimentoData, setRecebimentoData] = useState<PixRecebimentoRow[]>(
+    [],
+  )
+  const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const { toast } = useToast()
+  const { employee } = useUserStore()
 
   const loadData = async () => {
     setLoading(true)
     try {
-      const data = await pixService.getPixTransactions()
-      setTransactions(data)
+      if (activeTab === 'acerto') {
+        const data = await pixService.getPixAcertos()
+        setAcertoData(data)
+      } else {
+        const data = await pixService.getPixRecebimentos()
+        setRecebimentoData(data)
+      }
     } catch (error) {
       console.error(error)
       toast({
         title: 'Erro',
-        description: 'Não foi possível carregar as transações Pix.',
+        description: 'Não foi possível carregar os dados Pix.',
         variant: 'destructive',
       })
     } finally {
@@ -42,95 +56,147 @@ export default function PixPage() {
 
   useEffect(() => {
     loadData()
-  }, [])
+  }, [activeTab])
 
   const handleToggleAcerto = async (orderId: number, checked: boolean) => {
-    // Optimistic Update
-    setTransactions((prev) =>
-      prev.map((t) =>
-        t.orderId === orderId ? { ...t, acertoPixConfirmed: checked } : t,
+    if (!employee) return
+    const prev = [...acertoData]
+    // Optimistic
+    setAcertoData((curr) =>
+      curr.map((r) =>
+        r.orderId === orderId
+          ? {
+              ...r,
+              isConfirmed: checked,
+              confirmedBy: checked ? employee.nome_completo : undefined,
+            }
+          : r,
       ),
     )
 
     try {
-      await pixService.toggleAcertoPix(orderId, checked)
+      await pixService.toggleAcertoPix(orderId, checked, employee.nome_completo)
       toast({
-        title: checked ? 'Confirmado' : 'Desmarcado',
-        description: `Pix do Acerto (Pedido #${orderId}) atualizado.`,
+        title: checked ? 'Confirmado' : 'Cancelado',
+        className: checked
+          ? 'bg-green-600 text-white'
+          : 'bg-red-600 text-white',
+        description: `Status atualizado por ${employee.nome_completo}`,
         duration: 1500,
       })
     } catch (error) {
-      // Revert
-      setTransactions((prev) =>
-        prev.map((t) =>
-          t.orderId === orderId ? { ...t, acertoPixConfirmed: !checked } : t,
-        ),
-      )
+      setAcertoData(prev)
       toast({
         title: 'Erro',
-        description: 'Falha ao atualizar status.',
+        description: 'Falha ao atualizar o status.',
         variant: 'destructive',
       })
     }
   }
 
-  const handleToggleRecebimento = async (orderId: number, checked: boolean) => {
-    // Optimistic Update
-    setTransactions((prev) =>
-      prev.map((t) =>
-        t.orderId === orderId ? { ...t, recebimentoPixConfirmed: checked } : t,
+  const handleToggleRecebimento = async (id: number, checked: boolean) => {
+    if (!employee) return
+    const prev = [...recebimentoData]
+    // Optimistic
+    setRecebimentoData((curr) =>
+      curr.map((r) =>
+        r.id === id
+          ? {
+              ...r,
+              isConfirmed: checked,
+              confirmedBy: checked ? employee.nome_completo : undefined,
+            }
+          : r,
       ),
     )
 
     try {
-      await pixService.toggleRecebimentoPix(orderId, checked)
+      await pixService.toggleRecebimentoPix(id, checked, employee.nome_completo)
       toast({
-        title: checked ? 'Confirmado' : 'Desmarcado',
-        description: `Pix do Recebimento (Pedido #${orderId}) atualizado.`,
+        title: checked ? 'Confirmado' : 'Cancelado',
+        className: checked
+          ? 'bg-green-600 text-white'
+          : 'bg-red-600 text-white',
+        description: `Status atualizado por ${employee.nome_completo}`,
         duration: 1500,
       })
     } catch (error) {
-      // Revert
-      setTransactions((prev) =>
-        prev.map((t) =>
-          t.orderId === orderId
-            ? { ...t, recebimentoPixConfirmed: !checked }
-            : t,
-        ),
-      )
+      setRecebimentoData(prev)
       toast({
         title: 'Erro',
-        description: 'Falha ao atualizar status.',
+        description: 'Falha ao atualizar o status.',
         variant: 'destructive',
       })
     }
   }
 
-  const filteredTransactions = transactions.filter((t) => {
-    const searchLower = searchTerm.toLowerCase()
+  // Filter
+  const filteredAcertos = acertoData.filter((r) => {
+    const s = searchTerm.toLowerCase()
     return (
-      t.clientName.toLowerCase().includes(searchLower) ||
-      t.orderId.toString().includes(searchLower) ||
-      t.clientCode.toString().includes(searchLower) ||
-      t.employeeName.toLowerCase().includes(searchLower)
+      r.clientName.toLowerCase().includes(s) ||
+      r.orderId.toString().includes(s) ||
+      r.clientCode.toString().includes(s) ||
+      r.employeeName.toLowerCase().includes(s) ||
+      (r.isConfirmed ? 'confirmado' : 'a confirmar').includes(s)
+    )
+  })
+
+  const filteredRecebimentos = recebimentoData.filter((r) => {
+    const s = searchTerm.toLowerCase()
+    return (
+      r.orderId.toString().includes(s) ||
+      r.clientCode.toString().includes(s) ||
+      (r.isConfirmed ? 'confirmado' : 'a confirmar').includes(s)
     )
   })
 
   return (
     <div className="space-y-6 animate-fade-in p-4 pb-20">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="flex flex-col gap-4">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-teal-100 text-teal-700 rounded-lg shrink-0">
             <QrCode className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              Recebimento Pix
-            </h1>
+            <h1 className="text-3xl font-bold tracking-tight">Pix</h1>
             <p className="text-muted-foreground">
-              Confirmação de pagamentos Pix em Acertos e Recebimentos.
+              Central de confirmação de transações Pix.
             </p>
           </div>
+        </div>
+
+        <div className="flex gap-4">
+          <Button
+            variant={activeTab === 'acerto' ? 'default' : 'outline'}
+            onClick={() => setActiveTab('acerto')}
+            className={cn(
+              activeTab === 'acerto' && 'bg-teal-600 hover:bg-teal-700',
+            )}
+          >
+            Confirmar Pix Acerto
+          </Button>
+          <Button
+            variant={activeTab === 'recebimento' ? 'default' : 'outline'}
+            onClick={() => setActiveTab('recebimento')}
+            className={cn(
+              activeTab === 'recebimento' && 'bg-teal-600 hover:bg-teal-700',
+            )}
+          >
+            Confirmar Pix Recebimento
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center bg-card p-2 rounded-lg border shadow-sm max-w-md w-full">
+          <Search className="mr-2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="border-none shadow-none focus-visible:ring-0 h-8"
+          />
         </div>
         <Button onClick={loadData} variant="outline" disabled={loading}>
           <RefreshCw
@@ -140,130 +206,185 @@ export default function PixPage() {
         </Button>
       </div>
 
-      <div className="flex items-center bg-card p-4 rounded-lg border shadow-sm max-w-md">
-        <Search className="mr-2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Buscar por pedido, cliente ou funcionário..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="border-none shadow-none focus-visible:ring-0"
-        />
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Transações Pix</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="rounded-md border overflow-auto">
-            <Table>
-              <TableHeader className="bg-muted/50">
-                <TableRow>
-                  <TableHead className="w-[100px]">Pedido</TableHead>
-                  <TableHead className="w-[80px]">Cód.</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Funcionário</TableHead>
-                  <TableHead className="text-right bg-blue-50/50 text-blue-700">
-                    Pix Acerto
-                  </TableHead>
-                  <TableHead className="text-center w-[100px] bg-blue-50/50">
-                    Conf. Acerto
-                  </TableHead>
-                  <TableHead className="text-right bg-green-50/50 text-green-700">
-                    Pix Receb.
-                  </TableHead>
-                  <TableHead className="text-center w-[100px] bg-green-50/50">
-                    Conf. Receb.
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
+      {activeTab === 'acerto' ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Pix Acertos</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="rounded-md border overflow-auto">
+              <Table>
+                <TableHeader className="bg-muted/50">
                   <TableRow>
-                    <TableCell colSpan={8} className="h-24 text-center">
-                      <div className="flex justify-center items-center">
-                        <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
-                        Carregando...
-                      </div>
-                    </TableCell>
+                    <TableHead className="w-[100px]">Pedido</TableHead>
+                    <TableHead className="w-[80px]">Cód.</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Vendedor</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
+                    <TableHead className="text-center w-[150px]">
+                      Conf. Receb.
+                    </TableHead>
+                    <TableHead>Confirmado Por</TableHead>
                   </TableRow>
-                ) : filteredTransactions.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={8}
-                      className="h-24 text-center text-muted-foreground"
-                    >
-                      Nenhuma transação Pix encontrada.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredTransactions.map((row) => (
-                    <TableRow
-                      key={row.orderId}
-                      className="hover:bg-muted/30 transition-colors"
-                    >
-                      <TableCell className="font-mono font-medium">
-                        #{row.orderId}
-                      </TableCell>
-                      <TableCell className="font-mono text-muted-foreground">
-                        {row.clientCode}
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {row.clientName}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {row.employeeName}
-                      </TableCell>
-
-                      {/* Acerto Column */}
-                      <TableCell className="text-right font-mono bg-blue-50/20">
-                        {row.acertoPixValue > 0 ? (
-                          <span className="text-blue-700 font-semibold">
-                            R$ {formatCurrency(row.acertoPixValue)}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center bg-blue-50/20">
-                        <Checkbox
-                          checked={row.acertoPixConfirmed}
-                          disabled={row.acertoPixValue <= 0}
-                          onCheckedChange={(c) =>
-                            handleToggleAcerto(row.orderId, c as boolean)
-                          }
-                          className="data-[state=checked]:bg-blue-600 border-blue-600"
-                        />
-                      </TableCell>
-
-                      {/* Recebimento Column */}
-                      <TableCell className="text-right font-mono bg-green-50/20">
-                        {row.recebimentoPixValue > 0 ? (
-                          <span className="text-green-700 font-semibold">
-                            R$ {formatCurrency(row.recebimentoPixValue)}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center bg-green-50/20">
-                        <Checkbox
-                          checked={row.recebimentoPixConfirmed}
-                          disabled={row.recebimentoPixValue <= 0}
-                          onCheckedChange={(c) =>
-                            handleToggleRecebimento(row.orderId, c as boolean)
-                          }
-                          className="data-[state=checked]:bg-green-600 border-green-600"
-                        />
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="h-24 text-center">
+                        <div className="flex justify-center items-center">
+                          <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
+                          Carregando...
+                        </div>
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                  ) : filteredAcertos.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={7}
+                        className="h-24 text-center text-muted-foreground"
+                      >
+                        Nenhum registro encontrado.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredAcertos.map((row) => (
+                      <TableRow key={row.orderId} className="hover:bg-muted/30">
+                        <TableCell className="font-mono">
+                          #{row.orderId}
+                        </TableCell>
+                        <TableCell className="font-mono text-muted-foreground">
+                          {row.clientCode}
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {row.clientName}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {row.employeeName}
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-medium">
+                          R$ {formatCurrency(row.value)}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex flex-col items-center justify-center gap-1">
+                            <Checkbox
+                              checked={row.isConfirmed}
+                              onCheckedChange={(c) =>
+                                handleToggleAcerto(row.orderId, c as boolean)
+                              }
+                              className="data-[state=checked]:bg-green-600 border-gray-400"
+                            />
+                            <span
+                              className={cn(
+                                'text-[10px] font-bold uppercase',
+                                row.isConfirmed
+                                  ? 'text-green-600'
+                                  : 'text-red-500',
+                              )}
+                            >
+                              {row.isConfirmed ? 'Confirmado' : 'A Confirmar'}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {row.confirmedBy || '-'}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>Pix Recebimentos Avulsos</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="rounded-md border overflow-auto">
+              <Table>
+                <TableHeader className="bg-muted/50">
+                  <TableRow>
+                    <TableHead className="w-[100px]">Pedido</TableHead>
+                    <TableHead className="w-[80px]">Cód.</TableHead>
+                    <TableHead>Forma</TableHead>
+                    <TableHead className="text-right">
+                      Valor Avulso Receb.
+                    </TableHead>
+                    <TableHead className="text-center w-[180px]">
+                      Conf. Receb. Avulso
+                    </TableHead>
+                    <TableHead>Confirmado Por</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="h-24 text-center">
+                        <div className="flex justify-center items-center">
+                          <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
+                          Carregando...
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredRecebimentos.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={6}
+                        className="h-24 text-center text-muted-foreground"
+                      >
+                        Nenhum registro encontrado.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredRecebimentos.map((row) => (
+                      <TableRow key={row.id} className="hover:bg-muted/30">
+                        <TableCell className="font-mono">
+                          #{row.orderId}
+                        </TableCell>
+                        <TableCell className="font-mono text-muted-foreground">
+                          {row.clientCode}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {row.paymentMethod}
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-medium">
+                          R$ {formatCurrency(row.value)}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex flex-col items-center justify-center gap-1">
+                            <Checkbox
+                              checked={row.isConfirmed}
+                              onCheckedChange={(c) =>
+                                handleToggleRecebimento(row.id, c as boolean)
+                              }
+                              className="data-[state=checked]:bg-green-600 border-gray-400"
+                            />
+                            <span
+                              className={cn(
+                                'text-[10px] font-bold uppercase',
+                                row.isConfirmed
+                                  ? 'text-green-600'
+                                  : 'text-red-500',
+                              )}
+                            >
+                              {row.isConfirmed ? 'Confirmado' : 'A Confirmar'}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {row.confirmedBy || '-'}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

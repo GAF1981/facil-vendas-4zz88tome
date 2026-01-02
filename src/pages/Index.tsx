@@ -47,7 +47,6 @@ export default function Index() {
       description: 'Realizar acertos e captações de vendas',
       color: 'text-green-600',
     },
-    // Removed Complemento
     {
       title: 'Recebimento',
       icon: ArrowDownCircle,
@@ -56,9 +55,9 @@ export default function Index() {
       color: 'text-emerald-600',
     },
     {
-      title: 'Recebimento Pix',
+      title: 'Pix',
       icon: QrCode,
-      to: '/pix-recebimento',
+      to: '/pix',
       description: 'Confirmação de pagamentos Pix',
       color: 'text-teal-600',
     },

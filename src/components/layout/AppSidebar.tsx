@@ -61,15 +61,14 @@ export function AppSidebar() {
       url: '/acerto',
       icon: Scale,
     },
-    // Removed Complemento
     {
       title: 'Recebimento',
       url: '/recebimento',
       icon: ArrowDownCircle,
     },
     {
-      title: 'Recebimento Pix',
-      url: '/pix-recebimento',
+      title: 'Pix',
+      url: '/pix',
       icon: QrCode,
     },
     {
