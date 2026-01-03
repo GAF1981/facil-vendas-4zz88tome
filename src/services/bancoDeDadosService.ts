@@ -371,6 +371,28 @@ export const bancoDeDadosService = {
     return result
   },
 
+  async getOrderDetails(orderId: number) {
+    const { data: itemsData, error: itemsError } = await supabase
+      .from('BANCO_DE_DADOS')
+      .select('*')
+      .eq('"NÚMERO DO PEDIDO"', orderId)
+
+    if (itemsError) throw itemsError
+
+    // It's possible to have orders without items (e.g. only payments in some legacy cases), but rare.
+    // If no items, we might still want to print payments?
+    // Let's assume we need at least one row to get client/date info from items usually.
+
+    const { data: paymentsData, error: paymentsError } = await supabase
+      .from('RECEBIMENTOS')
+      .select('*')
+      .eq('venda_id', orderId)
+
+    if (paymentsError) throw paymentsError
+
+    return { items: itemsData || [], payments: paymentsData || [] }
+  },
+
   async saveTransaction(
     client: ClientRow,
     employee: Employee,

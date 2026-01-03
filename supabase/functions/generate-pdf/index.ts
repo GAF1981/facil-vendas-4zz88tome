@@ -411,41 +411,77 @@ serve(async (req) => {
       drawText('Nenhum pagamento registrado.', margins.left, y, { size: 9 })
     }
 
-    y -= 20
+    y -= 40
 
-    // Signature Section
+    // Signatures Section (Always visible)
+    checkPageBreak(120)
+
+    const sigLineLength = 200
+    const sigY = y
+    const sigTextY = y - 15
+
+    // Client Signature Line (Left)
+    page.drawLine({
+      start: { x: margins.left, y: sigY },
+      end: { x: margins.left + sigLineLength, y: sigY },
+      thickness: 1,
+      color: rgb(0, 0, 0),
+    })
+    drawText(
+      'Assinatura do Cliente',
+      margins.left + sigLineLength / 2,
+      sigTextY,
+      {
+        size: 9,
+        align: 'center',
+      },
+    )
+
+    // Employee Signature Line (Right)
+    page.drawLine({
+      start: { x: width - margins.right - sigLineLength, y: sigY },
+      end: { x: width - margins.right, y: sigY },
+      thickness: 1,
+      color: rgb(0, 0, 0),
+    })
+    drawText(
+      'Assinatura do Funcionário',
+      width - margins.right - sigLineLength / 2,
+      sigTextY,
+      {
+        size: 9,
+        align: 'center',
+      },
+    )
+
+    // Overlay Client Signature Image if present
     if (signature) {
-      checkPageBreak(100)
-      drawText('ASSINATURA DO CLIENTE', margins.left, y, {
-        size: 10,
-        font: fontBold,
-      })
-      y -= 10
-      // Decode Base64 and embed
       try {
         const base64Data = signature.split(',')[1]
         const imageBytes = Uint8Array.from(atob(base64Data), (c) =>
           c.charCodeAt(0),
         )
         const image = await pdfDoc.embedPng(imageBytes)
-        const imageDims = image.scale(0.5)
+        // Scale down to fit nicely above the line
+        const imageDims = image.scale(0.4)
 
-        y -= imageDims.height
+        // Position centered over the left line, slightly above
+        const imgX = margins.left + (sigLineLength - imageDims.width) / 2
+        const imgY = sigY + 5
+
         page.drawImage(image, {
-          x: margins.left,
-          y: y,
+          x: imgX,
+          y: imgY,
           width: imageDims.width,
           height: imageDims.height,
         })
-        y -= 10
       } catch (e) {
-        drawText('(Erro ao carregar assinatura)', margins.left, y, {
-          size: 8,
-          color: rgb(1, 0, 0),
-        })
-        y -= 20
+        console.error('Error embedding signature image:', e)
+        // Ignore error, just print line
       }
     }
+
+    y -= 50
 
     if (history && history.length > 0) {
       checkPageBreak(150)

@@ -17,11 +17,13 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { bancoDeDadosService } from '@/services/bancoDeDadosService'
+import { acertoService } from '@/services/acertoService'
 import { formatCurrency } from '@/lib/formatters'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { FileClock, Loader2, AlertCircle, Search } from 'lucide-react'
+import { FileClock, Loader2, AlertCircle, Search, FileText } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useToast } from '@/hooks/use-toast'
 
 export interface HistoryRow {
   id: number
@@ -67,6 +69,8 @@ export function AcertoHistoryTable({
   const [history, setHistory] = useState<HistoryRow[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
+  const [printingId, setPrintingId] = useState<number | null>(null)
+  const { toast } = useToast()
 
   // State for Payment Details Modal
   const [selectedPaymentDetails, setSelectedPaymentDetails] = useState<
@@ -132,6 +136,37 @@ export function AcertoHistoryTable({
     setDetailsOpen(true)
   }
 
+  const handleReprint = async (order: HistoryRow) => {
+    setPrintingId(order.id)
+    try {
+      const pdfBlob = await acertoService.reprintOrder(order.id)
+      const url = window.URL.createObjectURL(pdfBlob)
+      const a = document.createElement('a')
+      a.href = url
+      const dateStr = order.data || format(new Date(), 'yyyy-MM-dd')
+      a.download = `Pedido ${order.id} - ${dateStr}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.URL.revokeObjectURL(url)
+
+      toast({
+        title: 'PDF Gerado',
+        description: 'O download do PDF foi iniciado.',
+        className: 'bg-green-50 border-green-200 text-green-900',
+      })
+    } catch (err) {
+      console.error('Error reprinting order:', err)
+      toast({
+        title: 'Erro ao gerar PDF',
+        description: 'Não foi possível gerar o PDF do pedido.',
+        variant: 'destructive',
+      })
+    } finally {
+      setPrintingId(null)
+    }
+  }
+
   // Check if any order is currently selected
   const isAnyOrderSelected =
     selectedOrderId !== null && selectedOrderId !== undefined
@@ -190,6 +225,9 @@ export function AcertoHistoryTable({
                     <TableHead className="text-right text-red-600">
                       Débito
                     </TableHead>
+                    <TableHead className="w-[80px] text-center">
+                      Ações
+                    </TableHead>
                     {onSelectOrder && (
                       <TableHead className="w-[50px]"></TableHead>
                     )}
@@ -199,7 +237,7 @@ export function AcertoHistoryTable({
                   {history.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={onSelectOrder ? 9 : 8}
+                        colSpan={onSelectOrder ? 10 : 9}
                         className="h-24 text-center text-muted-foreground"
                       >
                         Nenhum histórico encontrado para este cliente.
@@ -279,6 +317,22 @@ export function AcertoHistoryTable({
                             )}
                           >
                             R$ {formatCurrency(row.debito)}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleReprint(row)}
+                              disabled={printingId === row.id}
+                              title="Gerar PDF do Pedido"
+                            >
+                              {printingId === row.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <FileText className="h-4 w-4 text-muted-foreground hover:text-primary" />
+                              )}
+                            </Button>
                           </TableCell>
                           {onSelectOrder && (
                             <TableCell>
