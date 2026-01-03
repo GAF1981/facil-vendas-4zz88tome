@@ -28,7 +28,7 @@ import {
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Save, Printer, Loader2 } from 'lucide-react'
-import { format } from 'date-fns'
+import { parseCurrency } from '@/lib/formatters'
 
 export default function AcertoPage() {
   const { employee: loggedInUser } = useUserStore()
@@ -122,19 +122,15 @@ export default function AcertoPage() {
   }, [client])
 
   // Calculations
-  const totalStockValue = items.reduce(
-    (acc, item) => acc + item.saldoFinal * item.precoUnitario,
-    0,
-  )
   const totalSalesValue = items.reduce(
     (acc, item) => acc + item.valorVendido,
     0,
   )
 
-  // Discount Logic
-  const discountStr = client?.Desconto || '30%'
-  const discountVal = parseFloat(discountStr.replace('%', '')) || 0
-  const discountFactor = discountVal / 100
+  // Discount Logic using consistent service logic
+  const discountStr = client?.Desconto || '0'
+  const discountVal = parseCurrency(discountStr.replace('%', ''))
+  const discountFactor = discountVal > 1 ? discountVal / 100 : discountVal
   const discountAmount = totalSalesValue * discountFactor
   const amountToPay = totalSalesValue - discountAmount
 
@@ -167,7 +163,7 @@ export default function AcertoPage() {
           payments,
           monthlyAverage,
           orderNumber: nextOrderNumber,
-          issuerName: loggedInUser?.nome_completo, // Add issuer name for preview
+          issuerName: loggedInUser?.nome_completo,
         },
         { preview: true, signature },
       )
@@ -240,11 +236,8 @@ export default function AcertoPage() {
           ),
           payments,
           monthlyAverage,
-          // Note: The actual order number is generated in DB, but we use the preview one for PDF generation context if needed,
-          // or we should fetch the actual one. For simplicity in this flow, we assume sequential.
-          // Ideally, saveTransaction returns the ID.
-          orderNumber: nextOrderNumber, // Use preview for PDF or refetch
-          issuerName: loggedInUser?.nome_completo, // Add issuer name for final PDF
+          orderNumber: nextOrderNumber,
+          issuerName: loggedInUser?.nome_completo,
         },
         { preview: false, signature },
       )
@@ -332,13 +325,8 @@ export default function AcertoPage() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="space-y-6">
-              <AcertoStockSummary totalStockValue={totalStockValue} />
-              <AcertoSalesSummary
-                totalSalesValue={totalSalesValue}
-                discountPercentage={discountVal}
-                discountAmount={discountAmount}
-                netValue={amountToPay}
-              />
+              <AcertoStockSummary items={items} />
+              <AcertoSalesSummary items={items} client={client} />
             </div>
             <div className="space-y-6">
               <AcertoPaymentSummary

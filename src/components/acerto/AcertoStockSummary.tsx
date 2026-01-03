@@ -4,23 +4,26 @@ import { formatCurrency } from '@/lib/formatters'
 import { Package, Coins, ArrowRightLeft } from 'lucide-react'
 
 interface AcertoStockSummaryProps {
-  items: AcertoItem[]
+  items?: AcertoItem[]
 }
 
-export function AcertoStockSummary({ items }: AcertoStockSummaryProps) {
-  const totalSaldoInicial = items.reduce(
+export function AcertoStockSummary({ items = [] }: AcertoStockSummaryProps) {
+  // Safe fallback to ensure items is an array before reducing
+  const safeItems = Array.isArray(items) ? items : []
+
+  const totalSaldoInicial = safeItems.reduce(
     (acc, item) => acc + (item.saldoInicial || 0),
     0,
   )
-  const totalSaldoFinal = items.reduce(
+  const totalSaldoFinal = safeItems.reduce(
     (acc, item) => acc + (item.saldoFinal || 0),
     0,
   )
-  const valorEstoqueInicial = items.reduce(
+  const valorEstoqueInicial = safeItems.reduce(
     (acc, item) => acc + (item.saldoInicial || 0) * (item.precoUnitario || 0),
     0,
   )
-  const valorEstoqueFinal = items.reduce(
+  const valorEstoqueFinal = safeItems.reduce(
     (acc, item) => acc + (item.saldoFinal || 0) * (item.precoUnitario || 0),
     0,
   )

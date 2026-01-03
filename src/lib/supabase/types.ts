@@ -979,6 +979,10 @@ export type Database = {
           grupo: string
         }[]
       }
+      increment_rota_items_on_finalize: {
+        Args: { p_rota_id: number }
+        Returns: undefined
+      }
       login_by_email: {
         Args: { p_email: string }
         Returns: {
