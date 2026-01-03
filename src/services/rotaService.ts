@@ -2,7 +2,6 @@ import { supabase } from '@/lib/supabase/client'
 import { Rota, RotaItem } from '@/types/rota'
 import { cobrancaService } from './cobrancaService'
 import { pendenciasService } from './pendenciasService'
-import { reportsService } from './reportsService'
 import { parseISO } from 'date-fns'
 import { parseCurrency } from '@/lib/formatters'
 
@@ -166,12 +165,11 @@ export const rotaService = {
   },
 
   async getFullRotaData(rota: Rota | null) {
-    // 1. Fetch all Clients
+    // 1. Fetch all Clients (Removed limit to ensure full visibility)
     const { data: clients, error: clientsError } = await supabase
       .from('CLIENTES')
       .select('*')
       .order('CODIGO', { ascending: false })
-      .limit(10000)
 
     if (clientsError) throw clientsError
     if (!clients) return []
@@ -191,21 +189,8 @@ export const rotaService = {
       items.forEach((i) => rotaItemsMap.set(i.cliente_id, i))
     }
 
-    // 5. Fetch Projections and Order Info
-    const reportData = await reportsService.getProjectionsReport()
-    const projectionMap = new Map<
-      number,
-      { projection: number; orderId: number }
-    >()
-
-    reportData.forEach((row) => {
-      if (!projectionMap.has(row.clientCode)) {
-        projectionMap.set(row.clientCode, {
-          projection: row.projection || 0,
-          orderId: row.orderId,
-        })
-      }
-    })
+    // 5. Fetch Projections (Using RPC as requested)
+    const projectionMap = await this.getClientProjections()
 
     // 6. Fetch Products for pricing
     const { data: products } = await supabase
@@ -218,18 +203,23 @@ export const rotaService = {
       if (p.CODIGO) priceMap.set(p.CODIGO, parseCurrency(p.PREÇO))
     })
 
-    // 7. Fetch basic Summary Stats
+    // 7. Fetch basic Summary Stats + Last Order Number
     const { data: dbStats } = await supabase
       .from('BANCO_DE_DADOS')
       .select(
-        '"CÓDIGO DO CLIENTE", "DATA DO ACERTO", "SALDO FINAL", "VALOR VENDIDO", "COD. PRODUTO"',
+        '"CÓDIGO DO CLIENTE", "DATA DO ACERTO", "SALDO FINAL", "VALOR VENDIDO", "COD. PRODUTO", "NÚMERO DO PEDIDO"',
       )
-      .order('"DATA DO ACERTO"', { ascending: false })
+      .order('DATA DO ACERTO', { ascending: false })
       .limit(50000)
 
     const statsMap = new Map<
       number,
-      { lastDate: string | null; stockValue: number; history: Set<string> }
+      {
+        lastDate: string | null
+        stockValue: number
+        history: Set<string>
+        lastOrderId: number | null
+      }
     >()
 
     dbStats?.forEach((row: any) => {
@@ -237,7 +227,12 @@ export const rotaService = {
       if (!cid) return
 
       if (!statsMap.has(cid)) {
-        statsMap.set(cid, { lastDate: null, stockValue: 0, history: new Set() })
+        statsMap.set(cid, {
+          lastDate: null,
+          stockValue: 0,
+          history: new Set(),
+          lastOrderId: null,
+        })
       }
       const entry = statsMap.get(cid)!
 
@@ -247,6 +242,10 @@ export const rotaService = {
 
       if (!entry.lastDate) {
         entry.lastDate = row['DATA DO ACERTO']
+        // Since we are ordered by date desc, the first row with date is the last acerto
+        if (row['NÚMERO DO PEDIDO']) {
+          entry.lastOrderId = row['NÚMERO DO PEDIDO']
+        }
       }
 
       if (row['DATA DO ACERTO'] === entry.lastDate) {
@@ -277,10 +276,7 @@ export const rotaService = {
       const debtInfo = debtMap.get(cid)
       const rotaItem = rotaItemsMap.get(cid)
       const stats = statsMap.get(cid)
-      const projInfo = projectionMap.get(cid)
-
-      const projecao = projInfo?.projection || 0
-      const numero_pedido = projInfo?.orderId || null
+      const projection = projectionMap.get(cid) || 0
 
       return {
         rowNumber: index + 1,
@@ -292,8 +288,8 @@ export const rotaService = {
         debito: debtInfo?.totalDebt || 0,
         quant_debito: debtInfo?.orderCount || 0,
         data_acerto: stats?.lastDate || null,
-        projecao: projecao,
-        numero_pedido: numero_pedido,
+        projecao: projection,
+        numero_pedido: stats?.lastOrderId || null,
         estoque: stats?.stockValue || 0,
         has_pendency: pendencyMap.has(cid),
         is_completed: completedSet.has(cid),

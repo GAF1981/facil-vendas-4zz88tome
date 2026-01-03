@@ -52,11 +52,7 @@ export const RotaTableRow = memo(function RotaTableRow({
         {row.rowNumber}
       </TableCell>
 
-      {/* Projection Column - Highlighted */}
-      <TableCell className="text-right font-mono font-bold text-blue-700 text-[11px] py-0.5 px-2 bg-blue-50/30 border-r">
-        {row.projecao > 0 ? `R$ ${formatCurrency(row.projecao)}` : '-'}
-      </TableCell>
-
+      {/* Moved Vendedor */}
       <TableCell className="py-0.5 px-1 border-r">
         <Select
           value={row.vendedor_id?.toString() || 'none'}
@@ -123,7 +119,12 @@ export const RotaTableRow = memo(function RotaTableRow({
         </div>
       </TableCell>
 
-      {/* Stock Column - Now showing Monetary Value */}
+      {/* Projection Column - Repositioned Here */}
+      <TableCell className="text-right font-mono font-bold text-blue-700 text-[11px] py-0.5 px-2 bg-blue-50/30 border-r">
+        {row.projecao > 0 ? `R$ ${formatCurrency(row.projecao)}` : '-'}
+      </TableCell>
+
+      {/* Stock Column */}
       <TableCell className="text-right font-mono text-[10px] py-0.5 px-2 border-r">
         {row.estoque > 0 ? `R$ ${formatCurrency(row.estoque)}` : '-'}
       </TableCell>
@@ -192,6 +193,7 @@ export const RotaTableRow = memo(function RotaTableRow({
         {row.numero_pedido ? `#${row.numero_pedido}` : '-'}
       </TableCell>
 
+      {/* x na Rota Column */}
       <TableCell className="py-0.5 px-1 border-r">
         <Input
           type="number"

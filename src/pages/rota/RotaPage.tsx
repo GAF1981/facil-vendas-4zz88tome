@@ -391,10 +391,10 @@ export default function RotaPage() {
   )
 
   const handleExportExcel = () => {
+    // Updated header order to match UI
     const headers = [
       'Código',
       'Nome',
-      'Fantasia',
       'Projeção',
       'Vendedor',
       'Débito',
@@ -407,11 +407,12 @@ export default function RotaPage() {
       'CEP',
       'Tipo',
       'N. Pedido',
-      'X na Rota',
+      'x na Rota',
       'Nota Fiscal',
       'Boleto',
       'Agregado',
       'Rota',
+      'Fantasia',
     ]
 
     const rowsToExport = sortedRows.slice(0, 500)
@@ -424,7 +425,6 @@ export default function RotaPage() {
         return [
           row.client.CODIGO,
           `"${(row.client['NOME CLIENTE'] || '').replace(/"/g, '""')}"`,
-          `"${(row.client['RAZÃO SOCIAL'] || '').replace(/"/g, '""')}"`,
           row.projecao.toFixed(2).replace('.', ','),
           `"${sellerName}"`,
           row.debito.toFixed(2).replace('.', ','),
@@ -442,6 +442,7 @@ export default function RotaPage() {
           row.boleto ? 'Sim' : 'Não',
           row.agregado ? 'Sim' : 'Não',
           `"${(row.client['GRUPO ROTA'] || '').replace(/"/g, '""')}"`,
+          `"${(row.client['RAZÃO SOCIAL'] || '').replace(/"/g, '""')}"`,
         ].join(';')
       }),
     ].join('\n')

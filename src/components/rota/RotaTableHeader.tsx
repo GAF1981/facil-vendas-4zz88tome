@@ -25,7 +25,7 @@ export function RotaTableHeader({ sortConfig, onSort }: RotaTableHeaderProps) {
   const renderHead = (label: string, key: string, className?: string) => (
     <TableHead
       className={cn(
-        'bg-muted/80 cursor-pointer hover:bg-muted transition-colors select-none group h-8 px-2 text-[10px] uppercase font-bold text-muted-foreground tracking-tight border-b border-r last:border-r-0',
+        'bg-muted/95 backdrop-blur-sm cursor-pointer hover:bg-muted transition-colors select-none group h-8 px-2 text-[10px] uppercase font-bold text-muted-foreground tracking-tight border-b border-r last:border-r-0 sticky top-0 z-20 shadow-sm',
         className,
       )}
       onClick={() => onSort(key)}
@@ -38,21 +38,25 @@ export function RotaTableHeader({ sortConfig, onSort }: RotaTableHeaderProps) {
   )
 
   return (
-    <TableHeader className="sticky top-0 z-20 shadow-sm bg-muted/80 backdrop-blur-sm">
+    <TableHeader className="sticky top-0 z-20">
       <TableRow className="hover:bg-transparent">
         {/* Main Info Columns */}
         {renderHead('#', 'rowNumber', 'w-[40px] text-center')}
-        {renderHead(
-          'PROJEÇÃO',
-          'projecao',
-          'w-[90px] text-right text-blue-700 bg-blue-50/50',
-        )}
+
         {renderHead('Vendedor', 'vendedor', 'w-[120px]')}
         {renderHead('Débito', 'debito', 'w-[90px] text-right')}
         {renderHead('Qtd.D.', 'quant_debito', 'w-[60px] text-center')}
         {renderHead('Dt. Acerto', 'data_acerto', 'w-[90px]')}
         {renderHead('CÓD.', 'codigo', 'w-[70px]')}
         {renderHead('NOME CLIENTE', 'nome', 'min-w-[180px]')}
+
+        {/* Repositioned Projection Column */}
+        {renderHead(
+          'PROJEÇÃO',
+          'projecao',
+          'w-[90px] text-right text-blue-700 bg-blue-50/95',
+        )}
+
         {renderHead('Estoque (R$)', 'estoque', 'w-[90px] text-right')}
 
         {/* Address and Contact Info */}
@@ -70,8 +74,9 @@ export function RotaTableHeader({ sortConfig, onSort }: RotaTableHeaderProps) {
         {renderHead(
           'N. Pedido',
           'numero_pedido',
-          'w-[80px] text-center bg-blue-50/50',
+          'w-[80px] text-center bg-blue-50/95',
         )}
+        {/* x na Rota Column (Already present, maintained) */}
         {renderHead('xRota', 'x_na_rota', 'w-[60px] text-center')}
         {renderHead('N. Fiscal', 'nota_fiscal', 'w-[90px]')}
         {renderHead('Bol.', 'boleto', 'w-[50px] text-center')}

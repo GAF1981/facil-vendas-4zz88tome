@@ -1,4 +1,4 @@
-import { Table, TableBody } from '@/components/ui/table'
+import { TableBody } from '@/components/ui/table'
 import { RotaRow, SortConfig } from '@/types/rota'
 import { Employee } from '@/types/employee'
 import { RotaTableHeader } from './RotaTableHeader'
@@ -24,7 +24,7 @@ export function RotaTable({
   return (
     <div className="rounded-md border bg-card flex flex-col h-full overflow-hidden shadow-sm">
       <div className="flex-1 overflow-auto relative">
-        <Table className="min-w-[1800px] border-separate border-spacing-0">
+        <table className="w-full caption-bottom text-sm min-w-[1800px] border-separate border-spacing-0">
           <RotaTableHeader sortConfig={sortConfig} onSort={onSort} />
           <TableBody>
             {rows.map((row) => (
@@ -47,7 +47,7 @@ export function RotaTable({
               </tr>
             )}
           </TableBody>
-        </Table>
+        </table>
       </div>
     </div>
   )
