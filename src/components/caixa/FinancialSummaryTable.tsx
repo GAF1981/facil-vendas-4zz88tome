@@ -10,7 +10,7 @@ import { CaixaSummaryRow } from '@/services/caixaService'
 import { formatCurrency } from '@/lib/formatters'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { Eye, PlusCircle } from 'lucide-react'
+import { Eye, PlusCircle, FileText } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -23,6 +23,7 @@ interface FinancialSummaryTableProps {
   onViewReceipts: (employeeId: number, employeeName: string) => void
   onViewExpenses: (employeeId: number, employeeName: string) => void
   onAddExpense: (employeeId: number, employeeName: string) => void
+  onGeneratePdf: (employeeId: number, employeeName: string) => void
 }
 
 export function FinancialSummaryTable({
@@ -30,6 +31,7 @@ export function FinancialSummaryTable({
   onViewReceipts,
   onViewExpenses,
   onAddExpense,
+  onGeneratePdf,
 }: FinancialSummaryTableProps) {
   const totalRecebido = data.reduce((acc, row) => acc + row.totalRecebido, 0)
   const totalDespesas = data.reduce((acc, row) => acc + row.totalDespesas, 0)
@@ -66,7 +68,31 @@ export function FinancialSummaryTable({
               {data.map((row) => (
                 <TableRow key={row.funcionarioId} className="hover:bg-muted/30">
                   <TableCell className="font-medium">
-                    {row.funcionarioNome}
+                    <div className="flex items-center gap-2">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-muted-foreground hover:text-blue-600"
+                              onClick={() =>
+                                onGeneratePdf(
+                                  row.funcionarioId,
+                                  row.funcionarioNome,
+                                )
+                              }
+                            >
+                              <FileText className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Gerar Relatório PDF</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      {row.funcionarioNome}
+                    </div>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">

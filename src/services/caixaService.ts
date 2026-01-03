@@ -17,6 +17,8 @@ export interface ReceiptDetail {
   clienteNome: string
   valor: number
   forma: string
+  funcionarioNome?: string // Added for global list
+  funcionarioId?: number
 }
 
 export interface ExpenseDetail {
@@ -25,13 +27,12 @@ export interface ExpenseDetail {
   grupo: string
   detalhamento: string
   valor: number
+  funcionarioNome?: string // Added for global list
+  funcionarioId?: number
 }
 
 export const caixaService = {
   async saveDespesa(despesa: DespesaInsert) {
-    // If Data is not provided, use current time. If provided (from date picker), use it.
-    // The date picker usually gives a Date object or YYYY-MM-DD string.
-    // We should ensure we store it as ISO string.
     const dataToSave = despesa.Data
       ? new Date(despesa.Data).toISOString()
       : new Date().toISOString()
@@ -51,7 +52,6 @@ export const caixaService = {
     const routeStart = parseISO(rota.data_inicio)
     const routeEnd = rota.data_fim ? parseISO(rota.data_fim) : new Date()
 
-    // 1. Fetch Employees
     const { data: employees, error: empError } = await supabase
       .from('FUNCIONARIOS')
       .select('id, nome_completo')
@@ -69,7 +69,6 @@ export const caixaService = {
       })
     })
 
-    // 2. Fetch Receipts (RECEBIMENTOS) within Route range
     const { data: receipts, error: recError } = await supabase
       .from('RECEBIMENTOS')
       .select('funcionario_id, valor_pago, created_at')
@@ -96,7 +95,6 @@ export const caixaService = {
       }
     })
 
-    // 3. Fetch Expenses (DESPESAS) within Route range
     const { data: expenses, error: expError } = await supabase
       .from('DESPESAS')
       .select('funcionario_id, Valor, Data')
@@ -137,6 +135,88 @@ export const caixaService = {
     return result
   },
 
+  async getAllReceipts(rota: Rota): Promise<ReceiptDetail[]> {
+    const routeStart = parseISO(rota.data_inicio)
+    const routeEnd = rota.data_fim ? parseISO(rota.data_fim) : new Date()
+
+    const { data, error } = await supabase
+      .from('RECEBIMENTOS')
+      .select(
+        `
+        id,
+        created_at,
+        valor_pago,
+        forma_pagamento,
+        funcionario_id,
+        CLIENTES ( "NOME CLIENTE" ),
+        FUNCIONARIOS ( nome_completo )
+      `,
+      )
+      .gte('created_at', rota.data_inicio)
+      .gt('valor_pago', 0)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+
+    const filtered = (data || []).filter((rec) => {
+      if (!rec.created_at) return false
+      const recDate = parseISO(rec.created_at)
+      const isAfterStart =
+        isAfter(recDate, routeStart) || isEqual(recDate, routeStart)
+      const isBeforeEnd =
+        isBefore(recDate, routeEnd) || isEqual(recDate, routeEnd)
+      return isAfterStart && (rota.data_fim ? isBeforeEnd : true)
+    })
+
+    return filtered.map((rec: any) => ({
+      id: rec.id,
+      data: rec.created_at,
+      clienteNome: rec.CLIENTES?.['NOME CLIENTE'] || 'N/D',
+      valor: rec.valor_pago,
+      forma: rec.forma_pagamento,
+      funcionarioNome: rec.FUNCIONARIOS?.nome_completo || 'N/D',
+      funcionarioId: rec.funcionario_id,
+    }))
+  },
+
+  async getAllExpenses(rota: Rota): Promise<ExpenseDetail[]> {
+    const routeStart = parseISO(rota.data_inicio)
+    const routeEnd = rota.data_fim ? parseISO(rota.data_fim) : new Date()
+
+    const { data, error } = await supabase
+      .from('DESPESAS')
+      .select(
+        `
+        *,
+        FUNCIONARIOS ( nome_completo )
+      `,
+      )
+      .gte('Data', rota.data_inicio)
+      .order('Data', { ascending: false })
+
+    if (error) throw error
+
+    const filtered = (data || []).filter((exp) => {
+      if (!exp.Data) return false
+      const expDate = parseISO(exp.Data)
+      const isAfterStart =
+        isAfter(expDate, routeStart) || isEqual(expDate, routeStart)
+      const isBeforeEnd =
+        isBefore(expDate, routeEnd) || isEqual(expDate, routeEnd)
+      return isAfterStart && (rota.data_fim ? isBeforeEnd : true)
+    })
+
+    return filtered.map((exp: any) => ({
+      id: exp.id,
+      data: exp.Data || '',
+      grupo: exp['Grupo de Despesas'],
+      detalhamento: exp.Detalhamento,
+      valor: Number(exp.Valor),
+      funcionarioNome: exp.FUNCIONARIOS?.nome_completo || 'N/D',
+      funcionarioId: exp.funcionario_id,
+    }))
+  },
+
   async getEmployeeReceipts(
     employeeId: number,
     rota: Rota,
@@ -164,7 +244,6 @@ export const caixaService = {
 
     if (error) throw error
 
-    // Filter by date range strictly in JS
     const filtered = (data || []).filter((rec) => {
       if (!rec.created_at) return false
       const recDate = parseISO(rec.created_at)
@@ -200,7 +279,6 @@ export const caixaService = {
 
     if (error) throw error
 
-    // Filter by date range strictly in JS
     const filtered = (data || []).filter((exp) => {
       if (!exp.Data) return false
       const expDate = parseISO(exp.Data)

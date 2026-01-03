@@ -97,20 +97,31 @@ serve(async (req) => {
       return false
     }
 
-    // --- CASH SUMMARY REPORT LOGIC ---
-    if (reportType === 'cash-summary') {
+    // --- CASH SUMMARY & EMPLOYEE REPORT LOGIC ---
+    if (
+      reportType === 'cash-summary' ||
+      reportType === 'employee-cash-summary'
+    ) {
       const {
-        summaryData,
+        summaryData, // Used only for cash-summary
+        receipts,
+        expenses,
         totalRecebido,
         totalDespesas,
         totalSaldo,
         periodo,
         date,
+        employee, // Used only for employee-cash-summary
       } = body
+
+      const title =
+        reportType === 'employee-cash-summary'
+          ? `RELATORIO DE CAIXA - ${employee?.name.toUpperCase()}`
+          : 'RESUMO GERAL DE CAIXA'
 
       // Header
       drawText('FACIL VENDAS', margins.left, y, { size: 18, font: fontBold })
-      drawText('RESUMO DE CAIXA', width - margins.right, y, {
+      drawText(title, width - margins.right, y, {
         size: 14,
         font: fontBold,
         align: 'right',
@@ -141,7 +152,7 @@ serve(async (req) => {
       })
 
       const textY = y - 20
-      drawText('TOTAL GERAL', width / 2, textY, {
+      drawText('TOTAL DO PERIODO', width / 2, textY, {
         size: 12,
         font: fontBold,
         align: 'center',
@@ -191,85 +202,254 @@ serve(async (req) => {
 
       y -= boxHeight + 30
 
-      // Table Header
-      drawText('BALANCO POR FUNCIONARIO', margins.left, y, {
+      // If general summary, show summary table
+      if (
+        reportType === 'cash-summary' &&
+        summaryData &&
+        summaryData.length > 0
+      ) {
+        drawText('BALANCO POR FUNCIONARIO', margins.left, y, {
+          size: 12,
+          font: fontBold,
+        })
+        y -= 15
+
+        const colX = {
+          name: margins.left,
+          rec: 250,
+          exp: 350,
+          bal: 450,
+        }
+
+        const drawSummaryHeaders = (currY: number) => {
+          drawText('Funcionario', colX.name, currY, {
+            size: 10,
+            font: fontBold,
+          })
+          drawText('Recebido', colX.rec, currY, {
+            size: 10,
+            font: fontBold,
+            align: 'right',
+          })
+          drawText('Despesas', colX.exp, currY, {
+            size: 10,
+            font: fontBold,
+            align: 'right',
+          })
+          drawText('Saldo', colX.bal, currY, {
+            size: 10,
+            font: fontBold,
+            align: 'right',
+          })
+          return currY - 15
+        }
+
+        y = drawSummaryHeaders(y)
+        page.drawLine({
+          start: { x: margins.left, y },
+          end: { x: width - margins.right, y },
+          thickness: 1,
+          color: rgb(0, 0, 0),
+        })
+        y -= 15
+
+        for (const row of summaryData) {
+          if (checkPageBreak(20)) {
+            y = drawSummaryHeaders(y)
+            page.drawLine({
+              start: { x: margins.left, y },
+              end: { x: width - margins.right, y },
+              thickness: 1,
+              color: rgb(0, 0, 0),
+            })
+            y -= 15
+          }
+
+          drawText(row.funcionarioNome, colX.name, y, { size: 10 })
+          drawText(`R$ ${formatCurrency(row.totalRecebido)}`, colX.rec, y, {
+            size: 10,
+            align: 'right',
+            color: rgb(0, 0.5, 0),
+          })
+          drawText(`R$ ${formatCurrency(row.totalDespesas)}`, colX.exp, y, {
+            size: 10,
+            align: 'right',
+            color: rgb(0.8, 0, 0),
+          })
+          drawText(`R$ ${formatCurrency(row.saldo)}`, colX.bal, y, {
+            size: 10,
+            font: fontBold,
+            align: 'right',
+            color: row.saldo >= 0 ? rgb(0, 0, 0.8) : rgb(0.8, 0, 0),
+          })
+
+          y -= 20
+        }
+        y -= 20
+      }
+
+      // Detailed Receipts Table
+      checkPageBreak(60)
+      drawText('DETALHAMENTO DE RECEITAS (ENTRADAS)', margins.left, y, {
         size: 12,
         font: fontBold,
       })
       y -= 15
 
-      const colX = {
-        name: margins.left,
-        rec: 250,
-        exp: 350,
-        bal: 450,
+      const recColX = {
+        date: margins.left,
+        client: margins.left + 90,
+        desc: margins.left + 250,
+        val: width - margins.right,
       }
 
-      const drawTableHeaders = (currY: number) => {
-        drawText('Funcionario', colX.name, currY, { size: 10, font: fontBold })
-        drawText('Recebido', colX.rec, currY, {
-          size: 10,
+      const drawReceiptHeaders = (currY: number) => {
+        drawText('Data/Hora', recColX.date, currY, { size: 9, font: fontBold })
+        drawText('Cliente', recColX.client, currY, { size: 9, font: fontBold })
+        drawText('Forma/Func.', recColX.desc, currY, {
+          size: 9,
+          font: fontBold,
+        })
+        drawText('Valor', recColX.val, currY, {
+          size: 9,
           font: fontBold,
           align: 'right',
         })
-        drawText('Despesas', colX.exp, currY, {
-          size: 10,
-          font: fontBold,
-          align: 'right',
-        })
-        drawText('Saldo', colX.bal, currY, {
-          size: 10,
-          font: fontBold,
-          align: 'right',
-        })
-        return currY - 15
+        return currY - 10
       }
 
-      y = drawTableHeaders(y)
+      y = drawReceiptHeaders(y)
       page.drawLine({
         start: { x: margins.left, y },
         end: { x: width - margins.right, y },
-        thickness: 1,
-        color: rgb(0, 0, 0),
+        thickness: 0.5,
+        color: rgb(0.5, 0.5, 0.5),
       })
       y -= 15
 
-      for (const row of summaryData) {
-        if (checkPageBreak(20)) {
-          y = drawTableHeaders(y)
-          page.drawLine({
-            start: { x: margins.left, y },
-            end: { x: width - margins.right, y },
-            thickness: 1,
-            color: rgb(0, 0, 0),
+      if (receipts && receipts.length > 0) {
+        for (const rec of receipts) {
+          if (checkPageBreak(20)) {
+            y = drawReceiptHeaders(y)
+            page.drawLine({
+              start: { x: margins.left, y },
+              end: { x: width - margins.right, y },
+              thickness: 0.5,
+              color: rgb(0.5, 0.5, 0.5),
+            })
+            y -= 15
+          }
+
+          drawText(safeFormatDate(rec.data), recColX.date, y, { size: 8 })
+          drawText(rec.clienteNome.substring(0, 30), recColX.client, y, {
+            size: 8,
           })
-          y -= 15
+          drawText(
+            `${rec.forma}${rec.funcionarioNome ? ` - ${rec.funcionarioNome.split(' ')[0]}` : ''}`,
+            recColX.desc,
+            y,
+            { size: 8 },
+          )
+          drawText(formatCurrency(rec.valor), recColX.val, y, {
+            size: 8,
+            align: 'right',
+            color: rgb(0, 0.5, 0),
+          })
+          y -= 12
         }
-
-        drawText(row.funcionarioNome, colX.name, y, { size: 10 })
-        drawText(`R$ ${formatCurrency(row.totalRecebido)}`, colX.rec, y, {
-          size: 10,
-          align: 'right',
-          color: rgb(0, 0.5, 0),
+      } else {
+        drawText('Nenhum recebimento registrado.', margins.left, y, {
+          size: 9,
+          color: rgb(0.5, 0.5, 0.5),
         })
-        drawText(`R$ ${formatCurrency(row.totalDespesas)}`, colX.exp, y, {
-          size: 10,
-          align: 'right',
-          color: rgb(0.8, 0, 0),
-        })
-        drawText(`R$ ${formatCurrency(row.saldo)}`, colX.bal, y, {
-          size: 10,
-          font: fontBold,
-          align: 'right',
-          color: row.saldo >= 0 ? rgb(0, 0, 0.8) : rgb(0.8, 0, 0),
-        })
-
-        y -= 20
+        y -= 15
       }
 
-      // End of Cash Summary
+      y -= 20
+
+      // Detailed Expenses Table
+      checkPageBreak(60)
+      drawText('DETALHAMENTO DE DESPESAS (SAIDAS)', margins.left, y, {
+        size: 12,
+        font: fontBold,
+      })
+      y -= 15
+
+      const expColX = {
+        date: margins.left,
+        group: margins.left + 60,
+        detail: margins.left + 160,
+        val: width - margins.right,
+      }
+
+      const drawExpenseHeaders = (currY: number) => {
+        drawText('Data', expColX.date, currY, { size: 9, font: fontBold })
+        drawText('Grupo', expColX.group, currY, { size: 9, font: fontBold })
+        drawText('Detalhamento', expColX.detail, currY, {
+          size: 9,
+          font: fontBold,
+        })
+        drawText('Valor', expColX.val, currY, {
+          size: 9,
+          font: fontBold,
+          align: 'right',
+        })
+        return currY - 10
+      }
+
+      y = drawExpenseHeaders(y)
+      page.drawLine({
+        start: { x: margins.left, y },
+        end: { x: width - margins.right, y },
+        thickness: 0.5,
+        color: rgb(0.5, 0.5, 0.5),
+      })
+      y -= 15
+
+      if (expenses && expenses.length > 0) {
+        for (const exp of expenses) {
+          if (checkPageBreak(20)) {
+            y = drawExpenseHeaders(y)
+            page.drawLine({
+              start: { x: margins.left, y },
+              end: { x: width - margins.right, y },
+              thickness: 0.5,
+              color: rgb(0.5, 0.5, 0.5),
+            })
+            y -= 15
+          }
+
+          // Format date shorter for expense list
+          const shortDate = formatDate(exp.data.split('T')[0])
+
+          drawText(shortDate, expColX.date, y, { size: 8 })
+          drawText(exp.grupo, expColX.group, y, { size: 8 })
+
+          let detailText = exp.detalhamento
+          if (exp.funcionarioNome) {
+            detailText += ` (${exp.funcionarioNome.split(' ')[0]})`
+          }
+          drawText(detailText.substring(0, 40), expColX.detail, y, { size: 8 })
+
+          drawText(formatCurrency(exp.valor), expColX.val, y, {
+            size: 8,
+            align: 'right',
+            color: rgb(0.8, 0, 0),
+          })
+          y -= 12
+        }
+      } else {
+        drawText('Nenhuma despesa registrada.', margins.left, y, {
+          size: 9,
+          color: rgb(0.5, 0.5, 0.5),
+        })
+        y -= 15
+      }
+
+      // End of Report
     } else {
-      // --- EXISTING LOGIC FOR RECEIPTS/ACERTOS ---
+      // --- EXISTING LOGIC FOR RECEIPTS/ACERTOS (Keep as is, but logic is in previous file content, need to preserve it) ---
+      // Re-implementing the existing logic for receipts/acertos to ensure it's not lost
       const {
         client,
         employee,
@@ -288,6 +468,9 @@ serve(async (req) => {
         orderNumber,
         isReceipt,
       } = body
+
+      // ... (Rest of existing logic for receipts)
+      // Since I need to output the FULL file content, I must include the existing logic here.
 
       // PDF Preview Warning
       if (preview) {

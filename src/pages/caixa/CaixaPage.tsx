@@ -15,7 +15,12 @@ import {
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { resumoAcertosService } from '@/services/resumoAcertosService'
-import { caixaService, CaixaSummaryRow } from '@/services/caixaService'
+import {
+  caixaService,
+  CaixaSummaryRow,
+  ReceiptDetail,
+  ExpenseDetail,
+} from '@/services/caixaService'
 import { formatCurrency, safeFormatDate } from '@/lib/formatters'
 import {
   Loader2,
@@ -36,12 +41,17 @@ import { ExpenseFormDialog } from '@/components/caixa/ExpenseFormDialog'
 import { ReceiptsDetailDialog } from '@/components/caixa/ReceiptsDetailDialog'
 import { ExpensesDetailDialog } from '@/components/caixa/ExpensesDetailDialog'
 import { supabase } from '@/lib/supabase/client'
+import { RevenueGallery } from '@/components/caixa/RevenueGallery'
+import { ExpenseGallery } from '@/components/caixa/ExpenseGallery'
 
 export default function CaixaPage() {
   const [loading, setLoading] = useState(true)
   const [routes, setRoutes] = useState<Rota[]>([])
   const [selectedRouteId, setSelectedRouteId] = useState<string>('')
-  const [data, setData] = useState<CaixaSummaryRow[]>([])
+  const [summaryData, setSummaryData] = useState<CaixaSummaryRow[]>([])
+  const [allReceipts, setAllReceipts] = useState<ReceiptDetail[]>([])
+  const [allExpenses, setAllExpenses] = useState<ExpenseDetail[]>([])
+
   const { toast } = useToast()
 
   // State for Dialogs
@@ -88,8 +98,16 @@ export default function CaixaPage() {
     try {
       const route = routes.find((r) => r.id.toString() === routeId)
       if (route) {
-        const summary = await caixaService.getFinancialSummary(route)
-        setData(summary)
+        // Parallel data fetching for performance
+        const [summary, receipts, expenses] = await Promise.all([
+          caixaService.getFinancialSummary(route),
+          caixaService.getAllReceipts(route),
+          caixaService.getAllExpenses(route),
+        ])
+
+        setSummaryData(summary)
+        setAllReceipts(receipts)
+        setAllExpenses(expenses)
       }
     } catch (error) {
       console.error(error)
@@ -116,8 +134,14 @@ export default function CaixaPage() {
   const selectedRoute = routes.find((r) => r.id.toString() === selectedRouteId)
 
   // Totals for Cards
-  const totalRecebido = data.reduce((acc, row) => acc + row.totalRecebido, 0)
-  const totalDespesas = data.reduce((acc, row) => acc + row.totalDespesas, 0)
+  const totalRecebido = summaryData.reduce(
+    (acc, row) => acc + row.totalRecebido,
+    0,
+  )
+  const totalDespesas = summaryData.reduce(
+    (acc, row) => acc + row.totalDespesas,
+    0,
+  )
   const totalSaldo = totalRecebido - totalDespesas
 
   // Handlers
@@ -139,24 +163,68 @@ export default function CaixaPage() {
     setViewExpenses({ open: true, empId, empName })
   }
 
-  const handleGeneratePdf = async () => {
+  // --- PDF GENERATION LOGIC ---
+  const handleGeneratePdf = async (
+    employeeId?: number,
+    employeeName?: string,
+  ) => {
     if (!selectedRoute) return
     setGeneratingPdf(true)
     try {
+      const reportType = employeeId ? 'employee-cash-summary' : 'cash-summary'
+      const employeeData = employeeId
+        ? {
+            id: employeeId,
+            name: employeeName,
+          }
+        : null
+
+      // Filter lists if it's for specific employee, otherwise pass all
+      const receiptsToPass = employeeId
+        ? allReceipts.filter((r) => r.funcionarioId === employeeId)
+        : allReceipts
+
+      const expensesToPass = employeeId
+        ? allExpenses.filter((e) => e.funcionarioId === employeeId)
+        : allExpenses
+
+      // If for employee, calculate their specific totals
+      let specificTotalRecebido = totalRecebido
+      let specificTotalDespesas = totalDespesas
+      let specificTotalSaldo = totalSaldo
+
+      if (employeeId) {
+        const empSummary = summaryData.find(
+          (s) => s.funcionarioId === employeeId,
+        )
+        if (empSummary) {
+          specificTotalRecebido = empSummary.totalRecebido
+          specificTotalDespesas = empSummary.totalDespesas
+          specificTotalSaldo = empSummary.saldo
+        } else {
+          specificTotalRecebido = 0
+          specificTotalDespesas = 0
+          specificTotalSaldo = 0
+        }
+      }
+
       const { data: pdfBlob, error } = await supabase.functions.invoke(
         'generate-pdf',
         {
           body: {
-            reportType: 'cash-summary',
-            summaryData: data,
-            totalRecebido,
-            totalDespesas,
-            totalSaldo,
+            reportType,
+            summaryData: employeeId ? [] : summaryData, // Only needed for general
+            receipts: receiptsToPass,
+            expenses: expensesToPass,
+            totalRecebido: specificTotalRecebido,
+            totalDespesas: specificTotalDespesas,
+            totalSaldo: specificTotalSaldo,
             periodo: {
               inicio: selectedRoute.data_inicio,
               fim: selectedRoute.data_fim,
               rotaId: selectedRoute.id,
             },
+            employee: employeeData,
             date: new Date().toISOString(),
           },
         },
@@ -170,10 +238,11 @@ export default function CaixaPage() {
         const url = window.URL.createObjectURL(blob)
         const link = document.createElement('a')
         link.href = url
-        link.setAttribute(
-          'download',
-          `Resumo_Caixa_Rota_${selectedRoute.id}.pdf`,
-        )
+        const filename = employeeId
+          ? `Caixa_${employeeName}_Rota_${selectedRoute.id}.pdf`
+          : `Resumo_Geral_Caixa_Rota_${selectedRoute.id}.pdf`
+
+        link.setAttribute('download', filename)
         document.body.appendChild(link)
         link.click()
         link.remove()
@@ -182,7 +251,7 @@ export default function CaixaPage() {
       console.error(err)
       toast({
         title: 'Erro ao gerar PDF',
-        description: 'Não foi possível gerar o resumo de caixa.',
+        description: 'Não foi possível gerar o relatório.',
         variant: 'destructive',
       })
     } finally {
@@ -208,7 +277,7 @@ export default function CaixaPage() {
         </div>
         <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           <Button
-            onClick={handleGeneratePdf}
+            onClick={() => handleGeneratePdf()}
             variant="outline"
             disabled={generatingPdf || loading || !selectedRoute}
             className="flex-1 sm:flex-none"
@@ -218,7 +287,7 @@ export default function CaixaPage() {
             ) : (
               <Printer className="mr-2 h-4 w-4" />
             )}
-            Gerar Resumo PDF
+            Resumo Geral PDF
           </Button>
           <Button
             onClick={handleOpenGeneralExpense}
@@ -344,6 +413,12 @@ export default function CaixaPage() {
         </Card>
       </div>
 
+      {/* Detail Galleries */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <RevenueGallery items={allReceipts} />
+        <ExpenseGallery items={allExpenses} />
+      </div>
+
       {/* Main Summary Table */}
       <Card>
         <CardHeader>
@@ -356,10 +431,11 @@ export default function CaixaPage() {
             </div>
           ) : (
             <FinancialSummaryTable
-              data={data}
+              data={summaryData}
               onAddExpense={handleAddExpense}
               onViewReceipts={handleViewReceipts}
               onViewExpenses={handleViewExpenses}
+              onGeneratePdf={handleGeneratePdf}
             />
           )}
         </CardContent>
