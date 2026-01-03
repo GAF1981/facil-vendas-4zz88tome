@@ -64,9 +64,11 @@ export const bancoDeDadosService = {
 
   async getMaxNumeroPedido() {
     // Using quotes for column with spaces to be safe
+    // Crucial fix: Filter out NULL values to avoid incorrect ordering (NULLS FIRST)
     const { data, error } = await supabase
       .from('BANCO_DE_DADOS')
       .select('"NÚMERO DO PEDIDO"')
+      .not('"NÚMERO DO PEDIDO"', 'is', null)
       .order('"NÚMERO DO PEDIDO"', { ascending: false })
       .limit(1)
       .maybeSingle()
@@ -76,13 +78,13 @@ export const bancoDeDadosService = {
   },
 
   // This is primarily for PREVIEW in the UI.
-  // For actual saving, use reserveNextOrderNumber() to guarantee uniqueness.
+  // For actual saving, use reserveNextOrderNumber() to guarantee uniqueness/consistency.
   async getNextNumeroPedido() {
     const max = await this.getMaxNumeroPedido()
     return max + 1
   },
 
-  // Calls the RPC to get the next sequence value safely
+  // Calls the RPC to get the next order number safely
   async reserveNextOrderNumber(): Promise<number> {
     const { data, error } = await supabase.rpc('get_next_order_number')
     if (error) throw error

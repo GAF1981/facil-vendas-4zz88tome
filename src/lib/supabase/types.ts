@@ -886,6 +886,7 @@ export type Database = {
           total_saldo_inicial_valor: number
         }[]
       }
+      get_next_order_number: { Args: never; Returns: number }
       get_unique_client_routes: {
         Args: never
         Returns: {
