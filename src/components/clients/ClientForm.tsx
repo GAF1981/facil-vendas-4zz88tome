@@ -666,14 +666,13 @@ export function ClientForm({
                   name="Desconto"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Desconto Padrão</FormLabel>
+                      <FormLabel>Desconto Padrão (30% - 50%)</FormLabel>
                       <FormControl>
                         <Input
                           placeholder="%"
                           {...field}
                           value={field.value || ''}
-                          readOnly
-                          className="bg-muted"
+                          // ENABLED Editing
                         />
                       </FormControl>
                       <FormMessage />

@@ -368,6 +368,28 @@ export default function CaixaPage() {
         </CardContent>
       </Card>
 
+      {/* Main Summary Table - MOVED UP */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Balanço por Funcionário</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <FinancialSummaryTable
+              data={summaryData}
+              onAddExpense={handleAddExpense}
+              onViewReceipts={handleViewReceipts}
+              onViewExpenses={handleViewExpenses}
+              onGeneratePdf={handleGeneratePdf}
+            />
+          )}
+        </CardContent>
+      </Card>
+
       {/* Financial Totalizers */}
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="bg-green-50/50 border-green-200">
@@ -418,28 +440,6 @@ export default function CaixaPage() {
         <RevenueGallery items={allReceipts} />
         <ExpenseGallery items={allExpenses} />
       </div>
-
-      {/* Main Summary Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Balanço por Funcionário</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="flex justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          ) : (
-            <FinancialSummaryTable
-              data={summaryData}
-              onAddExpense={handleAddExpense}
-              onViewReceipts={handleViewReceipts}
-              onViewExpenses={handleViewExpenses}
-              onGeneratePdf={handleGeneratePdf}
-            />
-          )}
-        </CardContent>
-      </Card>
 
       <ExpenseFormDialog
         open={isExpenseDialogOpen}

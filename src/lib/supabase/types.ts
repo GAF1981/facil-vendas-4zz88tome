@@ -517,6 +517,30 @@ export type Database = {
           },
         ]
       }
+      permissoes: {
+        Row: {
+          acesso: boolean
+          created_at: string
+          id: number
+          modulo: string
+          setor: string
+        }
+        Insert: {
+          acesso?: boolean
+          created_at?: string
+          id?: number
+          modulo: string
+          setor: string
+        }
+        Update: {
+          acesso?: boolean
+          created_at?: string
+          id?: number
+          modulo?: string
+          setor?: string
+        }
+        Relationships: []
+      }
       PIX: {
         Row: {
           banco_pix: string

@@ -40,6 +40,7 @@ export interface ClientDebt {
   status: 'VENCIDO' | 'A VENCER' | 'SEM DÉBITO'
   lastAcertoDate: string
   oldestOverdueDate: string | null
+  earliestUnpaidDate: string | null // NEW: For determining "A VENCER" date
   orders: OrderDebt[]
   // New classification fields
   group: string | null

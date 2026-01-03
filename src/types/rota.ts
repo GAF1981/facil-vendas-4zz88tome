@@ -36,6 +36,9 @@ export interface RotaRow {
   has_pendency: boolean
   // Meta
   is_completed: boolean // Green status
+  // Status Logic
+  earliest_unpaid_date: string | null
+  vencimento_status: 'VENCIDO' | 'A VENCER' | 'PAGO' | 'SEM DÉBITO'
 }
 
 export interface RotaFilterState {
@@ -53,6 +56,7 @@ export interface RotaFilterState {
   projecao_min: string
   estoque_min: string
   estoque_max: string
+  vencimento_status: string | 'todos'
 }
 
 export type SortDirection = 'asc' | 'desc'

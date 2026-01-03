@@ -282,6 +282,7 @@ export const cobrancaService = {
           status: 'SEM DÉBITO', // Default start
           lastAcertoDate: order.date,
           oldestOverdueDate: null,
+          earliestUnpaidDate: null,
           orders: [],
         })
       }
@@ -304,6 +305,7 @@ export const cobrancaService = {
         clientDebt.lastAcertoDate = order.date
       }
 
+      // Track oldest overdue for VENCIDO logic
       if (oldestOverdue) {
         if (
           !clientDebt.oldestOverdueDate ||
@@ -312,6 +314,22 @@ export const cobrancaService = {
           clientDebt.oldestOverdueDate = oldestOverdue
         }
       }
+
+      // Track earliest unpaid date for A VENCER logic
+      installments.forEach((inst) => {
+        if (
+          inst.status !== 'PAGO' &&
+          inst.vencimento &&
+          inst.valorRegistrado > inst.valorPago
+        ) {
+          if (
+            !clientDebt.earliestUnpaidDate ||
+            inst.vencimento < clientDebt.earliestUnpaidDate
+          ) {
+            clientDebt.earliestUnpaidDate = inst.vencimento
+          }
+        }
+      })
     })
 
     return Array.from(clientsMap.values()).sort((a, b) => {

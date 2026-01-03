@@ -61,6 +61,7 @@ export function RotaFilters({
       projecao_min: '',
       estoque_min: '',
       estoque_max: '',
+      vencimento_status: 'todos',
     })
   }
 
@@ -220,7 +221,25 @@ export function RotaFilters({
             </Popover>
           </div>
 
-          {/* Debito Filter - NEW */}
+          {/* Vencimento Filter - NEW */}
+          <div className="col-span-1 md:col-span-2 lg:col-span-1 xl:col-span-1 flex flex-col gap-1.5">
+            <Label className="text-xs font-semibold truncate">Status</Label>
+            <Select
+              value={filters.vencimento_status}
+              onValueChange={(v) => handleChange('vencimento_status', v)}
+            >
+              <SelectTrigger className="h-9 text-xs px-2">
+                <SelectValue placeholder="All" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                <SelectItem value="VENCIDO">Vencido</SelectItem>
+                <SelectItem value="A VENCER">A Vencer</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Debito Filter */}
           <div className="col-span-1 md:col-span-2 lg:col-span-1 xl:col-span-1 flex flex-col gap-1.5">
             <Label className="text-xs font-semibold truncate">
               Débito Min (R$)

@@ -6,7 +6,7 @@ import {
   CardTitle,
   CardDescription,
 } from '@/components/ui/card'
-import { Switch } from '@/components/ui/switch'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Table,
   TableBody,
@@ -117,7 +117,7 @@ export default function PermissionsPage() {
                       <TableRow key={perm.id}>
                         <TableCell className="py-2">{perm.modulo}</TableCell>
                         <TableCell className="text-right py-2">
-                          <Switch
+                          <Checkbox
                             checked={perm.acesso}
                             onCheckedChange={() =>
                               handleToggle(perm.id, perm.acesso)

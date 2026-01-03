@@ -125,23 +125,25 @@ export function RotaTable({
             <TableHead className="min-w-[200px]">Cliente</TableHead>
             <SortableHeader label="Projeção" sortKey="projecao" align="right" />
             <SortableHeader label="Estoque" sortKey="estoque" align="right" />
-            <SortableHeader label="x Rota" sortKey="x_na_rota" align="center" />
-            <TableHead className="w-[160px]">Vendedor</TableHead>
-            <TableHead className="w-[80px] text-center">Boleto</TableHead>
-            <TableHead className="w-[80px] text-center">Agreg.</TableHead>
             <TableHead className="w-[100px] text-right">Débito</TableHead>
+            <TableHead className="w-[140px] text-center">Vencimento</TableHead>
             <SortableHeader
               label="Data Acerto"
               sortKey="data_acerto"
               align="center"
             />
+            {/* Reordered Columns */}
+            <TableHead className="w-[160px]">Vendedor</TableHead>
+            <TableHead className="w-[80px] text-center">Boleto</TableHead>
+            <TableHead className="w-[80px] text-center">Agreg.</TableHead>
+            <SortableHeader label="x Rota" sortKey="x_na_rota" align="center" />
             <TableHead className="w-[50px]"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {visibleRows.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={11} className="h-24 text-center">
+              <TableCell colSpan={12} className="h-24 text-center">
                 Nenhum cliente encontrado.
               </TableCell>
             </TableRow>
@@ -183,22 +185,50 @@ export function RotaTable({
                 <TableCell className="text-right text-xs font-mono">
                   {formatCurrency(row.estoque)}
                 </TableCell>
-                <TableCell className="p-2">
-                  <Input
-                    type="number"
-                    min={0}
-                    className="h-7 w-16 mx-auto text-center text-xs px-1"
-                    value={row.x_na_rota || 0}
-                    disabled={disabled}
-                    onChange={(e) =>
-                      onUpdateRow(
-                        row.client.CODIGO,
-                        'x_na_rota',
-                        parseInt(e.target.value) || 0,
-                      )
-                    }
-                  />
+                <TableCell
+                  className={cn(
+                    'text-right text-xs font-mono',
+                    row.debito > 0
+                      ? 'text-red-600 font-medium'
+                      : 'text-muted-foreground',
+                  )}
+                >
+                  {row.debito > 0 ? formatCurrency(row.debito) : '-'}
                 </TableCell>
+                {/* Vencimento Column */}
+                <TableCell className="text-center text-xs">
+                  {row.earliest_unpaid_date ? (
+                    <div className="flex flex-col items-center gap-1">
+                      <span>
+                        {format(
+                          parseISO(row.earliest_unpaid_date),
+                          'dd/MM/yyyy',
+                        )}
+                      </span>
+                      {row.vencimento_status === 'VENCIDO' && (
+                        <Badge
+                          variant="destructive"
+                          className="h-4 px-1 py-0 text-[10px]"
+                        >
+                          VENCIDO
+                        </Badge>
+                      )}
+                      {row.vencimento_status === 'A VENCER' && (
+                        <Badge className="h-4 px-1 py-0 text-[10px] bg-green-600 hover:bg-green-700">
+                          A VENCER
+                        </Badge>
+                      )}
+                    </div>
+                  ) : (
+                    '-'
+                  )}
+                </TableCell>
+                <TableCell className="text-center text-xs">
+                  {row.data_acerto
+                    ? format(parseISO(row.data_acerto), 'dd/MM/yy')
+                    : '-'}
+                </TableCell>
+                {/* Reordered Columns */}
                 <TableCell className="p-2">
                   <Select
                     value={row.vendedor_id?.toString() || 'none'}
@@ -250,20 +280,21 @@ export function RotaTable({
                     />
                   </div>
                 </TableCell>
-                <TableCell
-                  className={cn(
-                    'text-right text-xs font-mono',
-                    row.debito > 0
-                      ? 'text-red-600 font-medium'
-                      : 'text-muted-foreground',
-                  )}
-                >
-                  {row.debito > 0 ? formatCurrency(row.debito) : '-'}
-                </TableCell>
-                <TableCell className="text-center text-xs">
-                  {row.data_acerto
-                    ? format(parseISO(row.data_acerto), 'dd/MM/yy')
-                    : '-'}
+                <TableCell className="p-2">
+                  <Input
+                    type="number"
+                    min={0}
+                    className="h-7 w-16 mx-auto text-center text-xs px-1"
+                    value={row.x_na_rota || 0}
+                    disabled={disabled}
+                    onChange={(e) =>
+                      onUpdateRow(
+                        row.client.CODIGO,
+                        'x_na_rota',
+                        parseInt(e.target.value) || 0,
+                      )
+                    }
+                  />
                 </TableCell>
                 <TableCell className="text-center p-2">
                   {row.has_pendency && (
@@ -286,7 +317,7 @@ export function RotaTable({
           {visibleCount < rows.length && (
             <TableRow ref={loadMoreRef}>
               <TableCell
-                colSpan={11}
+                colSpan={12}
                 className="h-12 text-center text-muted-foreground text-xs"
               >
                 Carregando mais clientes...

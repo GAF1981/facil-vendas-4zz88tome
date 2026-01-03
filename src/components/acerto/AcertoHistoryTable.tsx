@@ -24,6 +24,7 @@ import { ptBR } from 'date-fns/locale'
 import { FileClock, Loader2, AlertCircle, Search, FileText } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
+import { useUserStore } from '@/stores/useUserStore'
 
 export interface HistoryRow {
   id: number
@@ -38,8 +39,8 @@ export interface HistoryRow {
   methods?: string
   paymentDetails?: {
     method: string
-    value: number // This is 'Valor Pago'
-    registeredValue?: number // This is 'Valor Registrado'
+    value: number
+    registeredValue?: number
     date?: string
     employeeName?: string
     createdAt?: string
@@ -66,6 +67,7 @@ export function AcertoHistoryTable({
   onSelectOrder,
   selectedOrderId,
 }: AcertoHistoryTableProps) {
+  const { employee: loggedInUser } = useUserStore()
   const [history, setHistory] = useState<HistoryRow[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
@@ -139,7 +141,10 @@ export function AcertoHistoryTable({
   const handleReprint = async (order: HistoryRow) => {
     setPrintingId(order.id)
     try {
-      const pdfBlob = await acertoService.reprintOrder(order.id)
+      const pdfBlob = await acertoService.reprintOrder(
+        order.id,
+        loggedInUser?.nome_completo,
+      )
       const url = window.URL.createObjectURL(pdfBlob)
       const a = document.createElement('a')
       a.href = url

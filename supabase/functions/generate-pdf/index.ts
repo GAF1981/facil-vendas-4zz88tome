@@ -103,7 +103,7 @@ serve(async (req) => {
       reportType === 'employee-cash-summary'
     ) {
       const {
-        summaryData, // Used only for cash-summary
+        summaryData,
         receipts,
         expenses,
         totalRecebido,
@@ -111,7 +111,7 @@ serve(async (req) => {
         totalSaldo,
         periodo,
         date,
-        employee, // Used only for employee-cash-summary
+        employee,
       } = body
 
       const title =
@@ -419,7 +419,6 @@ serve(async (req) => {
             y -= 15
           }
 
-          // Format date shorter for expense list
           const shortDate = formatDate(exp.data.split('T')[0])
 
           drawText(shortDate, expColX.date, y, { size: 8 })
@@ -445,11 +444,8 @@ serve(async (req) => {
         })
         y -= 15
       }
-
-      // End of Report
     } else {
-      // --- EXISTING LOGIC FOR RECEIPTS/ACERTOS (Keep as is, but logic is in previous file content, need to preserve it) ---
-      // Re-implementing the existing logic for receipts/acertos to ensure it's not lost
+      // --- RECEIPT / ACERTO LOGIC ---
       const {
         client,
         employee,
@@ -467,10 +463,8 @@ serve(async (req) => {
         signature,
         orderNumber,
         isReceipt,
+        issuerName, // NEW: Passed for enhanced identification
       } = body
-
-      // ... (Rest of existing logic for receipts)
-      // Since I need to output the FULL file content, I must include the existing logic here.
 
       // PDF Preview Warning
       if (preview) {
@@ -482,7 +476,7 @@ serve(async (req) => {
             size: 14,
             font: fontBold,
             align: 'center',
-            color: rgb(1, 0, 0), // Red
+            color: rgb(1, 0, 0),
           },
         )
         y -= 10
@@ -502,6 +496,8 @@ serve(async (req) => {
 
       const dateStr = new Date(date).toLocaleString('pt-BR')
       drawText(`Data: ${dateStr}`, margins.left, y, { size: 10 })
+
+      // Enhanced Header: Vendedor AND Issuer
       drawText(
         `Vendedor: ${employee.nome_completo}`,
         width - margins.right,
@@ -511,7 +507,16 @@ serve(async (req) => {
           align: 'right',
         },
       )
-      y -= 15
+      y -= 12
+
+      if (issuerName) {
+        drawText(`Emissor: ${issuerName}`, width - margins.right, y, {
+          size: 9,
+          align: 'right',
+          color: rgb(0.4, 0.4, 0.4),
+        })
+      }
+      y -= 10
 
       // Order Number in Header
       if (orderNumber) {
@@ -837,10 +842,8 @@ serve(async (req) => {
             c.charCodeAt(0),
           )
           const image = await pdfDoc.embedPng(imageBytes)
-          // Scale down to fit nicely above the line
           const imageDims = image.scale(0.4)
 
-          // Position centered over the left line, slightly above
           const imgX = margins.left + (sigLineLength - imageDims.width) / 2
           const imgY = sigY + 5
 
@@ -852,7 +855,6 @@ serve(async (req) => {
           })
         } catch (e) {
           console.error('Error embedding signature image:', e)
-          // Ignore error, just print line
         }
       }
 
@@ -866,7 +868,6 @@ serve(async (req) => {
         })
         y -= 15
 
-        // Adjusted columns to include "Pedido"
         const histX = {
           id: margins.left,
           data: margins.left + 40,

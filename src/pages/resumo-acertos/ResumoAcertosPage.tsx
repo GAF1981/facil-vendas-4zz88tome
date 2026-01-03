@@ -1,11 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table,
   TableBody,
@@ -32,7 +26,6 @@ import {
   Loader2,
   RefreshCw,
   Map as MapIcon,
-  Calendar,
   DollarSign,
   ArrowLeft,
   CheckCircle,
@@ -57,8 +50,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { useUserStore } from '@/stores/useUserStore'
 
 export default function ResumoAcertosPage() {
+  const { employee: loggedInUser } = useUserStore()
   const [loading, setLoading] = useState(true)
   const [routes, setRoutes] = useState<Rota[]>([])
   const [selectedRouteId, setSelectedRouteId] = useState<string>('')
@@ -126,6 +121,13 @@ export default function ResumoAcertosPage() {
     fetchRoutes()
     fetchEmployees()
   }, [])
+
+  // Auto-filter based on logged in user
+  useEffect(() => {
+    if (loggedInUser && selectedEmployeeId === 'todos') {
+      setSelectedEmployeeId(loggedInUser.id.toString())
+    }
+  }, [loggedInUser])
 
   // Fetch data when selection changes
   useEffect(() => {

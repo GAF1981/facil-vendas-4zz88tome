@@ -93,9 +93,6 @@ export default function RecebimentoPage() {
   const handleOrderSelect = (order: HistoryRow | null) => {
     setSelectedOrder(order)
     if (order) {
-      // If order selected, we update the displayed "Saldo a Pagar" in the summary component context
-      // And we can auto-fill the payment with the remaining debt of THAT order
-      // Also reset payments to match the order debt
       if (order.debito > 0) {
         const today = new Date()
         const dueDate = format(today, 'yyyy-MM-dd')
@@ -105,15 +102,12 @@ export default function RecebimentoPage() {
           paidValue: order.debito,
           installments: 1,
           dueDate: dueDate,
-          // autoFill: true, // Removed as property doesn't exist on PaymentEntry anymore
         }
         setPayments([newEntry])
       } else {
         setPayments([])
       }
     } else {
-      // If deselected, revert to full debt and clear payments
-      // Recalculate full debt
       const debt = historyData.reduce((acc, row) => acc + row.debito, 0)
       setTotalDebt(debt)
       setPayments([])
@@ -171,14 +165,13 @@ export default function RecebimentoPage() {
       // Generate Receipt PDF
       try {
         const now = new Date()
-        // Prepare Data for Receipt (similar to AcertoPage but specifically for receipt)
         const pdfData = {
           client,
-          employee,
+          employee, // This is the vendedor associated with the transaction (passed to saveRecebimento)
           date: now.toISOString(),
           acertoTipo: 'Recebimento',
           totalVendido: selectedOrder.valorVendaTotal,
-          valorDesconto: 0, // Not relevant for receipt
+          valorDesconto: 0,
           valorAcerto: selectedOrder.saldoAPagar,
           valorPago: totalPaid,
           debito: Math.max(0, selectedOrder.debito - totalPaid),
@@ -186,14 +179,14 @@ export default function RecebimentoPage() {
           history: historyData.slice(0, 12),
           monthlyAverage,
           orderNumber: selectedOrder.id,
-          isReceipt: true, // Flag for specific receipt layout
+          isReceipt: true,
+          issuerName: employee.nome_completo, // Current user as issuer
         }
 
         const pdfBlob = await acertoService.generatePdf(pdfData, {
           preview: false,
         })
 
-        // Download
         const url = window.URL.createObjectURL(pdfBlob)
         const a = document.createElement('a')
         a.href = url
@@ -218,7 +211,6 @@ export default function RecebimentoPage() {
         className: 'bg-green-50 border-green-200 text-green-900',
       })
 
-      // Refresh history and clear payments/selection
       setPayments([])
       setSelectedOrder(null)
       setLoadingHistory(true)
@@ -236,7 +228,6 @@ export default function RecebimentoPage() {
     }
   }
 
-  // Determine what debt value to show
   const currentDebt = selectedOrder ? selectedOrder.debito : totalDebt
 
   return (
@@ -271,7 +262,6 @@ export default function RecebimentoPage() {
               loading={loadingLastAcerto}
             />
 
-            {/* Payment Section */}
             <div className="space-y-4">
               {selectedOrder ? (
                 <div className="bg-blue-50 border border-blue-200 text-blue-800 p-4 rounded-md flex items-center justify-between animate-fade-in">
@@ -337,7 +327,7 @@ export default function RecebimentoPage() {
               <AcertoHistoryTable
                 clientId={client.CODIGO}
                 monthlyAverage={monthlyAverage}
-                data={historyData} // Pass pre-fetched data
+                data={historyData}
                 onSelectOrder={handleOrderSelect}
                 selectedOrderId={selectedOrder?.id}
                 hideHeader

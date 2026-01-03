@@ -40,7 +40,6 @@ export const acertoService = {
       .insert(itemsToInsert)
 
     if (itemsError) {
-      // If items fail, we should technically rollback, but for simplicity we'll just throw
       console.error('Error inserting items:', itemsError)
       throw itemsError
     }
@@ -69,7 +68,7 @@ export const acertoService = {
     return blob as Blob
   },
 
-  async reprintOrder(orderId: number) {
+  async reprintOrder(orderId: number, issuerName?: string) {
     const { items: dbItems, payments: dbPayments } =
       await bancoDeDadosService.getOrderDetails(orderId)
 
@@ -77,7 +76,6 @@ export const acertoService = {
       throw new Error('Pedido não encontrado.')
     }
 
-    // Attempt to get context from first item
     let clientId: number | null = null
     let funcionarioName = 'Não identificado'
     let dateStr = new Date().toISOString()
@@ -90,11 +88,8 @@ export const acertoService = {
       dateStr = first['DATA DO ACERTO'] || dateStr
       descontoStr = first['DESCONTO POR GRUPO'] || '0'
     } else if (dbPayments.length > 0) {
-      // Fallback if no items (e.g. just debt payment)
       const first = dbPayments[0]
       clientId = first.cliente_id
-      // We might need to fetch employee name if not in payment
-      // Payment has funcionario_id
     }
 
     if (!clientId) throw new Error('Dados do cliente não encontrados.')
@@ -146,6 +141,7 @@ export const acertoService = {
       orderNumber: orderId,
       preview: false,
       signature: null,
+      issuerName, // Pass issuer name for reprint
     }
 
     return this.generatePdf(data)

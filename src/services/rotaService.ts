@@ -279,6 +279,23 @@ export const rotaService = {
       const stats = statsMap.get(cid)
       const projection = projectionMap.get(cid) || 0
 
+      // Calculate Status & Earliest Unpaid Date
+      let vencimentoStatus: 'VENCIDO' | 'A VENCER' | 'PAGO' | 'SEM DÉBITO' =
+        'SEM DÉBITO'
+      let earliestUnpaid: string | null = null
+
+      if (debtInfo) {
+        if (debtInfo.status === 'VENCIDO') {
+          vencimentoStatus = 'VENCIDO'
+          earliestUnpaid = debtInfo.oldestOverdueDate
+        } else if (debtInfo.status === 'A VENCER') {
+          vencimentoStatus = 'A VENCER'
+          earliestUnpaid = debtInfo.earliestUnpaidDate
+        } else {
+          vencimentoStatus = 'SEM DÉBITO'
+        }
+      }
+
       return {
         rowNumber: index + 1,
         client,
@@ -294,6 +311,8 @@ export const rotaService = {
         estoque: stats?.stockValue || 0,
         has_pendency: pendencyMap.has(cid),
         is_completed: completedSet.has(cid),
+        earliest_unpaid_date: earliestUnpaid,
+        vencimento_status: vencimentoStatus,
       }
     })
   },

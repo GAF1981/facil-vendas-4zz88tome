@@ -49,7 +49,15 @@ export const clientSchema = z.object({
   'FORMA DE PAGAMENTO': z.string().optional().nullable(),
   'NOTA FISCAL': z.string().optional().nullable(),
   EXPOSITOR: z.string().optional().nullable(),
-  Desconto: z.string().optional().nullable(),
+  Desconto: z
+    .string()
+    .optional()
+    .nullable()
+    .refine((val) => {
+      if (!val) return true
+      const num = parseFloat(val.replace('%', ''))
+      return !isNaN(num) && num >= 30 && num <= 50
+    }, 'O desconto deve estar entre 30% e 50%'),
   'DESCONTO ACESSORIO CELULAR': z.string().optional().nullable(),
   'DESCONTO BRINQUEDO': z.string().optional().nullable(),
   'DESCONTO ACESSORIO': z.string().optional().nullable(),
