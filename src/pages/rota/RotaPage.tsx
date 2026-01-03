@@ -94,7 +94,7 @@ export default function RotaPage() {
     if (!activeRota) return
     if (
       !window.confirm(
-        'Confirma o fechamento da rota atual e início de uma nova?',
+        'Confirma o fechamento da rota atual e início de uma nova? Esta ação irá incrementar o contador xRota para clientes não atendidos.',
       )
     )
       return
@@ -138,18 +138,40 @@ export default function RotaPage() {
       return
     }
 
+    let newXNaRota: number | undefined = undefined
+
+    // Automatic logic: Increment x_na_rota if seller is assigned (not removed)
+    if (field === 'vendedor_id' && value !== null) {
+      const currentRow = rows.find((r) => r.client.CODIGO === clientId)
+      if (currentRow) {
+        newXNaRota = (currentRow.x_na_rota || 0) + 1
+      }
+    }
+
     setRows((prev) =>
-      prev.map((r) =>
-        r.client.CODIGO === clientId ? { ...r, [field]: value } : r,
-      ),
+      prev.map((r) => {
+        if (r.client.CODIGO === clientId) {
+          const updated = { ...r, [field]: value }
+          if (newXNaRota !== undefined) {
+            updated.x_na_rota = newXNaRota
+          }
+          return updated
+        }
+        return r
+      }),
     )
 
     try {
-      await rotaService.upsertRotaItem({
+      const payload: any = {
         rota_id: activeRota.id,
         cliente_id: clientId,
         [field]: value,
-      })
+      }
+      if (newXNaRota !== undefined) {
+        payload.x_na_rota = newXNaRota
+      }
+
+      await rotaService.upsertRotaItem(payload)
     } catch (error) {
       console.error(error)
       toast({

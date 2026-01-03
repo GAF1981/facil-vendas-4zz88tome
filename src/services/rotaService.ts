@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase/client'
 import { Rota, RotaItem } from '@/types/rota'
 import { cobrancaService } from './cobrancaService'
 import { pendenciasService } from './pendenciasService'
-import { parseISO } from 'date-fns'
+import { parseISO, isAfter, isBefore, isEqual, startOfDay } from 'date-fns'
 import { parseCurrency } from '@/lib/formatters'
 
 export const rotaService = {
@@ -71,6 +71,18 @@ export const rotaService = {
   },
 
   async finishAndStartNewRoute(currentRotaId: number) {
+    // 0.5 Bulk update counters for active items in current route
+    // Calls the RPC function created in migration
+    const { error: rpcError } = await supabase.rpc(
+      'increment_rota_items_on_finalize',
+      { p_rota_id: currentRotaId },
+    )
+
+    if (rpcError) {
+      console.error('Error auto-incrementing x_na_rota:', rpcError)
+      // We continue even if this fails, but log it
+    }
+
     // 1. Close current route
     const { error: endError } = await supabase
       .from('ROTA')
@@ -315,5 +327,46 @@ export const rotaService = {
         vencimento_status: vencimentoStatus,
       }
     })
+  },
+
+  async checkAndDecrementXNaRota(clientId: number, settlementDate: Date) {
+    try {
+      // 1. Get active Rota
+      const activeRota = await this.getActiveRota()
+      if (!activeRota) return
+
+      // 2. Check if settlementDate is within Rota range
+      const startDate = parseISO(activeRota.data_inicio)
+      // For active rota, date must be >= start. No end date yet.
+      // We startOfDay to avoid time issues if settlementDate is same day but earlier hour?
+      // Usually settlementDate has no time in this context (coming from Acerto Page date picker)
+      const checkDate = startOfDay(settlementDate)
+      const start = startOfDay(startDate)
+
+      if (isBefore(checkDate, start)) {
+        return // Date is before rota start
+      }
+
+      // 3. Find Rota Item
+      const { data: item, error: itemError } = await supabase
+        .from('ROTA_ITEMS')
+        .select('*')
+        .eq('rota_id', activeRota.id)
+        .eq('cliente_id', clientId)
+        .maybeSingle()
+
+      if (itemError) throw itemError
+      if (!item) return
+
+      // 4. Decrement
+      const newX = (item.x_na_rota || 0) - 1
+
+      await supabase
+        .from('ROTA_ITEMS')
+        .update({ x_na_rota: newX })
+        .eq('id', item.id)
+    } catch (error) {
+      console.error('Error decrementing x_na_rota:', error)
+    }
   },
 }

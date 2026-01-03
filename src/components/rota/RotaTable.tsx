@@ -125,7 +125,7 @@ export function RotaTable({
             <TableHead className="min-w-[200px]">Cliente</TableHead>
             <SortableHeader label="Projeção" sortKey="projecao" align="right" />
             <SortableHeader label="Estoque" sortKey="estoque" align="right" />
-            <TableHead className="w-[100px] text-right">Débito</TableHead>
+            <SortableHeader label="Débito" sortKey="debito" align="right" />
             <TableHead className="w-[140px] text-center">Vencimento</TableHead>
             <SortableHeader
               label="Data Acerto"

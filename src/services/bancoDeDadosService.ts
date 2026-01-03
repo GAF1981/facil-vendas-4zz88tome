@@ -7,6 +7,7 @@ import { parseCurrency, formatCurrency } from '@/lib/formatters'
 import { format, parseISO, differenceInDays } from 'date-fns'
 import { PaymentEntry } from '@/types/payment'
 import { RecebimentoInsert } from '@/types/recebimento'
+import { rotaService } from '@/services/rotaService'
 
 export const bancoDeDadosService = {
   async hasOutstandingBalance(clienteId: number): Promise<boolean> {
@@ -584,6 +585,14 @@ export const bancoDeDadosService = {
       if (nfError) {
         console.error('Error inserting nota fiscal record:', nfError)
       }
+    }
+
+    // 7. Check Rota and Decrement x_na_rota if applicable (New Feature)
+    try {
+      await rotaService.checkAndDecrementXNaRota(client.CODIGO, date)
+    } catch (rotaError) {
+      console.error('Error updating Rota counter on settlement:', rotaError)
+      // Do not block the transaction success
     }
   },
 }
