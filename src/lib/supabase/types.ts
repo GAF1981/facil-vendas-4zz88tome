@@ -377,6 +377,41 @@ export type Database = {
         }
         Relationships: []
       }
+      DESPESAS: {
+        Row: {
+          Data: string | null
+          Detalhamento: string
+          funcionario_id: number
+          'Grupo de Despesas': string
+          id: number
+          Valor: number
+        }
+        Insert: {
+          Data?: string | null
+          Detalhamento: string
+          funcionario_id: number
+          'Grupo de Despesas': string
+          id?: number
+          Valor: number
+        }
+        Update: {
+          Data?: string | null
+          Detalhamento?: string
+          funcionario_id?: number
+          'Grupo de Despesas'?: string
+          id?: number
+          Valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'DESPESAS_funcionario_id_fkey'
+            columns: ['funcionario_id']
+            isOneToOne: false
+            referencedRelation: 'FUNCIONARIOS'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       FUNCIONARIOS: {
         Row: {
           apelido: string | null

@@ -11,9 +11,10 @@ export interface Despesa {
   funcionario_nome?: string
 }
 
-export type DespesaInsert = Omit<Despesa, 'id' | 'Data' | 'funcionario_nome'>
+export type DespesaInsert = Omit<Despesa, 'id' | 'funcionario_nome'>
 
 export const despesaSchema = z.object({
+  data: z.string().optional(), // Date string from input type="date"
   grupo: z.enum(['Alimentação', 'Combustível', 'Outros'], {
     required_error: 'Selecione um grupo',
   }),

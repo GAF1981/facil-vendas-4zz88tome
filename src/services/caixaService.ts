@@ -11,14 +11,37 @@ export interface CaixaSummaryRow {
   saldo: number
 }
 
+export interface ReceiptDetail {
+  id: number
+  data: string
+  clienteNome: string
+  valor: number
+  forma: string
+}
+
+export interface ExpenseDetail {
+  id: number
+  data: string
+  grupo: string
+  detalhamento: string
+  valor: number
+}
+
 export const caixaService = {
   async saveDespesa(despesa: DespesaInsert) {
+    // If Data is not provided, use current time. If provided (from date picker), use it.
+    // The date picker usually gives a Date object or YYYY-MM-DD string.
+    // We should ensure we store it as ISO string.
+    const dataToSave = despesa.Data
+      ? new Date(despesa.Data).toISOString()
+      : new Date().toISOString()
+
     const { error } = await supabase.from('DESPESAS').insert({
       'Grupo de Despesas': despesa['Grupo de Despesas'],
       Detalhamento: despesa.Detalhamento,
       Valor: despesa.Valor,
       funcionario_id: despesa.funcionario_id,
-      Data: new Date().toISOString(),
+      Data: dataToSave,
     })
 
     if (error) throw error
@@ -47,11 +70,10 @@ export const caixaService = {
     })
 
     // 2. Fetch Receipts (RECEBIMENTOS) within Route range
-    // We filter by created_at which indicates when the money entered the system
     const { data: receipts, error: recError } = await supabase
       .from('RECEBIMENTOS')
       .select('funcionario_id, valor_pago, created_at')
-      .gte('created_at', rota.data_inicio) // Optimistic filter
+      .gte('created_at', rota.data_inicio)
       .gt('valor_pago', 0)
 
     if (recError) throw recError
@@ -60,7 +82,6 @@ export const caixaService = {
       if (!rec.created_at) return
       const recDate = parseISO(rec.created_at)
 
-      // Precise filtering
       const isAfterStart =
         isAfter(recDate, routeStart) || isEqual(recDate, routeStart)
       const isBeforeEnd =
@@ -101,8 +122,6 @@ export const caixaService = {
       }
     })
 
-    // 4. Calculate Balance and Filter empty rows (optional, user story implies tracking for each member)
-    // We will return all employees who have activity
     const result = Array.from(summaryMap.values())
       .map((row) => ({
         ...row,
@@ -116,5 +135,88 @@ export const caixaService = {
       .sort((a, b) => a.funcionarioNome.localeCompare(b.funcionarioNome))
 
     return result
+  },
+
+  async getEmployeeReceipts(
+    employeeId: number,
+    rota: Rota,
+  ): Promise<ReceiptDetail[]> {
+    const routeStart = parseISO(rota.data_inicio)
+    const routeEnd = rota.data_fim ? parseISO(rota.data_fim) : new Date()
+
+    const { data, error } = await supabase
+      .from('RECEBIMENTOS')
+      .select(
+        `
+        id,
+        created_at,
+        valor_pago,
+        forma_pagamento,
+        CLIENTES (
+          "NOME CLIENTE"
+        )
+      `,
+      )
+      .eq('funcionario_id', employeeId)
+      .gte('created_at', rota.data_inicio)
+      .gt('valor_pago', 0)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+
+    // Filter by date range strictly in JS
+    const filtered = (data || []).filter((rec) => {
+      if (!rec.created_at) return false
+      const recDate = parseISO(rec.created_at)
+      const isAfterStart =
+        isAfter(recDate, routeStart) || isEqual(recDate, routeStart)
+      const isBeforeEnd =
+        isBefore(recDate, routeEnd) || isEqual(recDate, routeEnd)
+      return isAfterStart && (rota.data_fim ? isBeforeEnd : true)
+    })
+
+    return filtered.map((rec: any) => ({
+      id: rec.id,
+      data: rec.created_at,
+      clienteNome: rec.CLIENTES?.['NOME CLIENTE'] || 'N/D',
+      valor: rec.valor_pago,
+      forma: rec.forma_pagamento,
+    }))
+  },
+
+  async getEmployeeExpenses(
+    employeeId: number,
+    rota: Rota,
+  ): Promise<ExpenseDetail[]> {
+    const routeStart = parseISO(rota.data_inicio)
+    const routeEnd = rota.data_fim ? parseISO(rota.data_fim) : new Date()
+
+    const { data, error } = await supabase
+      .from('DESPESAS')
+      .select('*')
+      .eq('funcionario_id', employeeId)
+      .gte('Data', rota.data_inicio)
+      .order('Data', { ascending: false })
+
+    if (error) throw error
+
+    // Filter by date range strictly in JS
+    const filtered = (data || []).filter((exp) => {
+      if (!exp.Data) return false
+      const expDate = parseISO(exp.Data)
+      const isAfterStart =
+        isAfter(expDate, routeStart) || isEqual(expDate, routeStart)
+      const isBeforeEnd =
+        isBefore(expDate, routeEnd) || isEqual(expDate, routeEnd)
+      return isAfterStart && (rota.data_fim ? isBeforeEnd : true)
+    })
+
+    return filtered.map((exp) => ({
+      id: exp.id,
+      data: exp.Data || '',
+      grupo: exp['Grupo de Despesas'],
+      detalhamento: exp.Detalhamento,
+      valor: Number(exp.Valor),
+    }))
   },
 }

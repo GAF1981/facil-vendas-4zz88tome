@@ -36,12 +36,14 @@ interface ExpenseFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSuccess: () => void
+  preselectedEmployee?: { id: number; name: string } | null
 }
 
 export function ExpenseFormDialog({
   open,
   onOpenChange,
   onSuccess,
+  preselectedEmployee,
 }: ExpenseFormDialogProps) {
   const [loading, setLoading] = useState(false)
   const [employees, setEmployees] = useState<Employee[]>([])
@@ -50,6 +52,7 @@ export function ExpenseFormDialog({
   const form = useForm<DespesaFormData>({
     resolver: zodResolver(despesaSchema),
     defaultValues: {
+      data: new Date().toISOString().split('T')[0],
       grupo: 'Alimentação',
       detalhamento: '',
       valor: '',
@@ -61,36 +64,62 @@ export function ExpenseFormDialog({
 
   useEffect(() => {
     if (open) {
-      employeesService.getEmployees(1, 100).then(({ data }) => {
-        setEmployees(data.filter((e) => e.situacao === 'ATIVO'))
-      })
-      form.reset({
-        grupo: 'Alimentação',
-        detalhamento: '',
-        valor: '',
-        funcionario_id: '',
-      })
+      if (preselectedEmployee) {
+        form.reset({
+          data: new Date().toISOString().split('T')[0],
+          grupo: 'Alimentação',
+          detalhamento: 'Alimentação',
+          valor: '',
+          funcionario_id: preselectedEmployee.id.toString(),
+        })
+      } else {
+        employeesService.getEmployees(1, 100).then(({ data }) => {
+          setEmployees(data.filter((e) => e.situacao === 'ATIVO'))
+        })
+        form.reset({
+          data: new Date().toISOString().split('T')[0],
+          grupo: 'Alimentação',
+          detalhamento: 'Alimentação',
+          valor: '',
+          funcionario_id: '',
+        })
+      }
     }
-  }, [open, form])
+  }, [open, form, preselectedEmployee])
+
+  // Auto-fill detalhamento effect
+  useEffect(() => {
+    if (selectedGrupo === 'Alimentação') {
+      form.setValue('detalhamento', 'Alimentação')
+    } else if (selectedGrupo === 'Combustível') {
+      form.setValue('detalhamento', 'Combustível')
+    } else if (selectedGrupo === 'Outros') {
+      // Keep existing or clear if it was an auto-value
+      const current = form.getValues('detalhamento')
+      if (current === 'Alimentação' || current === 'Combustível') {
+        form.setValue('detalhamento', '')
+      }
+    }
+  }, [selectedGrupo, form])
 
   const onSubmit = async (data: DespesaFormData) => {
     // Logic for detailing
-    let detalhamentoToSave = ''
+    let detalhamentoToSave = data.detalhamento || ''
     if (data.grupo === 'Outros') {
-      if (!data.detalhamento?.trim()) {
+      if (!detalhamentoToSave.trim()) {
         form.setError('detalhamento', {
           message: 'Detalhamento é obrigatório para Outros',
         })
         return
       }
-      detalhamentoToSave = data.detalhamento
     } else {
-      detalhamentoToSave = data.grupo // "Alimentação" or "Combustível"
+      detalhamentoToSave = data.grupo // Enforce group name as detail for consistency if not others
     }
 
     setLoading(true)
     try {
       await caixaService.saveDespesa({
+        Data: data.data, // Pass date from form
         'Grupo de Despesas': data.grupo,
         Detalhamento: detalhamentoToSave,
         Valor: parseFloat(data.valor.replace(',', '.')),
@@ -120,35 +149,57 @@ export function ExpenseFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Cadastrar Despesa (Saída)</DialogTitle>
+          <DialogTitle>
+            {preselectedEmployee
+              ? `Nova Despesa: ${preselectedEmployee.name}`
+              : 'Cadastrar Despesa (Saída)'}
+          </DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="funcionario_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Funcionário</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="data"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Data</FormLabel>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Quem realizou a despesa?" />
-                      </SelectTrigger>
+                      <Input type="date" {...field} />
                     </FormControl>
-                    <SelectContent>
-                      {employees.map((emp) => (
-                        <SelectItem key={emp.id} value={emp.id.toString()}>
-                          {emp.nome_completo}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {!preselectedEmployee && (
+              <FormField
+                control={form.control}
+                name="funcionario_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Funcionário</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Quem realizou a despesa?" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {employees.map((emp) => (
+                          <SelectItem key={emp.id} value={emp.id.toString()}>
+                            {emp.nome_completo}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <FormField
               control={form.control}

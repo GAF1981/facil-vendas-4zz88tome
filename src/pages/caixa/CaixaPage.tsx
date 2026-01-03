@@ -26,20 +26,44 @@ import {
   ArrowDownCircle,
   ArrowUpCircle,
   PlusCircle,
+  Printer,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { Link } from 'react-router-dom'
 import { Rota } from '@/types/rota'
 import { FinancialSummaryTable } from '@/components/caixa/FinancialSummaryTable'
 import { ExpenseFormDialog } from '@/components/caixa/ExpenseFormDialog'
+import { ReceiptsDetailDialog } from '@/components/caixa/ReceiptsDetailDialog'
+import { ExpensesDetailDialog } from '@/components/caixa/ExpensesDetailDialog'
+import { supabase } from '@/lib/supabase/client'
 
 export default function CaixaPage() {
   const [loading, setLoading] = useState(true)
   const [routes, setRoutes] = useState<Rota[]>([])
   const [selectedRouteId, setSelectedRouteId] = useState<string>('')
   const [data, setData] = useState<CaixaSummaryRow[]>([])
-  const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false)
   const { toast } = useToast()
+
+  // State for Dialogs
+  const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false)
+  const [preselectedEmployee, setPreselectedEmployee] = useState<{
+    id: number
+    name: string
+  } | null>(null)
+
+  const [viewReceipts, setViewReceipts] = useState<{
+    open: boolean
+    empId: number | null
+    empName: string
+  }>({ open: false, empId: null, empName: '' })
+
+  const [viewExpenses, setViewExpenses] = useState<{
+    open: boolean
+    empId: number | null
+    empName: string
+  }>({ open: false, empId: null, empName: '' })
+
+  const [generatingPdf, setGeneratingPdf] = useState(false)
 
   const fetchRoutes = async () => {
     try {
@@ -96,6 +120,76 @@ export default function CaixaPage() {
   const totalDespesas = data.reduce((acc, row) => acc + row.totalDespesas, 0)
   const totalSaldo = totalRecebido - totalDespesas
 
+  // Handlers
+  const handleOpenGeneralExpense = () => {
+    setPreselectedEmployee(null)
+    setIsExpenseDialogOpen(true)
+  }
+
+  const handleAddExpense = (empId: number, empName: string) => {
+    setPreselectedEmployee({ id: empId, name: empName })
+    setIsExpenseDialogOpen(true)
+  }
+
+  const handleViewReceipts = (empId: number, empName: string) => {
+    setViewReceipts({ open: true, empId, empName })
+  }
+
+  const handleViewExpenses = (empId: number, empName: string) => {
+    setViewExpenses({ open: true, empId, empName })
+  }
+
+  const handleGeneratePdf = async () => {
+    if (!selectedRoute) return
+    setGeneratingPdf(true)
+    try {
+      const { data: pdfBlob, error } = await supabase.functions.invoke(
+        'generate-pdf',
+        {
+          body: {
+            reportType: 'cash-summary',
+            summaryData: data,
+            totalRecebido,
+            totalDespesas,
+            totalSaldo,
+            periodo: {
+              inicio: selectedRoute.data_inicio,
+              fim: selectedRoute.data_fim,
+              rotaId: selectedRoute.id,
+            },
+            date: new Date().toISOString(),
+          },
+        },
+      )
+
+      if (error) throw error
+
+      if (pdfBlob) {
+        // Create blob link to download
+        const blob = new Blob([pdfBlob], { type: 'application/pdf' })
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.setAttribute(
+          'download',
+          `Resumo_Caixa_Rota_${selectedRoute.id}.pdf`,
+        )
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+      }
+    } catch (err) {
+      console.error(err)
+      toast({
+        title: 'Erro ao gerar PDF',
+        description: 'Não foi possível gerar o resumo de caixa.',
+        variant: 'destructive',
+      })
+    } finally {
+      setGeneratingPdf(false)
+    }
+  }
+
   return (
     <div className="space-y-6 animate-fade-in p-2 pb-20 sm:p-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -112,9 +206,22 @@ export default function CaixaPage() {
             </p>
           </div>
         </div>
-        <div className="flex gap-2 w-full sm:w-auto">
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           <Button
-            onClick={() => setIsExpenseDialogOpen(true)}
+            onClick={handleGeneratePdf}
+            variant="outline"
+            disabled={generatingPdf || loading || !selectedRoute}
+            className="flex-1 sm:flex-none"
+          >
+            {generatingPdf ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Printer className="mr-2 h-4 w-4" />
+            )}
+            Gerar Resumo PDF
+          </Button>
+          <Button
+            onClick={handleOpenGeneralExpense}
             className="bg-blue-600 hover:bg-blue-700 flex-1 sm:flex-none"
           >
             <PlusCircle className="mr-2 h-4 w-4" />
@@ -248,7 +355,12 @@ export default function CaixaPage() {
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : (
-            <FinancialSummaryTable data={data} />
+            <FinancialSummaryTable
+              data={data}
+              onAddExpense={handleAddExpense}
+              onViewReceipts={handleViewReceipts}
+              onViewExpenses={handleViewExpenses}
+            />
           )}
         </CardContent>
       </Card>
@@ -257,6 +369,23 @@ export default function CaixaPage() {
         open={isExpenseDialogOpen}
         onOpenChange={setIsExpenseDialogOpen}
         onSuccess={() => fetchData(selectedRouteId)}
+        preselectedEmployee={preselectedEmployee}
+      />
+
+      <ReceiptsDetailDialog
+        open={viewReceipts.open}
+        onOpenChange={(v) => setViewReceipts((p) => ({ ...p, open: v }))}
+        employeeId={viewReceipts.empId}
+        employeeName={viewReceipts.empName}
+        route={selectedRoute}
+      />
+
+      <ExpensesDetailDialog
+        open={viewExpenses.open}
+        onOpenChange={(v) => setViewExpenses((p) => ({ ...p, open: v }))}
+        employeeId={viewExpenses.empId}
+        employeeName={viewExpenses.empName}
+        route={selectedRoute}
       />
     </div>
   )

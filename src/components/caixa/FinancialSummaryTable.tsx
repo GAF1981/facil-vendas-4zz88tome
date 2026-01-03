@@ -9,12 +9,28 @@ import {
 import { CaixaSummaryRow } from '@/services/caixaService'
 import { formatCurrency } from '@/lib/formatters'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { Eye, PlusCircle } from 'lucide-react'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 interface FinancialSummaryTableProps {
   data: CaixaSummaryRow[]
+  onViewReceipts: (employeeId: number, employeeName: string) => void
+  onViewExpenses: (employeeId: number, employeeName: string) => void
+  onAddExpense: (employeeId: number, employeeName: string) => void
 }
 
-export function FinancialSummaryTable({ data }: FinancialSummaryTableProps) {
+export function FinancialSummaryTable({
+  data,
+  onViewReceipts,
+  onViewExpenses,
+  onAddExpense,
+}: FinancialSummaryTableProps) {
   const totalRecebido = data.reduce((acc, row) => acc + row.totalRecebido, 0)
   const totalDespesas = data.reduce((acc, row) => acc + row.totalDespesas, 0)
   const totalCaixa = data.reduce((acc, row) => acc + row.saldo, 0)
@@ -32,13 +48,14 @@ export function FinancialSummaryTable({ data }: FinancialSummaryTableProps) {
             <TableHead className="text-right font-bold text-blue-700">
               Valor de Caixa
             </TableHead>
+            <TableHead className="text-center">Ações</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {data.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={4}
+                colSpan={5}
                 className="h-24 text-center text-muted-foreground"
               >
                 Nenhuma movimentação financeira encontrada para esta rota.
@@ -51,11 +68,63 @@ export function FinancialSummaryTable({ data }: FinancialSummaryTableProps) {
                   <TableCell className="font-medium">
                     {row.funcionarioNome}
                   </TableCell>
-                  <TableCell className="text-right font-mono text-green-600">
-                    R$ {formatCurrency(row.totalRecebido)}
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <span className="font-mono text-green-600">
+                        R$ {formatCurrency(row.totalRecebido)}
+                      </span>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() =>
+                                onViewReceipts(
+                                  row.funcionarioId,
+                                  row.funcionarioNome,
+                                )
+                              }
+                            >
+                              <Eye className="h-4 w-4 text-green-600" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Ver Recebimentos</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                   </TableCell>
-                  <TableCell className="text-right font-mono text-red-600">
-                    R$ {formatCurrency(row.totalDespesas)}
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <span className="font-mono text-red-600">
+                        R$ {formatCurrency(row.totalDespesas)}
+                      </span>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() =>
+                                onViewExpenses(
+                                  row.funcionarioId,
+                                  row.funcionarioNome,
+                                )
+                              }
+                            >
+                              <Eye className="h-4 w-4 text-red-600" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Ver Despesas</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                   </TableCell>
                   <TableCell
                     className={cn(
@@ -64,6 +133,19 @@ export function FinancialSummaryTable({ data }: FinancialSummaryTableProps) {
                     )}
                   >
                     R$ {formatCurrency(row.saldo)}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                      onClick={() =>
+                        onAddExpense(row.funcionarioId, row.funcionarioNome)
+                      }
+                    >
+                      <PlusCircle className="mr-1 h-3 w-3" />
+                      Cadastrar Despesa
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -79,6 +161,7 @@ export function FinancialSummaryTable({ data }: FinancialSummaryTableProps) {
                 <TableCell className="text-right text-blue-700">
                   R$ {formatCurrency(totalCaixa)}
                 </TableCell>
+                <TableCell></TableCell>
               </TableRow>
             </>
           )}
