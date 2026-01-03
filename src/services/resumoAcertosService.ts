@@ -6,6 +6,7 @@ import { Rota } from '@/types/rota'
 export interface SettlementSummary {
   orderId: number
   employee: string
+  employeeId?: number | null // Added for filtering
   clientCode: number
   clientName: string
   acertoDate: string
@@ -147,6 +148,7 @@ export const resumoAcertosService = {
         ordersMap.set(orderId, {
           orderId,
           employee: row['FUNCIONÁRIO'] || 'N/D',
+          employeeId: row['CODIGO FUNCIONARIO'], // Mapped
           clientCode: row['CÓDIGO DO CLIENTE'] || 0,
           clientName: row['CLIENTE'] || 'N/D',
           acertoDate: dateStr,

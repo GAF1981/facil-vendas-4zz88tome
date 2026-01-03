@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import {
   Card,
   CardContent,
@@ -40,10 +40,13 @@ import {
   TrendingUp,
   Receipt,
   RotateCcw,
+  User,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { Link } from 'react-router-dom'
 import { Rota } from '@/types/rota'
+import { Employee } from '@/types/employee'
+import { employeesService } from '@/services/employeesService'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -60,6 +63,11 @@ export default function ResumoAcertosPage() {
   const [routes, setRoutes] = useState<Rota[]>([])
   const [selectedRouteId, setSelectedRouteId] = useState<string>('')
   const [data, setData] = useState<SettlementSummary[]>([])
+
+  // Employee Filter
+  const [employees, setEmployees] = useState<Employee[]>([])
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('todos')
+
   const [showFinishDialog, setShowFinishDialog] = useState(false)
   const [finishing, setFinishing] = useState(false)
   const { toast } = useToast()
@@ -69,7 +77,6 @@ export default function ResumoAcertosPage() {
       const allRoutes = await resumoAcertosService.getAllRoutes()
       setRoutes(allRoutes)
       if (allRoutes.length > 0 && !selectedRouteId) {
-        // Select latest by default
         setSelectedRouteId(allRoutes[0].id.toString())
       }
       return allRoutes
@@ -81,6 +88,15 @@ export default function ResumoAcertosPage() {
         variant: 'destructive',
       })
       return []
+    }
+  }
+
+  const fetchEmployees = async () => {
+    try {
+      const { data } = await employeesService.getEmployees(1, 100)
+      setEmployees(data)
+    } catch (error) {
+      console.error('Failed to fetch employees', error)
     }
   }
 
@@ -108,6 +124,7 @@ export default function ResumoAcertosPage() {
   // Initial Load
   useEffect(() => {
     fetchRoutes()
+    fetchEmployees()
   }, [])
 
   // Fetch data when selection changes
@@ -116,6 +133,14 @@ export default function ResumoAcertosPage() {
       fetchData(selectedRouteId)
     }
   }, [selectedRouteId, routes])
+
+  // Filter Data Client-Side
+  const filteredData = useMemo(() => {
+    if (selectedEmployeeId === 'todos') return data
+    return data.filter(
+      (item) => item.employeeId?.toString() === selectedEmployeeId,
+    )
+  }, [data, selectedEmployeeId])
 
   const handleFinishRoute = async () => {
     setFinishing(true)
@@ -135,7 +160,6 @@ export default function ResumoAcertosPage() {
         className: 'bg-green-600 text-white',
       })
 
-      // Refresh everything
       const updatedRoutes = await fetchRoutes()
       if (updatedRoutes.length > 0) {
         setSelectedRouteId(updatedRoutes[0].id.toString())
@@ -157,11 +181,20 @@ export default function ResumoAcertosPage() {
   const isLatestRoute = routes.length > 0 && selectedRoute?.id === routes[0].id
   const isRouteOpen = selectedRoute && !selectedRoute.data_fim
 
-  // Financial Totals
-  const totalVendas = data.reduce((acc, curr) => acc + curr.totalSalesValue, 0)
-  const totalDescontos = data.reduce((acc, curr) => acc + curr.totalDiscount, 0)
-  const totalPago = data.reduce((acc, curr) => acc + curr.totalPaid, 0)
-  const totalReceber = data.reduce((acc, curr) => acc + curr.valorDevido, 0)
+  // Financial Totals (Based on filtered data)
+  const totalVendas = filteredData.reduce(
+    (acc, curr) => acc + curr.totalSalesValue,
+    0,
+  )
+  const totalDescontos = filteredData.reduce(
+    (acc, curr) => acc + curr.totalDiscount,
+    0,
+  )
+  const totalPago = filteredData.reduce((acc, curr) => acc + curr.totalPaid, 0)
+  const totalReceber = filteredData.reduce(
+    (acc, curr) => acc + curr.valorDevido,
+    0,
+  )
 
   return (
     <div className="space-y-6 animate-fade-in p-2 pb-20 sm:p-6">
@@ -205,20 +238,16 @@ export default function ResumoAcertosPage() {
         </div>
       </div>
 
-      {/* Header & Route Selector */}
+      {/* Header & Selectors */}
       <Card className="border-l-4 border-l-blue-600 bg-blue-50/20">
         <CardHeader className="pb-2">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div className="space-y-1">
-              <CardTitle className="text-lg flex items-center gap-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Route Selector */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-lg font-semibold">
                 <MapIcon className="h-5 w-5 text-blue-600" />
                 Seletor de Rota
-              </CardTitle>
-              <CardDescription>
-                Selecione uma rota para visualizar o histórico financeiro.
-              </CardDescription>
-            </div>
-            <div className="w-full md:w-[300px]">
+              </div>
               <Select
                 value={selectedRouteId}
                 onValueChange={setSelectedRouteId}
@@ -240,42 +269,48 @@ export default function ResumoAcertosPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Employee Filter */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-lg font-semibold">
+                <User className="h-5 w-5 text-blue-600" />
+                Filtrar por Funcionário
+              </div>
+              <Select
+                value={selectedEmployeeId}
+                onValueChange={setSelectedEmployeeId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos os funcionários" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos os funcionários</SelectItem>
+                  {employees.map((emp) => (
+                    <SelectItem key={emp.id} value={emp.id.toString()}>
+                      {emp.nome_completo}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
           {selectedRoute ? (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-2">
-              <div>
-                <span className="text-sm font-medium text-muted-foreground block">
-                  ID Rota
-                </span>
-                <span className="text-2xl font-bold font-mono">
-                  #{selectedRoute.id}
+            <div className="flex flex-wrap gap-4 pt-2 text-sm">
+              <div className="bg-background border px-3 py-1 rounded-md">
+                <span className="text-muted-foreground mr-2">Início:</span>
+                <span className="font-medium">
+                  {safeFormatDate(selectedRoute.data_inicio)}
                 </span>
               </div>
-              <div>
-                <span className="text-sm font-medium text-muted-foreground block mb-1">
-                  Data de Início
+              <div className="bg-background border px-3 py-1 rounded-md">
+                <span className="text-muted-foreground mr-2">Fim:</span>
+                <span className="font-medium">
+                  {selectedRoute.data_fim
+                    ? safeFormatDate(selectedRoute.data_fim)
+                    : 'Em andamento'}
                 </span>
-                <div className="flex items-center gap-2 bg-background border rounded-md px-3 py-1.5 w-fit">
-                  <Calendar className="h-4 w-4 text-green-600" />
-                  <span className="font-medium">
-                    {safeFormatDate(selectedRoute.data_inicio)}
-                  </span>
-                </div>
-              </div>
-              <div>
-                <span className="text-sm font-medium text-muted-foreground block mb-1">
-                  Data de Fim
-                </span>
-                <div className="flex items-center gap-2 bg-background border rounded-md px-3 py-1.5 w-fit">
-                  <Calendar className="h-4 w-4 text-red-600" />
-                  <span className="font-medium">
-                    {selectedRoute.data_fim
-                      ? safeFormatDate(selectedRoute.data_fim)
-                      : 'Em andamento'}
-                  </span>
-                </div>
               </div>
             </div>
           ) : (
@@ -356,7 +391,7 @@ export default function ResumoAcertosPage() {
               <Receipt className="h-5 w-5" />
               Detalhamento de Acertos
             </CardTitle>
-            <Badge variant="secondary">{data.length} Registros</Badge>
+            <Badge variant="secondary">{filteredData.length} Registros</Badge>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -386,17 +421,17 @@ export default function ResumoAcertosPage() {
                       Carregando dados...
                     </TableCell>
                   </TableRow>
-                ) : data.length === 0 ? (
+                ) : filteredData.length === 0 ? (
                   <TableRow>
                     <TableCell
                       colSpan={9}
                       className="h-32 text-center text-muted-foreground"
                     >
-                      Nenhum acerto encontrado para esta rota.
+                      Nenhum acerto encontrado.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  data.map((row) => (
+                  filteredData.map((row) => (
                     <TableRow key={row.orderId} className="hover:bg-muted/30">
                       <TableCell className="font-mono font-medium text-blue-600">
                         #{row.orderId}
