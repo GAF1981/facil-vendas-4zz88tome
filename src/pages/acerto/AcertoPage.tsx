@@ -87,7 +87,7 @@ export default function AcertoPage() {
   // Nota Fiscal State
   const [notaFiscalVenda, setNotaFiscalVenda] = useState(false)
 
-  // State for automatic order number
+  // State for automatic order number (Preview)
   const [nextOrderNumber, setNextOrderNumber] = useState<number | null>(null)
   // Ref for automatic Item ID generation (sequential)
   const nextItemIdRef = useRef<number | null>(null)
@@ -122,7 +122,7 @@ export default function AcertoPage() {
       }
       setNextOrderNumber(null)
 
-      // Fetch Next Order Number
+      // Fetch Next Order Number (Preview only)
       bancoDeDadosService
         .getNextNumeroPedido()
         .then((num) => setNextOrderNumber(num))
@@ -446,7 +446,7 @@ export default function AcertoPage() {
     return true
   }
 
-  const preparePdfData = async (now: Date) => {
+  const preparePdfData = async (now: Date, orderIdOverride?: number) => {
     // Fetch history
     let historyForPdf: any[] = []
     try {
@@ -473,7 +473,7 @@ export default function AcertoPage() {
       // New fields for PDF
       history: historyForPdf,
       monthlyAverage,
-      orderNumber: nextOrderNumber,
+      orderNumber: orderIdOverride ?? nextOrderNumber,
     }
   }
 
@@ -483,6 +483,7 @@ export default function AcertoPage() {
     setGeneratingPdf(true)
     try {
       const now = new Date()
+      // Use nextOrderNumber (preview) for preview
       const data = await preparePdfData(now)
 
       const pdfBlob = await acertoService.generatePdf(data, {
@@ -528,7 +529,11 @@ export default function AcertoPage() {
 
       const now = new Date()
 
-      // 1. Save to Database
+      // 1. Reserve Order Number (Critical for sequential integrity)
+      const definitiveOrderNumber =
+        await bancoDeDadosService.reserveNextOrderNumber()
+
+      // 2. Save to Database using the reserved number
       await bancoDeDadosService.saveTransaction(
         client,
         employee,
@@ -537,18 +542,19 @@ export default function AcertoPage() {
         acertoTipo,
         payments,
         notaFiscalVenda, // Pass the checkbox state
+        definitiveOrderNumber, // Use reserved number
       )
 
-      // 2. Generate and Download PDF
+      // 3. Generate and Download PDF using the reserved number
       try {
-        const data = await preparePdfData(now)
+        const data = await preparePdfData(now, definitiveOrderNumber)
         const pdfBlob = await acertoService.generatePdf(data, {
           preview: false,
           signature: signature,
         })
 
         // Trigger Download
-        const orderNum = nextOrderNumber || 0
+        const orderNum = definitiveOrderNumber
         const url = window.URL.createObjectURL(pdfBlob)
         const a = document.createElement('a')
         a.href = url
@@ -726,12 +732,13 @@ export default function AcertoPage() {
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-3 pb-2">
               <Label className="text-sm font-bold text-muted-foreground uppercase w-32">
-                Número de Pedido
+                Número de Pedido (Previsto)
               </Label>
               <Input
                 value={nextOrderNumber !== null ? nextOrderNumber : '...'}
                 readOnly
                 className="w-24 h-9 font-mono text-center font-bold bg-muted"
+                title="Este número pode mudar no momento de salvar se houver outros usuários salvando ao mesmo tempo."
               />
             </div>
           </div>

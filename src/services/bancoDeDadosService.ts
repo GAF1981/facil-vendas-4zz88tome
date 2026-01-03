@@ -75,9 +75,18 @@ export const bancoDeDadosService = {
     return (data?.['NÚMERO DO PEDIDO'] || 0) as number
   },
 
+  // This is primarily for PREVIEW in the UI.
+  // For actual saving, use reserveNextOrderNumber() to guarantee uniqueness.
   async getNextNumeroPedido() {
     const max = await this.getMaxNumeroPedido()
     return max + 1
+  },
+
+  // Calls the RPC to get the next sequence value safely
+  async reserveNextOrderNumber(): Promise<number> {
+    const { data, error } = await supabase.rpc('get_next_order_number')
+    if (error) throw error
+    return data as number
   },
 
   async getLastAcerto(
@@ -368,9 +377,13 @@ export const bancoDeDadosService = {
     acertoTipo: string,
     payments: PaymentEntry[],
     notaFiscalVenda: boolean,
+    customOrderNumber?: number,
   ) {
     // 1. Get Context (Order Number)
-    const nextPedido = await this.getNextNumeroPedido()
+    // If customOrderNumber is passed (e.g. reserved via sequence), use it.
+    // Otherwise fallback to reserveNextOrderNumber (safest)
+    const nextPedido =
+      customOrderNumber ?? (await this.reserveNextOrderNumber())
 
     const dataAcertoStr = format(date, 'yyyy-MM-dd')
     const horaAcerto = format(date, 'HH:mm:ss')
