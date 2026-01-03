@@ -38,6 +38,7 @@ import PermissionsPage from '@/pages/admin/PermissionsPage'
 import { AuthProvider } from '@/hooks/use-auth'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { PermissionsProvider } from '@/hooks/use-permissions'
+import { PermissionGuard } from '@/components/auth/PermissionGuard'
 
 const App = () => (
   <BrowserRouter
@@ -55,72 +56,120 @@ const App = () => (
               <Route element={<GlobalLayout />}>
                 <Route path="/" element={<Index />} />
                 <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/clientes" element={<ClientsPage />} />
-                <Route path="/clientes/novo" element={<ClientFormPage />} />
-                <Route path="/clientes/:id" element={<ClientFormPage />} />
-                <Route
-                  path="/clientes/:id/historico"
-                  element={<ClientHistoryPage />}
-                />
-                <Route path="/funcionarios" element={<EmployeesPage />} />
-                <Route
-                  path="/funcionarios/novo"
-                  element={<EmployeeFormPage />}
-                />
-                <Route
-                  path="/funcionarios/:id"
-                  element={<EmployeeFormPage />}
-                />
-                <Route path="/produtos" element={<ProductsPage />} />
-                <Route path="/produtos/novo" element={<ProductFormPage />} />
-                <Route path="/produtos/:id" element={<ProductFormPage />} />
-                {/* Acerto Module */}
-                <Route path="/acerto" element={<AcertoPage />} />
-                {/* Recebimento Module */}
-                <Route path="/recebimento" element={<RecebimentoPage />} />
-                <Route
-                  path="/confirmacao-recebimentos"
-                  element={<ConfirmacaoRecebimentosPage />}
-                />
-                {/* Pix Module */}
-                <Route path="/pix" element={<PixPage />} />
-                {/* Pagamentos Module */}
-                <Route path="/pagamentos" element={<PagamentosPage />} />
-                {/* Controle Module */}
-                <Route path="/controle" element={<ControlePage />} />
-                {/* Cobranca Module */}
-                <Route path="/cobranca" element={<CobrancaPage />} />
-                {/* Nota Fiscal Module */}
-                <Route path="/nota-fiscal" element={<NotaFiscalPage />} />
-                {/* Pendencias Module */}
-                <Route path="/pendencias" element={<PendenciasPage />} />
-                {/* Rota Module */}
-                <Route path="/rota" element={<RotaPage />} />
-                {/* Resumo Acertos Module */}
-                <Route path="/resumo-acertos" element={<ResumoAcertosPage />} />
-                {/* Backup & Export Module */}
-                <Route path="/backup" element={<BackupPage />} />
-                {/* Reports Module */}
-                <Route path="/relatorio" element={<RelatorioDashboard />} />
-                <Route
-                  path="/relatorio/projecoes"
-                  element={<ProjectionsPage />}
-                />
-                <Route
-                  path="/relatorio/vendas"
-                  element={<SalesReportsPage />}
-                />
-                <Route
-                  path="/relatorio/estoque"
-                  element={<StockReportsPage />}
-                />
-                {/* Caixa Module */}
-                <Route path="/caixa" element={<CaixaPage />} />
-                {/* Inventario Module */}
-                <Route path="/inventario" element={<InventarioPage />} />
-                <Route path="/inventario/contagem" element={<ContagemPage />} />
-                {/* Permissions Module */}
-                <Route path="/permissoes" element={<PermissionsPage />} />
+
+                {/* Modules protected by PermissionGuard */}
+                <Route element={<PermissionGuard module="Clientes" />}>
+                  <Route path="/clientes" element={<ClientsPage />} />
+                  <Route path="/clientes/novo" element={<ClientFormPage />} />
+                  <Route path="/clientes/:id" element={<ClientFormPage />} />
+                  <Route
+                    path="/clientes/:id/historico"
+                    element={<ClientHistoryPage />}
+                  />
+                </Route>
+
+                <Route element={<PermissionGuard module="Funcionários" />}>
+                  <Route path="/funcionarios" element={<EmployeesPage />} />
+                  <Route
+                    path="/funcionarios/novo"
+                    element={<EmployeeFormPage />}
+                  />
+                  <Route
+                    path="/funcionarios/:id"
+                    element={<EmployeeFormPage />}
+                  />
+                </Route>
+
+                <Route element={<PermissionGuard module="Produtos" />}>
+                  <Route path="/produtos" element={<ProductsPage />} />
+                  <Route path="/produtos/novo" element={<ProductFormPage />} />
+                  <Route path="/produtos/:id" element={<ProductFormPage />} />
+                </Route>
+
+                <Route element={<PermissionGuard module="Acerto" />}>
+                  <Route path="/acerto" element={<AcertoPage />} />
+                </Route>
+
+                <Route element={<PermissionGuard module="Recebimento" />}>
+                  <Route path="/recebimento" element={<RecebimentoPage />} />
+                  <Route
+                    path="/confirmacao-recebimentos"
+                    element={<ConfirmacaoRecebimentosPage />}
+                  />
+                </Route>
+
+                <Route element={<PermissionGuard module="Pix" />}>
+                  <Route path="/pix" element={<PixPage />} />
+                </Route>
+
+                <Route element={<PermissionGuard module="Pagamentos" />}>
+                  {/* Assuming Pagamentos module name or maybe mapped to Pix? Using name for now */}
+                  <Route path="/pagamentos" element={<PagamentosPage />} />
+                </Route>
+
+                <Route element={<PermissionGuard module="Controle" />}>
+                  {/* Module check for Control if distinct */}
+                  <Route path="/controle" element={<ControlePage />} />
+                </Route>
+
+                <Route element={<PermissionGuard module="Cobrança" />}>
+                  <Route path="/cobranca" element={<CobrancaPage />} />
+                </Route>
+
+                <Route element={<PermissionGuard module="Nota Fiscal" />}>
+                  <Route path="/nota-fiscal" element={<NotaFiscalPage />} />
+                </Route>
+
+                <Route element={<PermissionGuard module="Pendências" />}>
+                  <Route path="/pendencias" element={<PendenciasPage />} />
+                </Route>
+
+                <Route element={<PermissionGuard module="Rota" />}>
+                  <Route path="/rota" element={<RotaPage />} />
+                </Route>
+
+                <Route element={<PermissionGuard module="Resumo Acertos" />}>
+                  <Route
+                    path="/resumo-acertos"
+                    element={<ResumoAcertosPage />}
+                  />
+                </Route>
+
+                <Route element={<PermissionGuard module="Backup" />}>
+                  <Route path="/backup" element={<BackupPage />} />
+                </Route>
+
+                <Route element={<PermissionGuard module="Relatório" />}>
+                  <Route path="/relatorio" element={<RelatorioDashboard />} />
+                  <Route
+                    path="/relatorio/projecoes"
+                    element={<ProjectionsPage />}
+                  />
+                  <Route
+                    path="/relatorio/vendas"
+                    element={<SalesReportsPage />}
+                  />
+                  <Route
+                    path="/relatorio/estoque"
+                    element={<StockReportsPage />}
+                  />
+                </Route>
+
+                <Route element={<PermissionGuard module="Caixa" />}>
+                  <Route path="/caixa" element={<CaixaPage />} />
+                </Route>
+
+                <Route element={<PermissionGuard module="Inventário" />}>
+                  <Route path="/inventario" element={<InventarioPage />} />
+                  <Route
+                    path="/inventario/contagem"
+                    element={<ContagemPage />}
+                  />
+                </Route>
+
+                <Route element={<PermissionGuard module="Permissões" />}>
+                  <Route path="/permissoes" element={<PermissionsPage />} />
+                </Route>
 
                 {/* New Route */}
                 <Route path="/complemento" element={<PlaceholderModule />} />

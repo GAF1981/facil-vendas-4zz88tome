@@ -7,10 +7,29 @@ export interface Permission {
   acesso: boolean
 }
 
+const MODULES_LIST = [
+  'Clientes',
+  'Funcionários',
+  'Produtos',
+  'Acerto',
+  'Recebimento',
+  'Pix',
+  'Cobrança',
+  'Nota Fiscal',
+  'Caixa',
+  'Inventário',
+  'Rota',
+  'Resumo Acertos',
+  'Relatório',
+  'Pendências',
+  'Backup',
+  'Permissões',
+]
+
 export const permissionsService = {
   async getAll() {
     const { data, error } = await supabase
-      .from('PERMISSOES')
+      .from('permissoes')
       .select('*')
       .order('setor')
       .order('modulo')
@@ -19,18 +38,37 @@ export const permissionsService = {
     return data as Permission[]
   },
 
+  async getSectors() {
+    const { data, error } = await supabase.from('permissoes').select('setor')
+
+    if (error) throw error
+
+    // Extract unique sectors
+    const uniqueSectors = [...new Set(data.map((item) => item.setor))]
+    return uniqueSectors.sort()
+  },
+
   async updatePermission(id: number, acesso: boolean) {
     const { error } = await supabase
-      .from('PERMISSOES')
+      .from('permissoes')
       .update({ acesso })
       .eq('id', id)
 
     if (error) throw error
   },
 
+  async updatePermissionsBulk(ids: number[], acesso: boolean) {
+    const { error } = await supabase
+      .from('permissoes')
+      .update({ acesso })
+      .in('id', ids)
+
+    if (error) throw error
+  },
+
   async getPermissionsBySetor(setor: string) {
     const { data, error } = await supabase
-      .from('PERMISSOES')
+      .from('permissoes')
       .select('*')
       .eq('setor', setor)
 
@@ -38,36 +76,22 @@ export const permissionsService = {
     return data as Permission[]
   },
 
-  // Helper to init permissions if missing for a sector (called when accessing page if needed)
+  // Helper to init permissions if missing for a sector
   async initPermissionsForSetor(setor: string) {
-    const modules = [
-      'Clientes',
-      'Funcionários',
-      'Produtos',
-      'Acerto',
-      'Recebimento',
-      'Pix',
-      'Cobrança',
-      'Nota Fiscal',
-      'Caixa',
-      'Inventário',
-      'Rota',
-      'Resumo Acertos',
-      'Relatório',
-      'Pendências',
-      'Backup',
-    ]
-
-    const inserts = modules.map((m) => ({
+    const inserts = MODULES_LIST.map((m) => ({
       setor,
       modulo: m,
-      acesso: true,
+      acesso: true, // Default to true
     }))
 
     const { error } = await supabase
-      .from('PERMISSOES')
+      .from('permissoes')
       .upsert(inserts, { onConflict: 'setor,modulo' })
 
     if (error) console.error('Error init permissions', error)
+  },
+
+  getAvailableModules() {
+    return MODULES_LIST
   },
 }

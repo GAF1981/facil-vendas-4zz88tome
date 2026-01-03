@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { EmployeeFormData, employeeSchema, Employee } from '@/types/employee'
@@ -23,6 +23,7 @@ import {
 import { Loader2, Image as ImageIcon, Camera } from 'lucide-react'
 import { maskCPF } from '@/lib/masks'
 import { employeesService } from '@/services/employeesService'
+import { permissionsService } from '@/services/permissionsService'
 import { useToast } from '@/hooks/use-toast'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { CameraCapture } from '@/components/common/CameraCapture'
@@ -40,6 +41,7 @@ export function EmployeeForm({
 }: EmployeeFormProps) {
   const [loading, setLoading] = useState(false)
   const [showCamera, setShowCamera] = useState(false)
+  const [sectors, setSectors] = useState<string[]>([])
   const { toast } = useToast()
 
   const form = useForm<EmployeeFormData>({
@@ -67,6 +69,22 @@ export function EmployeeForm({
         },
   })
 
+  useEffect(() => {
+    // Fetch sectors for dropdown
+    const loadSectors = async () => {
+      try {
+        const sectorList = await permissionsService.getSectors()
+        // Ensure default sectors are present
+        const defaults = ['Vendedor', 'Estoque', 'Motoqueiro', 'Financeiro']
+        const merged = Array.from(new Set([...defaults, ...sectorList])).sort()
+        setSectors(merged)
+      } catch (error) {
+        console.error('Failed to load sectors', error)
+      }
+    }
+    loadSectors()
+  }, [])
+
   const watchPhotoUrl = form.watch('foto_url')
 
   const handleCameraCapture = (dataUrl: string) => {
@@ -76,17 +94,9 @@ export function EmployeeForm({
   const onSubmit = async (data: EmployeeFormData) => {
     setLoading(true)
     try {
-      // If password is empty, don't update it (keep existing) or set to default if new?
-      // User story says: "Disable the 'Senha' field or set it as non-mandatory"
-      // If new and empty, maybe set default '0000' backend side or here?
-      // Since schema allows empty, we handle it here.
       if (!data.senha && !initialData) {
         data.senha = '0000'
       } else if (!data.senha && initialData) {
-        // If updating and empty, pass undefined to avoid overwriting?
-        // Supabase update usually overwrites.
-        // We will fetch the current one if not provided or just keep it as is.
-        // Assuming the UI wants to preserve it if left blank.
         data.senha = initialData.senha || '0000'
       }
 
@@ -99,6 +109,10 @@ export function EmployeeForm({
         })
       } else {
         await employeesService.create(data)
+        // Ensure permissions are initialized for this sector
+        if (data.setor) {
+          await permissionsService.initPermissionsForSetor(data.setor)
+        }
         toast({
           title: 'Funcionário cadastrado',
           description: 'Novo funcionário adicionado com sucesso.',
@@ -254,6 +268,7 @@ export function EmployeeForm({
                     <Select
                       onValueChange={field.onChange}
                       defaultValue={field.value || undefined}
+                      value={field.value || undefined}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -261,10 +276,11 @@ export function EmployeeForm({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="Vendedor">Vendedor</SelectItem>
-                        <SelectItem value="Estoque">Estoque</SelectItem>
-                        <SelectItem value="Motoqueiro">Motoqueiro</SelectItem>
-                        <SelectItem value="Financeiro">Financeiro</SelectItem>
+                        {sectors.map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {s}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
