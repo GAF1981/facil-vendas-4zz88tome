@@ -165,11 +165,12 @@ export const rotaService = {
   },
 
   async getFullRotaData(rota: Rota | null) {
-    // 1. Fetch all Clients (Removed limit to ensure full visibility)
+    // 1. Fetch all Clients with increased limit to ensure full visibility (including codes like 67)
     const { data: clients, error: clientsError } = await supabase
       .from('CLIENTES')
       .select('*')
       .order('CODIGO', { ascending: false })
+      .limit(10000) // Increased from default to ensure all clients are fetched
 
     if (clientsError) throw clientsError
     if (!clients) return []

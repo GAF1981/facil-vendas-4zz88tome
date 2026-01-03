@@ -48,7 +48,7 @@ export default function RotaPage() {
         const [active, last, empRes] = await Promise.all([
           rotaService.getActiveRota(),
           rotaService.getLastRota(),
-          employeesService.getEmployees(1, 100),
+          employeesService.getEmployees(1, 1000), // Increased limit to ensure all sellers are available
         ])
         setActiveRota(active)
         setLastRota(last)
@@ -415,7 +415,7 @@ export default function RotaPage() {
       'Fantasia',
     ]
 
-    const rowsToExport = sortedRows.slice(0, 500)
+    const rowsToExport = sortedRows // Export all rows without limit
 
     const csvContent = [
       headers.join(';'),
