@@ -233,19 +233,15 @@ export default function CaixaPage() {
       if (error) throw error
 
       if (pdfBlob) {
-        // Create blob link to download
+        // Automatically open in new tab instead of download
         const blob = new Blob([pdfBlob], { type: 'application/pdf' })
         const url = window.URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.href = url
-        const filename = employeeId
-          ? `Caixa_${employeeName}_Rota_${selectedRoute.id}.pdf`
-          : `Resumo_Geral_Caixa_Rota_${selectedRoute.id}.pdf`
+        window.open(url, '_blank')
 
-        link.setAttribute('download', filename)
-        document.body.appendChild(link)
-        link.click()
-        link.remove()
+        // Clean up URL object after a short delay to ensure it opened
+        setTimeout(() => {
+          window.URL.revokeObjectURL(url)
+        }, 1000)
       }
     } catch (err) {
       console.error(err)

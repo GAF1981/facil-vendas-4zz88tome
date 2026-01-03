@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/table'
 import { reportsService, TopSellingItem } from '@/services/reportsService'
 import { formatCurrency } from '@/lib/formatters'
-import { format, subDays, startOfMonth, endOfMonth } from 'date-fns'
+import { format, startOfMonth, endOfMonth } from 'date-fns'
 import { Search, Loader2, ArrowLeft } from 'lucide-react'
 import { Link } from 'react-router-dom'
 

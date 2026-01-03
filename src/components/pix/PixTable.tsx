@@ -13,7 +13,6 @@ import { formatCurrency } from '@/lib/formatters'
 import { format, parseISO } from 'date-fns'
 import {
   CheckCircle2,
-  AlertCircle,
   Edit2,
   ArrowUpDown,
   ArrowUp,

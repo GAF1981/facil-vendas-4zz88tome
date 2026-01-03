@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Loader2, ChevronsUpDown, Check, Search } from 'lucide-react'
+import { Loader2, ChevronsUpDown, Check } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -71,7 +71,10 @@ export function ClientForm({
       ? {
           ...initialData,
           EMAIL: initialData.EMAIL || '',
-          Desconto: initialData.Desconto || '30%',
+          // Ensure discount is just the number string for editing
+          Desconto: initialData.Desconto
+            ? initialData.Desconto.replace('%', '')
+            : '30',
         }
       : {
           CODIGO: 0,
@@ -93,7 +96,7 @@ export function ClientForm({
           'FORMA DE PAGAMENTO': 'BOLETO', // Default
           'NOTA FISCAL': 'NÃO',
           EXPOSITOR: 'OUTROS', // Default
-          Desconto: '30%', // Default for new entries as per requirement
+          Desconto: '30', // Default without % for the input
           'DESCONTO ACESSORIO CELULAR': '',
           'DESCONTO BRINQUEDO': '',
           'DESCONTO ACESSORIO': '',
@@ -167,34 +170,21 @@ export function ClientForm({
     }
   }
 
-  // Handle Discount formatting
-  const handleDiscountBlur = (
-    e: React.FocusEvent<HTMLInputElement>,
-    onChange: (val: string) => void,
-  ) => {
-    let val = e.target.value.replace(/[^0-9.]/g, '')
-    if (val) {
-      // Ensure percentage is not > 100
-      if (parseFloat(val) > 100) val = '100'
-      // Append % symbol
-      onChange(`${val}%`)
-    } else {
-      onChange('')
-    }
-  }
-
-  const handleDiscountFocus = (
-    e: React.FocusEvent<HTMLInputElement>,
-    onChange: (val: string) => void,
-  ) => {
-    const val = e.target.value.replace('%', '')
-    onChange(val)
-  }
-
   const onSubmit = async (data: ClientFormData) => {
     setLoading(true)
     try {
-      const payload = { ...data, CODIGO: Number(data.CODIGO) }
+      // Append % to discount before saving if not present
+      const discountVal = data.Desconto
+        ? data.Desconto.includes('%')
+          ? data.Desconto
+          : `${data.Desconto}%`
+        : null
+
+      const payload = {
+        ...data,
+        CODIGO: Number(data.CODIGO),
+        Desconto: discountVal,
+      }
 
       if (initialData) {
         await clientsService.update(initialData.CODIGO, payload)
@@ -696,22 +686,24 @@ export function ClientForm({
                         <div className="relative">
                           <Input
                             placeholder="30"
+                            type="number"
+                            min="30"
+                            max="50"
+                            step="0.1"
                             {...field}
                             value={field.value || ''}
-                            onChange={field.onChange}
-                            onBlur={(e) =>
-                              handleDiscountBlur(e, field.onChange)
-                            }
-                            onFocus={(e) =>
-                              handleDiscountFocus(e, field.onChange)
-                            }
+                            onChange={(e) => {
+                              // Ensure only numbers are entered and update
+                              const val = e.target.value
+                              field.onChange(val)
+                            }}
                             className={cn(
                               'pr-8',
                               form.formState.errors.Desconto &&
                                 'border-destructive focus-visible:ring-destructive',
                             )}
                           />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium pointer-events-none">
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium pointer-events-none select-none">
                             %
                           </span>
                         </div>

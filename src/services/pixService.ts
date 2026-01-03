@@ -47,18 +47,24 @@ export const pixService = {
     const orderIds = [...new Set(receipts.map((r) => r.venda_id))]
 
     if (orderIds.length > 0) {
-      // Chunking for large arrays if needed, but 2000 limit is fine for now
+      // Fetching DATA DO ACERTO, FUNCIONÁRIO and data_combinada
       const { data: orderData, error: orderError } = await supabase
         .from('BANCO_DE_DADOS')
-        .select('"NÚMERO DO PEDIDO", "DATA DO ACERTO", "FUNCIONÁRIO"')
+        .select(
+          '"NÚMERO DO PEDIDO", "DATA DO ACERTO", "FUNCIONÁRIO", "data_combinada"',
+        )
         .in('NÚMERO DO PEDIDO', orderIds)
 
       if (!orderError && orderData) {
-        const orderMap = new Map<number, { date: string; seller: string }>()
+        const orderMap = new Map<
+          number,
+          { date: string; seller: string; combinedDate: string | null }
+        >()
         orderData.forEach((od: any) => {
           orderMap.set(od['NÚMERO DO PEDIDO'], {
             date: od['DATA DO ACERTO'],
             seller: od['FUNCIONÁRIO'],
+            combinedDate: od['data_combinada'],
           })
         })
 
@@ -66,7 +72,11 @@ export const pixService = {
         receipts.forEach((r) => {
           const info = orderMap.get(r.venda_id)
           if (info) {
-            r.data_acerto = info.date
+            // Using data_combinada as prioritized source for Data do Acerto if explicitly requested,
+            // otherwise fallback to DATA DO ACERTO.
+            // Requirement says: "Data do Acerto (from BANCO_DE_DADOS.data_combinada)"
+            // So we use combinedDate if available.
+            r.data_acerto = info.combinedDate || info.date
             r.vendedor_pedido = info.seller
           }
         })
