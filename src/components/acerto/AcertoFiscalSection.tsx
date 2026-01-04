@@ -1,12 +1,18 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
-import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Receipt } from 'lucide-react'
 
 interface AcertoFiscalSectionProps {
   clientNotaFiscal: string | null
-  notaFiscalVenda: boolean
-  onNotaFiscalVendaChange: (checked: boolean) => void
+  notaFiscalVenda: string
+  onNotaFiscalVendaChange: (value: string) => void
   disabled?: boolean
 }
 
@@ -17,7 +23,7 @@ export function AcertoFiscalSection({
   disabled = false,
 }: AcertoFiscalSectionProps) {
   return (
-    <Card className="border-muted bg-muted/10">
+    <Card className="border-muted bg-muted/10 h-full">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg font-semibold flex items-center gap-2">
           <Receipt className="h-5 w-5 text-primary" />
@@ -25,7 +31,7 @@ export function AcertoFiscalSection({
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center">
+        <div className="grid grid-cols-1 gap-6">
           <div className="flex flex-col space-y-1 p-3 bg-white dark:bg-card rounded-lg border shadow-sm">
             <span className="text-sm text-muted-foreground font-medium">
               Nota Fiscal Cadastro
@@ -35,25 +41,29 @@ export function AcertoFiscalSection({
             </span>
           </div>
 
-          <div className="flex items-center space-x-3 p-3 bg-white dark:bg-card rounded-lg border shadow-sm h-full">
-            <Checkbox
-              id="notaFiscalVenda"
-              checked={notaFiscalVenda}
-              onCheckedChange={(c) => onNotaFiscalVendaChange(c as boolean)}
+          <div className="flex flex-col space-y-2 p-3 bg-white dark:bg-card rounded-lg border shadow-sm">
+            <Label htmlFor="notaFiscalVenda" className="font-medium">
+              Nota Fiscal Venda <span className="text-red-500">*</span>
+            </Label>
+            <Select
+              value={notaFiscalVenda}
+              onValueChange={onNotaFiscalVendaChange}
               disabled={disabled}
-              className="h-6 w-6"
-            />
-            <div className="grid gap-1.5 leading-none">
-              <Label
-                htmlFor="notaFiscalVenda"
-                className="text-base font-medium cursor-pointer"
+            >
+              <SelectTrigger
+                id="notaFiscalVenda"
+                className={notaFiscalVenda === '' ? 'border-red-300' : ''}
               >
-                Nota Fiscal Venda
-              </Label>
-              <p className="text-xs text-muted-foreground">
-                Marque para emitir nota fiscal nesta venda.
-              </p>
-            </div>
+                <SelectValue placeholder="Selecione..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="SIM">SIM</SelectItem>
+                <SelectItem value="NÃO">NÃO</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Obrigatório para finalizar o acerto.
+            </p>
           </div>
         </div>
       </CardContent>

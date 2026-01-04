@@ -398,7 +398,7 @@ export const bancoDeDadosService = {
     date: Date,
     acertoTipo: string,
     payments: PaymentEntry[],
-    notaFiscalVenda: boolean,
+    notaFiscalVenda: string, // Changed to string
     customOrderNumber?: number,
   ) {
     // 1. Get Context (Order Number)
@@ -437,7 +437,8 @@ export const bancoDeDadosService = {
 
     // Determine Status NF
     const nfCadastro = client['NOTA FISCAL'] || 'NÃO'
-    const nfVenda = notaFiscalVenda ? 'SIM' : 'NÃO'
+    // notaFiscalVenda is now passed as string 'SIM' or 'NÃO' or empty
+    const nfVenda = notaFiscalVenda || 'NÃO'
     let statusNf = 'Pendente'
 
     if (nfCadastro === 'NÃO' && nfVenda === 'NÃO') {
@@ -539,7 +540,7 @@ export const bancoDeDadosService = {
             funcionario_id: employee.id,
             forma_pagamento: payment.method,
             valor_registrado: detail.value,
-            valor_pago: 0,
+            valor_pago: detail.paidValue || 0, // Use the specific paidValue for this installment (e.g. ENTRADA)
             vencimento: new Date(`${detail.dueDate}T12:00:00`).toISOString(),
             ID_da_fêmea: nextPedido, // Backfill
           })
@@ -572,7 +573,8 @@ export const bancoDeDadosService = {
     }
 
     // 6. Insert into NOTA_FISCAL if requested
-    if (notaFiscalVenda) {
+    // Since we changed to string check
+    if (nfVenda === 'SIM') {
       const { error: nfError } = await supabase.from('NOTA_FISCAL').insert({
         venda_id: nextPedido,
         cliente_id: client.CODIGO,

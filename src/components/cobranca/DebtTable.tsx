@@ -245,15 +245,19 @@ export function DebtTable({
     <>
       <div className="rounded-md border bg-card">
         <Table>
-          <TableHeader>
+          <TableHeader className="bg-background sticky top-0 z-10 shadow-sm">
             <TableRow>
-              <TableHead className="w-[70px]">Código</TableHead>
-              <TableHead className="w-[90px]">Tipo</TableHead>
-              <TableHead className="min-w-[150px]">Nome Cliente</TableHead>
-              <TableHead className="min-w-[150px]">Endereço</TableHead>
+              <TableHead className="w-[70px] bg-background">Código</TableHead>
+              <TableHead className="w-[90px] bg-background">Tipo</TableHead>
+              <TableHead className="min-w-[150px] bg-background">
+                Nome Cliente
+              </TableHead>
+              <TableHead className="min-w-[150px] bg-background">
+                Endereço
+              </TableHead>
 
               <TableHead
-                className="min-w-[100px] cursor-pointer hover:bg-muted"
+                className="min-w-[100px] cursor-pointer hover:bg-muted bg-background"
                 onClick={() => requestSort('neighborhood')}
               >
                 <div className="flex items-center gap-1">
@@ -263,7 +267,7 @@ export function DebtTable({
               </TableHead>
 
               <TableHead
-                className="min-w-[100px] cursor-pointer hover:bg-muted"
+                className="min-w-[100px] cursor-pointer hover:bg-muted bg-background"
                 onClick={() => requestSort('city')}
               >
                 <div className="flex items-center gap-1">
@@ -272,23 +276,32 @@ export function DebtTable({
                 </div>
               </TableHead>
 
-              <TableHead className="w-[80px]">Pedido #</TableHead>
-              <TableHead>Vencimento</TableHead>
-              <TableHead>F. Pagamento</TableHead>
-              <TableHead className="text-right">Valor Parc.</TableHead>
-              <TableHead className="text-right">Pago</TableHead>
-              <TableHead className="text-right">Débito</TableHead>
-              <TableHead className="text-center">Status</TableHead>
+              <TableHead className="w-[80px] bg-background">Pedido</TableHead>
+              <TableHead className="bg-background">Vencimento</TableHead>
+              <TableHead className="bg-background">F. Pagamento</TableHead>
+              <TableHead className="text-right bg-background">
+                Valor Parc.
+              </TableHead>
+              <TableHead className="text-right bg-background">Pago</TableHead>
+              <TableHead className="text-right bg-background">Débito</TableHead>
+              <TableHead className="text-center bg-background">
+                Status
+              </TableHead>
 
               {/* Editable Columns */}
-              <TableHead className="min-w-[150px]">Forma Cobrança</TableHead>
-              <TableHead className="min-w-[150px]">Data Combinada</TableHead>
-              <TableHead className="min-w-[80px] text-center">Ações</TableHead>
-              <TableHead className="w-[50px]"></TableHead>
+              <TableHead className="min-w-[150px] bg-background">
+                Forma Cobrança
+              </TableHead>
+              <TableHead className="min-w-[150px] bg-background">
+                Data Combinada
+              </TableHead>
+              <TableHead className="min-w-[80px] text-center bg-background">
+                Ações
+              </TableHead>
 
               {/* Rota Motoqueiro Column */}
               <TableHead
-                className="w-[50px] text-center"
+                className="w-[50px] text-center bg-background"
                 title="Rota Motoqueiro"
               >
                 Rota
@@ -299,7 +312,7 @@ export function DebtTable({
             {flattenedData.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={18}
+                  colSpan={17}
                   className="h-24 text-center text-muted-foreground"
                 >
                   Nenhum registro encontrado.
@@ -366,22 +379,6 @@ export function DebtTable({
                     <TableCell className="text-right font-mono text-xs text-red-600 font-bold">
                       <div className="flex items-center justify-end gap-2">
                         {formatCurrency(row.debito)}
-                        {/* New Action Button Adjacent to Debt Value */}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-blue-600 hover:bg-blue-100"
-                          onClick={() =>
-                            handleOpenActions(
-                              row.orderId,
-                              row.clientId,
-                              row.clientName,
-                            )
-                          }
-                          title="Registrar Ação de Cobrança"
-                        >
-                          <PlusCircle className="h-4 w-4" />
-                        </Button>
                       </div>
                     </TableCell>
                     <TableCell className="text-center">
@@ -475,23 +472,14 @@ export function DebtTable({
                       </div>
                     </TableCell>
 
-                    {/* Collection Actions Column (History Icon) */}
+                    {/* Actions Column */}
                     <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <span
-                          className={cn(
-                            'text-xs font-semibold',
-                            row.collectionActionCount > 0
-                              ? 'text-blue-600'
-                              : 'text-muted-foreground',
-                          )}
-                        >
-                          {row.collectionActionCount}
-                        </span>
+                      <div className="flex items-center justify-center gap-1">
+                        {/* Action Button */}
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-7 w-7 text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                          className="h-7 w-7 text-blue-600 hover:bg-blue-100"
                           onClick={() =>
                             handleOpenActions(
                               row.orderId,
@@ -499,27 +487,52 @@ export function DebtTable({
                               row.clientName,
                             )
                           }
-                          title="Ver Histórico de Cobrança"
+                          title="Registrar Ação de Cobrança"
                         >
-                          <MessageSquareText className="h-4 w-4" />
+                          <PlusCircle className="h-4 w-4" />
+                        </Button>
+
+                        {/* History Button */}
+                        <div className="relative">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                            onClick={() =>
+                              handleOpenActions(
+                                row.orderId,
+                                row.clientId,
+                                row.clientName,
+                              )
+                            }
+                            title="Ver Histórico"
+                          >
+                            <MessageSquareText className="h-4 w-4" />
+                          </Button>
+                          {row.collectionActionCount > 0 && (
+                            <span className="absolute -top-1 -right-1 flex h-3 w-3 items-center justify-center rounded-full bg-red-600 text-[8px] text-white">
+                              {row.collectionActionCount}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Details Button */}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => {
+                            const originalClient = data.find(
+                              (c) => c.clientId === row.clientId,
+                            )
+                            if (originalClient)
+                              handleOpenDetails(originalClient)
+                          }}
+                          title="Ver Detalhes"
+                        >
+                          <Search className="h-4 w-4" />
                         </Button>
                       </div>
-                    </TableCell>
-
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          const originalClient = data.find(
-                            (c) => c.clientId === row.clientId,
-                          )
-                          if (originalClient) handleOpenDetails(originalClient)
-                        }}
-                        title="Ver Detalhes do Cliente"
-                      >
-                        <Search className="h-4 w-4" />
-                      </Button>
                     </TableCell>
 
                     {/* Rota Motoqueiro Selection Checkbox */}

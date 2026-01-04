@@ -3,6 +3,7 @@ export type PaymentMethodType = 'Pix' | 'Dinheiro' | 'Boleto' | 'Cheque'
 export interface PaymentInstallment {
   number: number
   value: number
+  paidValue: number // Maps to "Valor Pago" for individual installments (e.g. ENTRADA)
   dueDate: string
 }
 

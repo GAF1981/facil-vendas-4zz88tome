@@ -46,11 +46,13 @@ export function AcertoPaymentSummary({
       const dueDateDate = method === 'Boleto' ? addDays(today, 10) : today
       const dueDate = format(dueDateDate, 'yyyy-MM-dd')
 
+      // Auto-fill logic for Cheque (Value = Paid Value)
+      const initialPaidValue = method === 'Cheque' ? defaultValue : 0
+
       const newEntry: PaymentEntry = {
         method,
         value: defaultValue,
-        paidValue:
-          method === 'Boleto' || method === 'Cheque' ? 0 : defaultValue, // Initially 0 for delayed methods unless autofill logic kicks in later
+        paidValue: initialPaidValue,
         installments: 1,
         dueDate: dueDate,
       }
@@ -63,14 +65,32 @@ export function AcertoPaymentSummary({
   const generateInstallments = (
     totalValue: number,
     count: number,
+    method: PaymentMethodType,
   ): PaymentInstallment[] => {
     const installmentValue = Number((totalValue / count).toFixed(2))
     const today = new Date()
-    return Array.from({ length: count }, (_, i) => ({
-      number: i + 1,
-      value: installmentValue,
-      dueDate: format(addDays(today, (i + 1) * 30), 'yyyy-MM-dd'),
-    }))
+    return Array.from({ length: count }, (_, i) => {
+      let dueDate = format(addDays(today, (i + 1) * 30), 'yyyy-MM-dd')
+      let paidValue = 0
+
+      // Logic for ENTRADA (Index 0 for PIX/Dinheiro)
+      if (i === 0 && (method === 'Pix' || method === 'Dinheiro')) {
+        dueDate = format(today, 'yyyy-MM-dd')
+        paidValue = installmentValue
+      }
+
+      // Logic for Cheque installments (Paid Value = Value)
+      if (method === 'Cheque') {
+        paidValue = installmentValue
+      }
+
+      return {
+        number: i + 1,
+        value: installmentValue,
+        paidValue: paidValue,
+        dueDate: dueDate,
+      }
+    })
   }
 
   const handleUpdateEntry = (
@@ -87,10 +107,16 @@ export function AcertoPaymentSummary({
         const updated = { ...p, [field]: value }
 
         if (field === 'value') {
+          // If method is Cheque, auto-sync paidValue if installments=1
+          if (method === 'Cheque' && updated.installments === 1) {
+            updated.paidValue = value as number
+          }
+
           if (updated.installments > 1) {
             updated.details = generateInstallments(
               value as number,
               updated.installments,
+              method,
             )
           }
         }
@@ -98,18 +124,19 @@ export function AcertoPaymentSummary({
         if (field === 'installments') {
           const count = value as number
           if (count > 1) {
-            updated.details = generateInstallments(p.value, count)
-            // Auto-Fill Logic: If Check/Money/Pix AND Installments > 1 => Paid Value = Registered Value
-            if (['Cheque', 'Dinheiro', 'Pix'].includes(method)) {
-              updated.paidValue = updated.value
-            }
+            updated.details = generateInstallments(p.value, count, method)
           } else {
             updated.details = undefined
             const today = new Date()
             const dueDateDate = method === 'Boleto' ? addDays(today, 10) : today
             updated.dueDate = format(dueDateDate, 'yyyy-MM-dd')
-            // Revert auto-fill logic? Keeping previous state might be safer or reset to default logic.
-            // For now, let's leave it as is, user can edit if needed.
+
+            // Re-apply single payment logic
+            if (method === 'Cheque') {
+              updated.paidValue = updated.value
+            } else {
+              updated.paidValue = 0 // Reset or keep previous? Resetting seems safer for consistency
+            }
           }
         }
 
@@ -131,6 +158,14 @@ export function AcertoPaymentSummary({
         if (p.method !== method || !p.details) return p
         const newDetails = [...p.details]
         newDetails[index] = { ...newDetails[index], [field]: value }
+
+        // Check constraints inside installments?
+        // For Cheque, if user changes value, should we sync paidValue?
+        if (method === 'Cheque' && field === 'value') {
+          newDetails[index].paidValue = value
+        }
+
+        // Recalculate parent value from sum of installments
         let newValue = p.value
         if (field === 'value') {
           newValue = Number(
@@ -268,7 +303,8 @@ export function AcertoPaymentSummary({
                   Math.abs(entry.paidValue - entry.value) < 0.01 &&
                   entry.value > 0
 
-                const isPaidDisabled = entry.method === 'Boleto'
+                const isPaidDisabled =
+                  entry.method === 'Boleto' || entry.method === 'Cheque'
 
                 return (
                   <div
@@ -354,6 +390,7 @@ export function AcertoPaymentSummary({
                               isOverpaid
                                 ? 'border-red-300 bg-red-50 text-red-700 focus-visible:ring-red-200'
                                 : 'border-green-200 bg-green-50/20 text-green-700',
+                              disabled ? 'bg-muted' : '',
                             )}
                             value={entry.paidValue}
                             disabled={disabled || isPaidDisabled}
@@ -372,9 +409,14 @@ export function AcertoPaymentSummary({
                             Aviso: Valor pago maior que registrado.
                           </span>
                         )}
-                        {isPaidDisabled && (
+                        {entry.method === 'Boleto' && (
                           <span className="text-[10px] text-muted-foreground font-medium block mt-1">
                             Boleto não permite entrada de valor pago imediato.
+                          </span>
+                        )}
+                        {entry.method === 'Cheque' && (
+                          <span className="text-[10px] text-muted-foreground font-medium block mt-1">
+                            Valor pago é preenchido automaticamente.
                           </span>
                         )}
                       </div>
@@ -437,60 +479,113 @@ export function AcertoPaymentSummary({
                           Parcelas
                         </h4>
                         <div className="grid gap-3">
-                          {entry.details.map((inst, idx) => (
-                            <div
-                              key={idx}
-                              className="flex flex-col sm:flex-row gap-3 items-center bg-muted/20 p-2 rounded-md"
-                            >
-                              <div className="w-full sm:w-20 text-sm font-medium text-muted-foreground">
-                                {idx + 1}ª Parcela
+                          {entry.details.map((inst, idx) => {
+                            // Check for ENTRADA logic
+                            const isEntrada =
+                              idx === 0 &&
+                              (entry.method === 'Pix' ||
+                                entry.method === 'Dinheiro')
+                            const isCheque = entry.method === 'Cheque'
+
+                            return (
+                              <div
+                                key={idx}
+                                className={cn(
+                                  'flex flex-col sm:flex-row gap-3 items-center p-2 rounded-md',
+                                  isEntrada
+                                    ? 'bg-red-50 border border-red-100'
+                                    : 'bg-muted/20',
+                                )}
+                              >
+                                <div
+                                  className={cn(
+                                    'w-full sm:w-20 text-sm font-medium',
+                                    isEntrada
+                                      ? 'text-red-600 font-bold'
+                                      : 'text-muted-foreground',
+                                  )}
+                                >
+                                  {isEntrada
+                                    ? 'ENTRADA'
+                                    : `${idx + 1}ª Parcela`}
+                                </div>
+                                <div className="w-full sm:flex-1 relative">
+                                  <span className="absolute left-2.5 top-2 text-muted-foreground text-xs">
+                                    R$
+                                  </span>
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    className="h-8 pl-7 text-sm"
+                                    value={inst.value}
+                                    disabled={disabled}
+                                    onChange={(e) =>
+                                      handleUpdateInstallment(
+                                        entry.method,
+                                        idx,
+                                        'value',
+                                        parseFloat(e.target.value) || 0,
+                                      )
+                                    }
+                                    onBlur={() =>
+                                      handleUpdateInstallment(
+                                        entry.method,
+                                        idx,
+                                        'value',
+                                        Number(inst.value.toFixed(2)),
+                                      )
+                                    }
+                                  />
+                                </div>
+
+                                {/* Paid Value per Installment */}
+                                <div className="w-full sm:flex-1 relative">
+                                  <span className="absolute left-2.5 top-2 text-muted-foreground text-xs">
+                                    Pago: R$
+                                  </span>
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    className={cn(
+                                      'h-8 pl-16 text-sm',
+                                      isCheque ? 'bg-muted' : '',
+                                    )}
+                                    value={inst.paidValue}
+                                    disabled={
+                                      disabled ||
+                                      isCheque ||
+                                      entry.method === 'Boleto'
+                                    }
+                                    onChange={(e) =>
+                                      handleUpdateInstallment(
+                                        entry.method,
+                                        idx,
+                                        'paidValue',
+                                        parseFloat(e.target.value) || 0,
+                                      )
+                                    }
+                                  />
+                                </div>
+
+                                <div className="w-full sm:w-32">
+                                  <Input
+                                    type="date"
+                                    className="h-8 text-sm px-2"
+                                    value={inst.dueDate}
+                                    disabled={disabled}
+                                    onChange={(e) =>
+                                      handleUpdateInstallment(
+                                        entry.method,
+                                        idx,
+                                        'dueDate',
+                                        e.target.value,
+                                      )
+                                    }
+                                  />
+                                </div>
                               </div>
-                              <div className="w-full sm:flex-1 relative">
-                                <span className="absolute left-2.5 top-2 text-muted-foreground text-xs">
-                                  R$
-                                </span>
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  className="h-8 pl-7 text-sm"
-                                  value={inst.value}
-                                  disabled={disabled}
-                                  onChange={(e) =>
-                                    handleUpdateInstallment(
-                                      entry.method,
-                                      idx,
-                                      'value',
-                                      parseFloat(e.target.value) || 0,
-                                    )
-                                  }
-                                  onBlur={() =>
-                                    handleUpdateInstallment(
-                                      entry.method,
-                                      idx,
-                                      'value',
-                                      Number(inst.value.toFixed(2)),
-                                    )
-                                  }
-                                />
-                              </div>
-                              <div className="w-full sm:w-32">
-                                <Input
-                                  type="date"
-                                  className="h-8 text-sm px-2"
-                                  value={inst.dueDate}
-                                  disabled={disabled}
-                                  onChange={(e) =>
-                                    handleUpdateInstallment(
-                                      entry.method,
-                                      idx,
-                                      'dueDate',
-                                      e.target.value,
-                                    )
-                                  }
-                                />
-                              </div>
-                            </div>
-                          ))}
+                            )
+                          })}
                         </div>
                       </div>
                     )}

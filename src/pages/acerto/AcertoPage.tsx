@@ -43,7 +43,7 @@ export default function AcertoPage() {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('')
   const [items, setItems] = useState<AcertoItem[]>([])
   const [payments, setPayments] = useState<PaymentEntry[]>([])
-  const [notaFiscal, setNotaFiscal] = useState(false)
+  const [notaFiscal, setNotaFiscal] = useState<string>('') // Changed to string
   const [signature, setSignature] = useState<string | null>(null)
   const [signatureOpen, setSignatureOpen] = useState(false)
 
@@ -121,6 +121,7 @@ export default function AcertoPage() {
       setNextOrderNumber(null)
       setPayments([])
       setSignature(null)
+      setNotaFiscal('') // Reset NF selection
     }
   }, [client])
 
@@ -294,6 +295,17 @@ export default function AcertoPage() {
       return
     }
 
+    // Nota Fiscal Validation (Mandatory)
+    if (!notaFiscal) {
+      toast({
+        title: 'Nota Fiscal Obrigatória',
+        description:
+          'Por favor, selecione SIM ou NÃO para a Nota Fiscal Venda.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     // Payment Validation
     if (payments.length === 0 && amountToPay > 0.01) {
       toast({
@@ -326,7 +338,7 @@ export default function AcertoPage() {
         now,
         'Acerto',
         payments,
-        notaFiscal,
+        notaFiscal, // Passing string instead of boolean
       )
 
       // Generate Final PDF

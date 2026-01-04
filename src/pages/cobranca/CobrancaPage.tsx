@@ -487,7 +487,8 @@ export default function CobrancaPage() {
       </Card>
 
       {/* Scrollable Container for Desktop List */}
-      <ScrollArea className="h-[600px] border rounded-md bg-card">
+      {/* Updated height calculation and container responsiveness for mobile vertical scrolling */}
+      <ScrollArea className="h-[calc(100vh-250px)] min-h-[500px] border rounded-md bg-card">
         {loading && data.length === 0 ? (
           <div className="flex justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />

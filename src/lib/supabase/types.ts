@@ -90,6 +90,51 @@ export type Database = {
         }
         Relationships: []
       }
+      AJUSTE_SALDO_INICIAL: {
+        Row: {
+          cliente_id: number
+          cliente_nome: string | null
+          created_at: string | null
+          data_acerto: string | null
+          id: number
+          numero_pedido: number | null
+          produto_id: number
+          quantidade_alterada: number | null
+          saldo_anterior: number | null
+          saldo_novo: number | null
+          vendedor_id: number | null
+          vendedor_nome: string | null
+        }
+        Insert: {
+          cliente_id: number
+          cliente_nome?: string | null
+          created_at?: string | null
+          data_acerto?: string | null
+          id?: number
+          numero_pedido?: number | null
+          produto_id: number
+          quantidade_alterada?: number | null
+          saldo_anterior?: number | null
+          saldo_novo?: number | null
+          vendedor_id?: number | null
+          vendedor_nome?: string | null
+        }
+        Update: {
+          cliente_id?: number
+          cliente_nome?: string | null
+          created_at?: string | null
+          data_acerto?: string | null
+          id?: number
+          numero_pedido?: number | null
+          produto_id?: number
+          quantidade_alterada?: number | null
+          saldo_anterior?: number | null
+          saldo_novo?: number | null
+          vendedor_id?: number | null
+          vendedor_nome?: string | null
+        }
+        Relationships: []
+      }
       BANCO_DE_DADOS: {
         Row: {
           CLIENTE: string | null
