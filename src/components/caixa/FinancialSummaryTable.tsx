@@ -10,7 +10,14 @@ import { CaixaSummaryRow } from '@/services/caixaService'
 import { formatCurrency } from '@/lib/formatters'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { Eye, PlusCircle, FileText } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import {
+  Eye,
+  PlusCircle,
+  FileText,
+  CheckCircle2,
+  AlertCircle,
+} from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -43,6 +50,7 @@ export function FinancialSummaryTable({
         <TableHeader className="bg-muted/50">
           <TableRow>
             <TableHead>Funcionário</TableHead>
+            <TableHead className="text-center">Caixa</TableHead>
             <TableHead className="text-right text-green-700">
               Valores Recebidos
             </TableHead>
@@ -57,7 +65,7 @@ export function FinancialSummaryTable({
           {data.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={5}
+                colSpan={6}
                 className="h-24 text-center text-muted-foreground"
               >
                 Nenhuma movimentação financeira encontrada para esta rota.
@@ -69,30 +77,52 @@ export function FinancialSummaryTable({
                 <TableRow key={row.funcionarioId} className="hover:bg-muted/30">
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 text-muted-foreground hover:text-blue-600"
-                              onClick={() =>
-                                onGeneratePdf(
-                                  row.funcionarioId,
-                                  row.funcionarioNome,
-                                )
-                              }
-                            >
-                              <FileText className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Gerar Relatório PDF</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                      {row.statusCaixa === 'Fechado' && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-green-600 hover:text-green-700 hover:bg-green-100"
+                                onClick={() =>
+                                  onGeneratePdf(
+                                    row.funcionarioId,
+                                    row.funcionarioNome,
+                                  )
+                                }
+                              >
+                                <FileText className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Relatório de Fechamento PDF</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
                       {row.funcionarioNome}
                     </div>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        row.statusCaixa === 'Fechado'
+                          ? 'bg-green-100 text-green-700 border-green-200'
+                          : 'bg-red-50 text-red-600 border-red-200',
+                      )}
+                    >
+                      {row.statusCaixa === 'Fechado' ? (
+                        <span className="flex items-center gap-1">
+                          <CheckCircle2 className="h-3 w-3" /> Caixa Fechado
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" /> Caixa Aberto
+                        </span>
+                      )}
+                    </Badge>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
@@ -168,6 +198,7 @@ export function FinancialSummaryTable({
                       onClick={() =>
                         onAddExpense(row.funcionarioId, row.funcionarioNome)
                       }
+                      disabled={row.statusCaixa === 'Fechado'}
                     >
                       <PlusCircle className="mr-1 h-3 w-3" />
                       Cadastrar Despesa
@@ -177,7 +208,7 @@ export function FinancialSummaryTable({
               ))}
               {/* Totalizer Row */}
               <TableRow className="bg-muted/50 font-bold border-t-2">
-                <TableCell>TOTAL GERAL</TableCell>
+                <TableCell colSpan={2}>TOTAL GERAL</TableCell>
                 <TableCell className="text-right text-green-700">
                   R$ {formatCurrency(totalRecebido)}
                 </TableCell>

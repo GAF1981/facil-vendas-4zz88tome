@@ -465,6 +465,7 @@ export type Database = {
           cheque_aprovado: boolean | null
           created_at: string
           desconto_total: number | null
+          despesas_aprovadas: boolean | null
           dinheiro_aprovado: boolean | null
           funcionario_id: number
           id: number
@@ -474,6 +475,7 @@ export type Database = {
           status: string | null
           valor_a_receber: number | null
           valor_cheque: number | null
+          valor_despesas: number | null
           valor_dinheiro: number | null
           valor_pix: number | null
           venda_total: number | null
@@ -482,6 +484,7 @@ export type Database = {
           cheque_aprovado?: boolean | null
           created_at?: string
           desconto_total?: number | null
+          despesas_aprovadas?: boolean | null
           dinheiro_aprovado?: boolean | null
           funcionario_id: number
           id?: number
@@ -491,6 +494,7 @@ export type Database = {
           status?: string | null
           valor_a_receber?: number | null
           valor_cheque?: number | null
+          valor_despesas?: number | null
           valor_dinheiro?: number | null
           valor_pix?: number | null
           venda_total?: number | null
@@ -499,6 +503,7 @@ export type Database = {
           cheque_aprovado?: boolean | null
           created_at?: string
           desconto_total?: number | null
+          despesas_aprovadas?: boolean | null
           dinheiro_aprovado?: boolean | null
           funcionario_id?: number
           id?: number
@@ -508,6 +513,7 @@ export type Database = {
           status?: string | null
           valor_a_receber?: number | null
           valor_cheque?: number | null
+          valor_despesas?: number | null
           valor_dinheiro?: number | null
           valor_pix?: number | null
           venda_total?: number | null

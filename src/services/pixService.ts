@@ -1,9 +1,10 @@
 import { supabase } from '@/lib/supabase/client'
 import { PixReceiptRow, PixConferenceFormData } from '@/types/pix'
+import { parseISO, isAfter, isBefore, isEqual } from 'date-fns'
 
 export const pixService = {
   async getPixReceipts(): Promise<PixReceiptRow[]> {
-    // 1. Fetch from RECEBIMENTOS where forma_pagamento contains 'Pix'
+    // 1. Fetch from RECEBIMENTOS
     const { data, error } = await supabase
       .from('RECEBIMENTOS')
       .select(
@@ -19,9 +20,31 @@ export const pixService = {
 
     if (error) throw error
 
+    // 2. Fetch All Rotas to determine Route Number efficiently
+    const { data: rotas } = await supabase
+      .from('ROTA')
+      .select('*')
+      .order('id', { ascending: false })
+      .limit(50) // Assuming last 50 routes cover recent history
+
     const receipts = (data || []).map((row: any) => {
       const pix = Array.isArray(row.PIX) ? row.PIX[0] : row.PIX
       const clientName = row.CLIENTES?.['NOME CLIENTE'] || 'N/D'
+
+      // Determine Rota ID based on created_at
+      let rotaId: number | undefined
+      if (row.created_at && rotas) {
+        const created = parseISO(row.created_at)
+        const rota = rotas.find((r) => {
+          const start = parseISO(r.data_inicio)
+          const end = r.data_fim ? parseISO(r.data_fim) : new Date()
+          return (
+            (isAfter(created, start) || isEqual(created, start)) &&
+            (isBefore(created, end) || isEqual(created, end))
+          )
+        })
+        if (rota) rotaId = rota.id
+      }
 
       return {
         id: row.id,
@@ -39,15 +62,14 @@ export const pixService = {
         banco_pix: pix?.banco_pix,
         data_pix_realizado: pix?.data_pix_realizado,
         confirmado_por: pix?.confirmado_por,
+        rota_id: rotaId, // New field
       }
     })
 
-    // 2. Enhance with "Data do Acerto" and "Vendedor do Pedido" from BANCO_DE_DADOS
-    // Extract unique venda_ids to query BANCO_DE_DADOS
+    // 3. Enhance with "Data do Acerto"
     const orderIds = [...new Set(receipts.map((r) => r.venda_id))]
 
     if (orderIds.length > 0) {
-      // Fetching DATA DO ACERTO, FUNCIONÁRIO and data_combinada
       const { data: orderData, error: orderError } = await supabase
         .from('BANCO_DE_DADOS')
         .select(
@@ -68,14 +90,9 @@ export const pixService = {
           })
         })
 
-        // Merge into receipts
         receipts.forEach((r) => {
           const info = orderMap.get(r.venda_id)
           if (info) {
-            // Using data_combinada as prioritized source for Data do Acerto if explicitly requested,
-            // otherwise fallback to DATA DO ACERTO.
-            // Requirement says: "Data do Acerto (from BANCO_DE_DADOS.data_combinada)"
-            // So we use combinedDate if available.
             r.data_acerto = info.combinedDate || info.date
             r.vendedor_pedido = info.seller
           }
@@ -105,5 +122,42 @@ export const pixService = {
     )
 
     if (error) throw error
+  },
+
+  // Helper to check automated approval
+  async areAllPixConfirmedForEmployee(rotaId: number, employeeId: number) {
+    // 1. Get current route details to define time range
+    const { data: rota } = await supabase
+      .from('ROTA')
+      .select('*')
+      .eq('id', rotaId)
+      .single()
+
+    if (!rota) return false
+
+    // 2. Fetch ALL Pix receipts for this employee in this route time
+    // We filter by 'Pix' in forma_pagamento directly
+    const { data: receipts, error } = await supabase
+      .from('RECEBIMENTOS')
+      .select('id, PIX(confirmado_por)')
+      .eq('funcionario_id', employeeId)
+      .ilike('forma_pagamento', '%Pix%')
+      .gte('created_at', rota.data_inicio)
+      // If route closed, check upper bound
+      .lte(
+        'created_at',
+        rota.data_fim || new Date(Date.now() + 86400000).toISOString(),
+      )
+
+    if (error) throw error
+    if (!receipts || receipts.length === 0) return true // No pix = All confirmed (technically valid for checkbox)
+
+    // 3. Check if all have a 'confirmado_por' value (Left join returns array or object)
+    const allConfirmed = receipts.every((r: any) => {
+      const pix = Array.isArray(r.PIX) ? r.PIX[0] : r.PIX
+      return !!pix?.confirmado_por
+    })
+
+    return allConfirmed
   },
 }

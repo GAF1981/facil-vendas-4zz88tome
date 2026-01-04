@@ -17,6 +17,8 @@ import { useUserStore } from '@/stores/useUserStore'
 import { useToast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { format } from 'date-fns'
+import { fechamentoService } from '@/services/fechamentoService'
+import { rotaService } from '@/services/rotaService'
 
 export default function RecebimentoPage() {
   const { employee } = useUserStore()
@@ -124,6 +126,28 @@ export default function RecebimentoPage() {
       return
     }
 
+    // CHECK CLOSURE BLOCK
+    try {
+      const activeRota = await rotaService.getActiveRota()
+      if (activeRota) {
+        const closureStatus = await fechamentoService.getClosureStatus(
+          activeRota.id,
+          employee.id,
+        )
+        if (closureStatus === 'Aberto' || closureStatus === 'Fechado') {
+          toast({
+            title: 'Ação Bloqueada',
+            description:
+              'Seu Caixa está fechado para a Rota !!! Você deve aguardar abrir uma Nova Rota !!!',
+            variant: 'destructive',
+          })
+          return
+        }
+      }
+    } catch (error) {
+      console.error('Error checking closure status:', error)
+    }
+
     if (!selectedOrder) {
       toast({
         title: 'Pedido não selecionado',
@@ -167,7 +191,7 @@ export default function RecebimentoPage() {
         const now = new Date()
         const pdfData = {
           client,
-          employee, // This is the vendedor associated with the transaction (passed to saveRecebimento)
+          employee,
           date: now.toISOString(),
           acertoTipo: 'Recebimento',
           totalVendido: selectedOrder.valorVendaTotal,
@@ -180,7 +204,7 @@ export default function RecebimentoPage() {
           monthlyAverage,
           orderNumber: selectedOrder.id,
           isReceipt: true,
-          issuerName: employee.nome_completo, // Current user as issuer
+          issuerName: employee.nome_completo,
         }
 
         const pdfBlob = await acertoService.generatePdf(pdfData, {
@@ -188,10 +212,8 @@ export default function RecebimentoPage() {
         })
 
         const url = window.URL.createObjectURL(pdfBlob)
-        // Automatically open in new tab instead of download
         window.open(url, '_blank')
 
-        // Clean up URL object after a short delay to ensure it opened
         setTimeout(() => {
           window.URL.revokeObjectURL(url)
         }, 1000)

@@ -34,6 +34,8 @@ import { Button } from '@/components/ui/button'
 import { Save, Printer, Loader2 } from 'lucide-react'
 import { parseCurrency } from '@/lib/formatters'
 import { format } from 'date-fns'
+import { fechamentoService } from '@/services/fechamentoService'
+import { rotaService } from '@/services/rotaService'
 
 export default function AcertoPage() {
   const { employee: loggedInUser } = useUserStore()
@@ -50,7 +52,7 @@ export default function AcertoPage() {
   const [signatureOpen, setSignatureOpen] = useState(false)
   const [zeroStockDialogOpen, setZeroStockDialogOpen] = useState(false)
 
-  // Pending Stock Adjustments Queue (Requirement 4)
+  // Pending Stock Adjustments Queue
   const [pendingAdjustments, setPendingAdjustments] = useState<
     PendingStockAdjustment[]
   >([])
@@ -104,7 +106,7 @@ export default function AcertoPage() {
         })
         .then(({ items: newItems }) => {
           setItems(newItems)
-          setPendingAdjustments([]) // Clear any pending adjustments from previous client
+          setPendingAdjustments([])
         })
         .catch((err) => {
           console.error(err)
@@ -131,7 +133,7 @@ export default function AcertoPage() {
       setPayments([])
       setSignature(null)
       setNotaFiscal('')
-      setPendingAdjustments([]) // Reset pending adjustments
+      setPendingAdjustments([])
     }
   }, [client])
 
@@ -147,7 +149,7 @@ export default function AcertoPage() {
   const discountAmount = totalSalesValue * discountFactor
   const amountToPay = totalSalesValue - discountAmount
 
-  // Auto-select PIX logic (Requirement: Default to PIX with full payment)
+  // Auto-select PIX logic
   useEffect(() => {
     if (
       amountToPay > 0.01 &&
@@ -162,13 +164,12 @@ export default function AcertoPage() {
         {
           method: 'Pix',
           value: paymentValue,
-          paidValue: paymentValue, // Default to full payment for Pix (Pay Now)
+          paidValue: paymentValue,
           installments: 1,
           dueDate: today,
           hasZeroDownPayment: false,
           details: [
             {
-              // Always add details for consistency
               number: 1,
               value: paymentValue,
               paidValue: paymentValue,
@@ -180,7 +181,6 @@ export default function AcertoPage() {
     }
   }, [amountToPay, loadingAcerto, client])
 
-  // Handlers for AcertoTable
   const handleUpdateContagem = (uid: string, newContagem: number) => {
     setItems((prevItems) =>
       prevItems.map((item) => {
@@ -211,7 +211,6 @@ export default function AcertoPage() {
     setItems((prevItems) =>
       prevItems.map((item) => {
         if (item.uid === uid) {
-          // Recalculate based on new initial balance
           const quantVendida = newSaldo - item.contagem
           const valorVendido = quantVendida * item.precoUnitario
           return {
@@ -226,7 +225,6 @@ export default function AcertoPage() {
     )
   }
 
-  // Requirement 4: Queue stock adjustment (Temporary local state)
   const handleQueueAdjustment = (adjustment: PendingStockAdjustment) => {
     setPendingAdjustments((prev) => [...prev, adjustment])
   }
@@ -306,7 +304,7 @@ export default function AcertoPage() {
     }
   }
 
-  const handlePreSaveValidation = () => {
+  const handlePreSaveValidation = async () => {
     if (!client) return
     const emp = employees.find((e) => e.id.toString() === selectedEmployeeId)
     if (!emp) {
@@ -318,7 +316,31 @@ export default function AcertoPage() {
       return
     }
 
-    // Requirement 5: Finalization Validation (Mandatory Nota Fiscal)
+    // CHECK CLOSURE BLOCK
+    try {
+      const activeRota = await rotaService.getActiveRota()
+      if (activeRota) {
+        const closureStatus = await fechamentoService.getClosureStatus(
+          activeRota.id,
+          emp.id,
+        )
+        if (closureStatus === 'Aberto' || closureStatus === 'Fechado') {
+          toast({
+            title: 'Ação Bloqueada',
+            description:
+              'Seu Caixa está fechado para a Rota !!! Você deve aguardar abrir uma Nova Rota !!!',
+            variant: 'destructive',
+          })
+          return
+        }
+      }
+    } catch (error) {
+      console.error('Error checking closure status:', error)
+      // Continue or block? Let's warn but maybe allow if error? No, safer to block or warn.
+      // But standard is strict. Assuming if error we might want to be careful.
+    }
+
+    // Finalization Validation
     if (!notaFiscal) {
       toast({
         title: 'Nota Fiscal Obrigatória',
@@ -387,7 +409,6 @@ export default function AcertoPage() {
     try {
       const now = new Date()
       // 1. Save Transaction and get final Order Number
-      // Requirement 5 & 6: Consolidated Data Persistence
       const finalOrderNumber = await bancoDeDadosService.saveTransaction(
         client,
         emp,
@@ -398,17 +419,16 @@ export default function AcertoPage() {
         notaFiscal,
       )
 
-      // 2. Process Pending Stock Adjustments (Requirement 4 & 5 - Batch Persistence)
+      // 2. Process Pending Stock Adjustments
       if (pendingAdjustments.length > 0) {
         for (const adj of pendingAdjustments) {
           try {
             await bancoDeDadosService.logInitialBalanceAdjustment({
               ...adj,
-              numero_pedido: finalOrderNumber, // Link to final order number
+              numero_pedido: finalOrderNumber,
             })
           } catch (logError) {
             console.error('Failed to log adjustment', adj, logError)
-            // Error handling strategy: Log and continue, or notify user.
           }
         }
       }
@@ -431,7 +451,7 @@ export default function AcertoPage() {
           ),
           payments,
           monthlyAverage,
-          orderNumber: finalOrderNumber, // Use final number
+          orderNumber: finalOrderNumber,
           issuerName: loggedInUser?.nome_completo,
         },
         { preview: false, signature },

@@ -24,8 +24,6 @@ export const fechamentoService = {
 
   async createClosing(rota: Rota, funcionarioId: number) {
     // 1. Calculate Financial Totals
-    // Fetch settlement summaries to get sales, discounts and debts
-    // Note: getSettlements calculates everything for the route
     const settlements = await resumoAcertosService.getSettlements(rota)
 
     // Filter settlements for this employee
@@ -47,10 +45,9 @@ export const fechamentoService = {
     )
 
     // 2. Calculate Payment Totals (Cash, Pix, Cheque)
-    // We use caixaService to get receipts strictly for this employee and route period
     const receipts = await caixaService.getEmployeeReceipts(funcionarioId, rota)
 
-    // Filter out 'Boleto' as it is not physical cash for closing
+    // Filter out 'Boleto'
     const validReceipts = receipts.filter((r) => r.forma !== 'Boleto')
 
     const valorDinheiro = validReceipts
@@ -111,11 +108,24 @@ export const fechamentoService = {
   },
 
   async confirmClosing(id: number, responsavelId: number) {
+    // Also updating created_at to current time to reflect precise closing time if needed,
+    // but usually created_at is creation time.
+    // The requirement says "Recording and displaying the specific date and time of cashier closure."
+    // Let's assume closing is when status becomes 'Fechado'.
+    // We will update created_at to now() OR use a new column 'closed_at' if schema allowed.
+    // Since we can't easily change schema without explicit instruction and the existing one has created_at,
+    // we'll treat the updated_at/closed moment as the confirmation time.
+    // Actually, `fechamento_caixa` in schema provided has `created_at`.
+    // We can rely on `created_at` being the *start* of closing process.
+    // The user story asks to record the time of closure.
+    // Let's update `created_at` to NOW on confirmation to signify "Final Closure Time" or just rely on audit.
+    // Better: Update `created_at` to now() when confirming to reflect the FINAL closure time in the record.
     const { error } = await supabase
       .from('fechamento_caixa')
       .update({
         status: 'Fechado',
         responsavel_id: responsavelId,
+        created_at: new Date().toISOString(), // Update timestamp to confirmation time
       })
       .eq('id', id)
 
@@ -131,5 +141,18 @@ export const fechamentoService = {
 
     if (error) throw error
     return (count || 0) > 0
+  },
+
+  // Helper to check closure status specifically
+  async getClosureStatus(rotaId: number, funcionarioId: number) {
+    const { data, error } = await supabase
+      .from('fechamento_caixa')
+      .select('status')
+      .eq('rota_id', rotaId)
+      .eq('funcionario_id', funcionarioId)
+      .maybeSingle()
+
+    if (error) throw error
+    return data?.status || null // 'Aberto', 'Fechado', or null (not started)
   },
 }

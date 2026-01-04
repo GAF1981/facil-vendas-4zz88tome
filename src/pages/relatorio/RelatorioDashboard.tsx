@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import {
   Card,
   CardContent,
@@ -13,8 +14,80 @@ import {
   RotateCcw,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { useUserStore } from '@/stores/useUserStore'
+import { rotaService } from '@/services/rotaService'
+import { caixaService } from '@/services/caixaService'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { useToast } from '@/hooks/use-toast'
 
 const RelatorioDashboard = () => {
+  const { employee } = useUserStore()
+  const [showNewRoutePrompt, setShowNewRoutePrompt] = useState(false)
+  const [currentRouteId, setCurrentRouteId] = useState<number | null>(null)
+  const { toast } = useToast()
+
+  useEffect(() => {
+    const checkAllClosed = async () => {
+      // Check permission (only allow if authorized user, usually Admin or Manager)
+      // Assuming 'Administrador' or 'Financeiro' has right, or based on module access.
+      // User Story says: "When an authorized user (with 'Relatório' permission) clicks 'Relatório'"
+      // This component IS the 'Relatório' dashboard, so access is already guarded by PermissionGuard.
+      // We just need to check the condition.
+
+      try {
+        const activeRota = await rotaService.getActiveRota()
+        if (!activeRota) return
+
+        setCurrentRouteId(activeRota.id)
+
+        // Get all summaries to check status
+        const summaries = await caixaService.getFinancialSummary(activeRota)
+
+        if (summaries.length === 0) return
+
+        const allClosed = summaries.every((s) => s.statusCaixa === 'Fechado')
+
+        if (allClosed) {
+          setShowNewRoutePrompt(true)
+        }
+      } catch (e) {
+        console.error('Error checking route status', e)
+      }
+    }
+
+    checkAllClosed()
+  }, [])
+
+  const handleStartNewRoute = async () => {
+    if (!currentRouteId) return
+
+    try {
+      await rotaService.finishAndStartNewRoute(currentRouteId)
+      toast({
+        title: 'Nova Rota Iniciada',
+        description: 'A rota anterior foi finalizada e uma nova foi aberta.',
+        className: 'bg-green-600 text-white',
+      })
+      setShowNewRoutePrompt(false)
+    } catch (error) {
+      console.error(error)
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível iniciar uma nova rota.',
+        variant: 'destructive',
+      })
+    }
+  }
+
   const reports = [
     {
       title: 'Projeções',
@@ -93,6 +166,27 @@ const RelatorioDashboard = () => {
           </Link>
         ))}
       </div>
+
+      <AlertDialog
+        open={showNewRoutePrompt}
+        onOpenChange={setShowNewRoutePrompt}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Iniciar Nova Rota?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Todos os Funcionários que estão com o Caixa Fechado para a Rota, é
+              necessário abrir outra Rota!!! Deseja abrir outra Rota agora?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>NÃO</AlertDialogCancel>
+            <AlertDialogAction onClick={handleStartNewRoute}>
+              SIM
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

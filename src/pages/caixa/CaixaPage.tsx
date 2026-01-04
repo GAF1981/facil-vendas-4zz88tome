@@ -35,8 +35,8 @@ import {
   Banknote,
   Landmark,
   QrCode,
-  Filter,
   Lock,
+  Calculator,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { Link } from 'react-router-dom'
@@ -50,6 +50,15 @@ import { RevenueGallery } from '@/components/caixa/RevenueGallery'
 import { ExpenseGallery } from '@/components/caixa/ExpenseGallery'
 import { Label } from '@/components/ui/label'
 import { CloseCashierDialog } from '@/components/caixa/CloseCashierDialog'
+import { useUserStore } from '@/stores/useUserStore'
+import { MultiSelect, Option } from '@/components/common/MultiSelect'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import { fechamentoService } from '@/services/fechamentoService'
 
 export default function CaixaPage() {
   const [loading, setLoading] = useState(true)
@@ -59,7 +68,9 @@ export default function CaixaPage() {
   const [allReceipts, setAllReceipts] = useState<ReceiptDetail[]>([])
   const [allExpenses, setAllExpenses] = useState<ExpenseDetail[]>([])
 
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('all')
+  // Employee Filter State
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([])
+  const { employee: loggedInUser } = useUserStore()
 
   const { toast } = useToast()
 
@@ -84,6 +95,14 @@ export default function CaixaPage() {
   }>({ open: false, empId: null, empName: '' })
 
   const [generatingPdf, setGeneratingPdf] = useState(false)
+
+  // Initialization: Fetch Routes and Set Default User
+  useEffect(() => {
+    fetchRoutes()
+    if (loggedInUser) {
+      setSelectedEmployeeIds([loggedInUser.id.toString()])
+    }
+  }, []) // Empty dependency array to run once on mount
 
   const fetchRoutes = async () => {
     try {
@@ -131,10 +150,6 @@ export default function CaixaPage() {
   }
 
   useEffect(() => {
-    fetchRoutes()
-  }, [])
-
-  useEffect(() => {
     if (selectedRouteId && routes.length > 0) {
       fetchData(selectedRouteId)
     }
@@ -142,27 +157,36 @@ export default function CaixaPage() {
 
   const selectedRoute = routes.find((r) => r.id.toString() === selectedRouteId)
 
-  const filteredReceipts = useMemo(() => {
-    if (selectedEmployeeId === 'all') return allReceipts
-    return allReceipts.filter(
-      (r) => r.funcionarioId === Number(selectedEmployeeId),
-    )
-  }, [allReceipts, selectedEmployeeId])
-
-  const filteredExpenses = useMemo(() => {
-    if (selectedEmployeeId === 'all') return allExpenses
-    return allExpenses.filter(
-      (e) => e.funcionarioId === Number(selectedEmployeeId),
-    )
-  }, [allExpenses, selectedEmployeeId])
-
-  const uniqueEmployees = useMemo(() => {
+  // Filtering Logic
+  const employeeOptions: Option[] = useMemo(() => {
     return summaryData.map((s) => ({
-      id: s.funcionarioId,
-      name: s.funcionarioNome,
+      label: s.funcionarioNome,
+      value: s.funcionarioId.toString(),
     }))
   }, [summaryData])
 
+  const filteredReceipts = useMemo(() => {
+    if (selectedEmployeeIds.length === 0) return allReceipts
+    return allReceipts.filter((r) =>
+      selectedEmployeeIds.includes(r.funcionarioId?.toString() || ''),
+    )
+  }, [allReceipts, selectedEmployeeIds])
+
+  const filteredExpenses = useMemo(() => {
+    if (selectedEmployeeIds.length === 0) return allExpenses
+    return allExpenses.filter((e) =>
+      selectedEmployeeIds.includes(e.funcionarioId?.toString() || ''),
+    )
+  }, [allExpenses, selectedEmployeeIds])
+
+  const filteredSummary = useMemo(() => {
+    if (selectedEmployeeIds.length === 0) return summaryData
+    return summaryData.filter((s) =>
+      selectedEmployeeIds.includes(s.funcionarioId.toString()),
+    )
+  }, [summaryData, selectedEmployeeIds])
+
+  // Calculations
   const totalRecebido = filteredReceipts.reduce((acc, r) => acc + r.valor, 0)
   const totalDespesas = filteredExpenses.reduce((acc, e) => acc + e.valor, 0)
   const totalSaldo = totalRecebido - totalDespesas
@@ -177,7 +201,31 @@ export default function CaixaPage() {
     .filter((r) => r.forma === 'Cheque')
     .reduce((acc, r) => acc + r.valor, 0)
 
-  const handleOpenGeneralExpense = () => {
+  // New Calculation: Saldo de Acerto = (Total Saldo - Total Pix)
+  const saldoDeAcerto = totalSaldo - totalPix
+
+  const handleOpenGeneralExpense = async () => {
+    if (!loggedInUser || !selectedRouteId) return
+
+    // Block check
+    try {
+      const status = await fechamentoService.getClosureStatus(
+        parseInt(selectedRouteId),
+        loggedInUser.id,
+      )
+      if (status === 'Aberto' || status === 'Fechado') {
+        toast({
+          title: 'Ação Bloqueada',
+          description:
+            'Seu Caixa está fechado para a Rota !!! Você deve aguardar abrir uma Nova Rota !!!',
+          variant: 'destructive',
+        })
+        return
+      }
+    } catch (e) {
+      console.error(e)
+    }
+
     setPreselectedEmployee(null)
     setIsExpenseDialogOpen(true)
   }
@@ -230,9 +278,15 @@ export default function CaixaPage() {
         finalTotalDespesas = empSummary?.totalDespesas || 0
         finalTotalSaldo = empSummary?.saldo || 0
       } else {
-        finalTotalRecebido = allReceipts.reduce((acc, r) => acc + r.valor, 0)
-        finalTotalDespesas = allExpenses.reduce((acc, e) => acc + e.valor, 0)
-        finalTotalSaldo = finalTotalRecebido - finalTotalDespesas
+        // If "Resumo Geral", calculate totals from all passed data
+        // which might be filtered by current selection if we wanted, but "Resumo Geral" usually means everything in view.
+        // The implementation uses totalRecebido derived from filteredReceipts if employeeId is undefined but filtered?
+        // Wait, handleGeneratePdf is called with params for specific employee, or without for global.
+        // If without params, we use the currently filtered totals (which might be just 1 employee if filtered).
+        // Let's stick to using the displayed totals.
+        finalTotalRecebido = totalRecebido
+        finalTotalDespesas = totalDespesas
+        finalTotalSaldo = totalSaldo
       }
 
       const { data: pdfBlob, error } = await supabase.functions.invoke(
@@ -240,7 +294,7 @@ export default function CaixaPage() {
         {
           body: {
             reportType,
-            summaryData: employeeId ? [] : summaryData,
+            summaryData: employeeId ? [] : filteredSummary, // Pass filtered summary
             receipts: receiptsToPass,
             expenses: expensesToPass,
             totalRecebido: finalTotalRecebido,
@@ -338,39 +392,52 @@ export default function CaixaPage() {
         </div>
       </div>
 
+      {/* Filters Card */}
       <Card className="border-l-4 border-l-blue-600 bg-blue-50/20">
         <CardHeader className="pb-2">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div className="space-y-1">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Calendar className="h-5 w-5 text-blue-600" />
-                Período / Rota
+                Filtros & Rota
               </CardTitle>
               <CardDescription>
-                Selecione a rota para visualizar o balanço financeiro.
+                Selecione a rota e os funcionários para visualizar o balanço.
               </CardDescription>
             </div>
-            <div className="w-full md:w-[300px]">
-              <Select
-                value={selectedRouteId}
-                onValueChange={setSelectedRouteId}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione a rota" />
-                </SelectTrigger>
-                <SelectContent>
-                  {routes.map((route) => (
-                    <SelectItem key={route.id} value={route.id.toString()}>
-                      Rota #{route.id} (
-                      {safeFormatDate(route.data_inicio, 'dd/MM')}
-                      {route.data_fim
-                        ? ` - ${safeFormatDate(route.data_fim, 'dd/MM')}`
-                        : ' - Atual'}
-                      )
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+              <div className="w-full sm:w-[250px]">
+                <Label className="text-xs mb-1 block">Funcionários</Label>
+                <MultiSelect
+                  options={employeeOptions}
+                  selected={selectedEmployeeIds}
+                  onChange={setSelectedEmployeeIds}
+                  placeholder="Selecione funcionários..."
+                />
+              </div>
+              <div className="w-full sm:w-[250px]">
+                <Label className="text-xs mb-1 block">Rota</Label>
+                <Select
+                  value={selectedRouteId}
+                  onValueChange={setSelectedRouteId}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a rota" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {routes.map((route) => (
+                      <SelectItem key={route.id} value={route.id.toString()}>
+                        Rota #{route.id} (
+                        {safeFormatDate(route.data_inicio, 'dd/MM')}
+                        {route.data_fim
+                          ? ` - ${safeFormatDate(route.data_fim, 'dd/MM')}`
+                          : ' - Atual'}
+                        )
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -396,150 +463,105 @@ export default function CaixaPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Balanço por Funcionário</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="flex justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          ) : (
-            <FinancialSummaryTable
-              data={summaryData}
-              onAddExpense={handleAddExpense}
-              onViewReceipts={handleViewReceipts}
-              onViewExpenses={handleViewExpenses}
-              onGeneratePdf={handleGeneratePdf}
-            />
-          )}
-        </CardContent>
-      </Card>
-
-      <div className="flex justify-end">
-        <div className="w-full sm:w-[300px] flex items-center gap-2 bg-card p-3 rounded-lg border shadow-sm">
-          <Label className="whitespace-nowrap flex items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            Filtrar Totais:
-          </Label>
-          <Select
-            value={selectedEmployeeId}
-            onValueChange={setSelectedEmployeeId}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Todos os Funcionários" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os Funcionários</SelectItem>
-              {uniqueEmployees.map((emp) => (
-                <SelectItem key={emp.id} value={emp.id.toString()}>
-                  {emp.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-3">
+      {/* Totals Row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+        {/* Recebimentos Cards */}
         <Card className="bg-white border-green-200 shadow-sm border-l-4 border-l-green-600">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-green-700">
-              Recebimentos em PIX
+          <CardHeader className="p-4 pb-2">
+            <CardTitle className="text-xs font-medium text-green-700 flex items-center gap-1">
+              <QrCode className="h-3 w-3" /> Pix
             </CardTitle>
-            <QrCode className="h-4 w-4 text-green-600" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-700">
+          <CardContent className="p-4 pt-0">
+            <div className="text-lg font-bold text-green-700">
               R$ {formatCurrency(totalPix)}
             </div>
-            {selectedEmployeeId !== 'all' && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Filtrado por funcionário
-              </p>
-            )}
           </CardContent>
         </Card>
 
         <Card className="bg-white border-green-200 shadow-sm border-l-4 border-l-green-600">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-green-700">
-              Recebimentos em Dinheiro
+          <CardHeader className="p-4 pb-2">
+            <CardTitle className="text-xs font-medium text-green-700 flex items-center gap-1">
+              <Banknote className="h-3 w-3" /> Dinheiro
             </CardTitle>
-            <Banknote className="h-4 w-4 text-green-600" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-700">
+          <CardContent className="p-4 pt-0">
+            <div className="text-lg font-bold text-green-700">
               R$ {formatCurrency(totalDinheiro)}
             </div>
-            {selectedEmployeeId !== 'all' && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Filtrado por funcionário
-              </p>
-            )}
           </CardContent>
         </Card>
 
         <Card className="bg-white border-green-200 shadow-sm border-l-4 border-l-green-600">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-green-700">
-              Recebimentos em Cheque
+          <CardHeader className="p-4 pb-2">
+            <CardTitle className="text-xs font-medium text-green-700 flex items-center gap-1">
+              <Landmark className="h-3 w-3" /> Cheque
             </CardTitle>
-            <Landmark className="h-4 w-4 text-green-600" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-700">
+          <CardContent className="p-4 pt-0">
+            <div className="text-lg font-bold text-green-700">
               R$ {formatCurrency(totalCheque)}
             </div>
-            {selectedEmployeeId !== 'all' && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Filtrado por funcionário
-              </p>
-            )}
           </CardContent>
         </Card>
-      </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
         <Card className="bg-green-50/50 border-green-200">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-green-700">
-              Total Entradas (Geral)
+          <CardHeader className="p-4 pb-2">
+            <CardTitle className="text-xs font-medium text-green-700 flex items-center gap-1">
+              <ArrowDownCircle className="h-3 w-3" /> Total Entradas
             </CardTitle>
-            <ArrowDownCircle className="h-4 w-4 text-green-600" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-700">
+          <CardContent className="p-4 pt-0">
+            <div className="text-lg font-bold text-green-700">
               R$ {formatCurrency(totalRecebido)}
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-red-50/50 border-red-200">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-red-700">
-              Saídas (Despesas)
+          <CardHeader className="p-4 pb-2">
+            <CardTitle className="text-xs font-medium text-red-700 flex items-center gap-1">
+              <ArrowUpCircle className="h-3 w-3" /> Saídas
             </CardTitle>
-            <ArrowUpCircle className="h-4 w-4 text-red-600" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-700">
+          <CardContent className="p-4 pt-0">
+            <div className="text-lg font-bold text-red-700">
               R$ {formatCurrency(totalDespesas)}
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-blue-50/50 border-blue-200">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-blue-700">
-              Saldo em Caixa
+        <Card className="bg-blue-50/50 border-blue-200 lg:col-span-2">
+          <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-xs font-medium text-blue-700 flex items-center gap-1">
+              <Wallet className="h-3 w-3" /> Saldo em Caixa
             </CardTitle>
-            <Wallet className="h-4 w-4 text-blue-600" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 pt-0">
             <div className="text-2xl font-bold text-blue-700">
               R$ {formatCurrency(totalSaldo)}
+            </div>
+            <div className="mt-2 pt-2 border-t border-blue-200">
+              <div className="flex items-center justify-between">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="text-xs text-blue-600 font-medium flex items-center gap-1 cursor-help border-b border-dotted border-blue-400">
+                        <Calculator className="h-3 w-3" /> Saldo de Acerto
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>
+                        O Saldo de Acerto leva em conta o Saldo em Caixa -
+                        Recebimentos em Pix.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <span className="text-sm font-bold text-blue-800">
+                  R$ {formatCurrency(saldoDeAcerto)}
+                </span>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -549,6 +571,28 @@ export default function CaixaPage() {
         <RevenueGallery items={filteredReceipts} />
         <ExpenseGallery items={filteredExpenses} />
       </div>
+
+      {/* Moved to Bottom */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Resumo por Funcionário</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <FinancialSummaryTable
+              data={filteredSummary}
+              onAddExpense={handleAddExpense}
+              onViewReceipts={handleViewReceipts}
+              onViewExpenses={handleViewExpenses}
+              onGeneratePdf={handleGeneratePdf}
+            />
+          )}
+        </CardContent>
+      </Card>
 
       <ExpenseFormDialog
         open={isExpenseDialogOpen}
@@ -577,6 +621,7 @@ export default function CaixaPage() {
         open={isCloseCashierDialogOpen}
         onOpenChange={setIsCloseCashierDialogOpen}
         currentRoute={selectedRoute}
+        onSuccess={() => fetchData(selectedRouteId)}
       />
     </div>
   )

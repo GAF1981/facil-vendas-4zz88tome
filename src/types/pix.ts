@@ -11,17 +11,17 @@ export interface PixEntry {
 }
 
 export interface PixReceiptRow {
-  id: number // recebimento.id
-  venda_id: number // recebimento.venda_id
-  id_da_femea: number | null // recebimento.ID_da_fêmea
-  cliente_id: number // recebimento.cliente_id
-  forma_pagamento: string // recebimento.forma_pagamento
-  valor_pago: number // recebimento.valor_pago
-  valor_registrado: number | null // recebimento.valor_registrado
-  vencimento: string | null // recebimento.vencimento
-  created_at: string | null // recebimento.created_at
-  cliente_nome: string // Joined
-  // Pix specific data (Left Join - nullable)
+  id: number
+  venda_id: number
+  id_da_femea: number | null
+  cliente_id: number
+  forma_pagamento: string
+  valor_pago: number
+  valor_registrado: number | null
+  vencimento: string | null
+  created_at: string | null
+  cliente_nome: string
+  // Pix specific data
   pix_id?: number
   nome_no_pix?: string
   banco_pix?: string
@@ -30,6 +30,7 @@ export interface PixReceiptRow {
   // Enhanced info
   data_acerto?: string | null
   vendedor_pedido?: string | null
+  rota_id?: number
 }
 
 export const pixConferenceSchema = z.object({

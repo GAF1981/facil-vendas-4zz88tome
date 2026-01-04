@@ -9,6 +9,7 @@ export interface CaixaSummaryRow {
   totalRecebido: number
   totalDespesas: number
   saldo: number
+  statusCaixa: 'Aberto' | 'Fechado'
 }
 
 export interface ReceiptDetail {
@@ -17,7 +18,7 @@ export interface ReceiptDetail {
   clienteNome: string
   valor: number
   forma: string
-  funcionarioNome?: string // Added for global list
+  funcionarioNome?: string
   funcionarioId?: number
 }
 
@@ -27,7 +28,7 @@ export interface ExpenseDetail {
   grupo: string
   detalhamento: string
   valor: number
-  funcionarioNome?: string // Added for global list
+  funcionarioNome?: string
   funcionarioId?: number
 }
 
@@ -52,24 +53,56 @@ export const caixaService = {
     const routeStart = parseISO(rota.data_inicio)
     const routeEnd = rota.data_fim ? parseISO(rota.data_fim) : new Date()
 
+    // 1. Fetch Employees
     const { data: employees, error: empError } = await supabase
       .from('FUNCIONARIOS')
       .select('id, nome_completo')
 
     if (empError) throw empError
 
+    // 2. Fetch Closure Statuses for this Route
+    const { data: closures, error: closureError } = await supabase
+      .from('fechamento_caixa')
+      .select('funcionario_id, status')
+      .eq('rota_id', rota.id)
+
+    if (closureError) throw closureError
+
+    const closureMap = new Map<number, 'Aberto' | 'Fechado'>()
+    closures?.forEach((c) =>
+      closureMap.set(c.funcionario_id, c.status as 'Aberto' | 'Fechado'),
+    )
+
     const summaryMap = new Map<number, CaixaSummaryRow>()
     employees?.forEach((emp) => {
+      // Determine status: If closure record exists, use its status (Aberto/Fechado implies "In Process" or "Done").
+      // If no record, it's "Aberto" (Open for business).
+      // Requirement: "Display a Green badge 'Caixa Fechado' if the cashier is closed... Red badge 'Caixa Aberto' if the cashier is open."
+      // Closed = status 'Fechado'. Open = No record or 'Aberto'.
+      // Wait, if 'Aberto' (Closure started), is it "Closed" for operations? Yes per blocking logic.
+      // But purely for the badge, let's map DB status.
+      // If record exists, we might want to show "Em Fechamento" or "Fechado".
+      // But the requirement specifically says "Caixa Fechado" if closed.
+      // Let's assume:
+      // - No record: 'Aberto' (Red)
+      // - 'Aberto' record: 'Aberto' (Red) -- or maybe 'Em Fechamento'? Standardizing on 'Aberto'/'Fechado' as per acceptance criteria.
+      // - 'Fechado' record: 'Fechado' (Green)
+      // The logic `checkExistingClosing` implies blocking if *any* record exists.
+      // For display, let's use explicit status from table.
+      const dbStatus = closureMap.get(emp.id)
+      const statusCaixa = dbStatus === 'Fechado' ? 'Fechado' : 'Aberto'
+
       summaryMap.set(emp.id, {
         funcionarioId: emp.id,
         funcionarioNome: emp.nome_completo,
         totalRecebido: 0,
         totalDespesas: 0,
         saldo: 0,
+        statusCaixa,
       })
     })
 
-    // Added forma_pagamento to selection to filter out Boletos
+    // 3. Receipts
     const { data: receipts, error: recError } = await supabase
       .from('RECEBIMENTOS')
       .select('funcionario_id, valor_pago, created_at, forma_pagamento')
@@ -80,12 +113,9 @@ export const caixaService = {
 
     receipts?.forEach((rec) => {
       if (!rec.created_at) return
-
-      // Filter out Boleto payments from employee balance
       if (rec.forma_pagamento === 'Boleto') return
 
       const recDate = parseISO(rec.created_at)
-
       const isAfterStart =
         isAfter(recDate, routeStart) || isEqual(recDate, routeStart)
       const isBeforeEnd =
@@ -100,6 +130,7 @@ export const caixaService = {
       }
     })
 
+    // 4. Expenses
     const { data: expenses, error: expError } = await supabase
       .from('DESPESAS')
       .select('funcionario_id, Valor, Data')
@@ -110,7 +141,6 @@ export const caixaService = {
     expenses?.forEach((exp) => {
       if (!exp.Data) return
       const expDate = parseISO(exp.Data)
-
       const isAfterStart =
         isAfter(expDate, routeStart) || isEqual(expDate, routeStart)
       const isBeforeEnd =
@@ -133,7 +163,8 @@ export const caixaService = {
       .filter(
         (row) =>
           Math.abs(row.totalRecebido) > 0.01 ||
-          Math.abs(row.totalDespesas) > 0.01,
+          Math.abs(row.totalDespesas) > 0.01 ||
+          row.statusCaixa === 'Fechado', // Keep closed employees visible even if 0
       )
       .sort((a, b) => a.funcionarioNome.localeCompare(b.funcionarioNome))
 

@@ -75,6 +75,7 @@ export function PixTable({
       <Table>
         <TableHeader className="bg-muted/50">
           <TableRow>
+            <TableHead className="w-[60px] text-center">Rota</TableHead>
             {renderSortableHead('Número do Pedido', 'id_da_femea', 'w-[140px]')}
             {renderSortableHead('Data Acerto', 'data_acerto')}
             <TableHead>Vendedor</TableHead>
@@ -94,7 +95,7 @@ export function PixTable({
           {data.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={13}
+                colSpan={14}
                 className="h-24 text-center text-muted-foreground"
               >
                 Nenhum recebimento encontrado.
@@ -103,6 +104,9 @@ export function PixTable({
           ) : (
             data.map((row) => (
               <TableRow key={row.id} className="hover:bg-muted/30">
+                <TableCell className="text-center font-mono text-xs">
+                  {row.rota_id ? `#${row.rota_id}` : '-'}
+                </TableCell>
                 <TableCell className="font-mono font-medium text-blue-600">
                   #{row.id_da_femea || row.venda_id}
                 </TableCell>
