@@ -9,6 +9,7 @@ interface AdditionalFields {
   'DESCONTO OUTROS'?: string | null
   GRUPO?: string | null
   'GRUPO ROTA'?: string | null
+  situacao?: string | null
 }
 
 // Type definition derived from Supabase Row with manual extension
@@ -67,6 +68,7 @@ export const clientSchema = z.object({
   'GRUPO ROTA': z.string().optional().nullable(),
   'OBSERVAÇÃO FIXA': z.string().optional().nullable(),
   'ALTERAÇÃO CLIENTE': z.string().optional().nullable(),
+  situacao: z.string().optional().nullable(),
 })
 
 export type ClientFormData = z.infer<typeof clientSchema>

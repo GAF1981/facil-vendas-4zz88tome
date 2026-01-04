@@ -29,6 +29,7 @@ export interface OrderDebt {
   formaPagamento: string // "Forma de Pagamento" (Order Level)
   valorDevido: number // "Valor Devido"
   collectionActionCount: number // New: Count of collection actions
+  employeeName: string | null // NEW: Employee Name
 }
 
 export interface ClientDebt {
@@ -49,6 +50,8 @@ export interface ClientDebt {
   address: string | null
   neighborhood: string | null
   city: string | null
+  // New situation field
+  situacao: string | null
 }
 
 export interface CollectionAction {

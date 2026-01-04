@@ -29,6 +29,7 @@ import SalesReportsPage from '@/pages/relatorio/SalesReportsPage'
 import StockReportsPage from '@/pages/relatorio/StockReportsPage'
 import TopSellingReportsPage from '@/pages/relatorio/TopSellingReportsPage'
 import AdjustmentReportsPage from '@/pages/relatorio/AdjustmentReportsPage'
+import InactiveClientsPage from '@/pages/relatorio/InactiveClientsPage'
 import CaixaPage from '@/pages/caixa/CaixaPage'
 import PixPage from '@/pages/pix/PixPage'
 import PagamentosPage from '@/pages/pagamentos/PagamentosPage'
@@ -105,12 +106,10 @@ const App = () => (
                 </Route>
 
                 <Route element={<PermissionGuard module="Pagamentos" />}>
-                  {/* Assuming Pagamentos module name or maybe mapped to Pix? Using name for now */}
                   <Route path="/pagamentos" element={<PagamentosPage />} />
                 </Route>
 
                 <Route element={<PermissionGuard module="Controle" />}>
-                  {/* Module check for Control if distinct */}
                   <Route path="/controle" element={<ControlePage />} />
                 </Route>
 
@@ -162,6 +161,10 @@ const App = () => (
                   <Route
                     path="/relatorio/ajustes-saldo"
                     element={<AdjustmentReportsPage />}
+                  />
+                  <Route
+                    path="/relatorio/clientes-inativos"
+                    element={<InactiveClientsPage />}
                   />
                 </Route>
 

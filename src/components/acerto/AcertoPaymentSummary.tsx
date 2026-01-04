@@ -94,9 +94,14 @@ export function AcertoPaymentSummary({
         }
       }
 
-      // Requirement 1 & 3: Boleto and Cheque always 0 Paid Value
-      if (method === 'Boleto' || method === 'Cheque') {
+      // Requirement 1: Boleto always 0 Paid Value
+      if (method === 'Boleto') {
         paidValue = 0
+      }
+
+      // Update Requirement: Cheque now populated with registered value (considered paid/collected)
+      if (method === 'Cheque') {
+        paidValue = value
       }
 
       return {
@@ -121,6 +126,8 @@ export function AcertoPaymentSummary({
       let initialPaidValue = 0
       if (method === 'Pix' || method === 'Dinheiro') {
         initialPaidValue = defaultValue // Default to full payment for 1x
+      } else if (method === 'Cheque') {
+        initialPaidValue = defaultValue // Cheque populated with registered value
       }
 
       // Generate default 1x details to keep logic consistent
@@ -220,10 +227,25 @@ export function AcertoPaymentSummary({
           newValue = Number(
             newDetails.reduce((acc, curr) => acc + curr.value, 0).toFixed(2),
           )
+
+          // Also update paid value automatically if it's supposed to be synced (Cheque, Pix entry, etc)
+          // However, the `paidValue` update below handles recalculation from details.
+          // But if we only change 'value', we might need to sync 'paidValue' inside details too?
+          // If Cheque, paidValue should equal value.
+          if (method === 'Cheque') {
+            newDetails[index].paidValue = newDetails[index].value
+          }
         }
 
         if (field === 'paidValue') {
           // If installment paid value changes, update total paid
+          newPaidValue = Number(
+            newDetails
+              .reduce((acc, curr) => acc + curr.paidValue, 0)
+              .toFixed(2),
+          )
+        } else if (field === 'value') {
+          // Recalculate total paid value sum after value updates (incase auto-updates happened)
           newPaidValue = Number(
             newDetails
               .reduce((acc, curr) => acc + curr.paidValue, 0)
@@ -424,7 +446,7 @@ export function AcertoPaymentSummary({
                           <span className="absolute left-3 top-2.5 text-muted-foreground text-sm">
                             R$
                           </span>
-                          {/* Requirement 1 (Boleto) and 2 (Pix/Dinheiro): Summary Paid Value must be disabled */}
+                          {/* Requirement 1 (Boleto) Summary Paid Value must be disabled */}
                           <Input
                             type="number"
                             step="0.01"
@@ -505,8 +527,8 @@ export function AcertoPaymentSummary({
                             const isEntrada = idx === 0 && isPixOrDinheiro
                             // Requirement 1: Boleto Paid Value is 0 and Disabled
                             const isBoleto = entry.method === 'Boleto'
-                            // Requirement 3: Cheque Paid Value is 0 and Disabled
-                            const isCheque = entry.method === 'Cheque'
+                            // Cheque behavior is same as others for editability but defaults to full value.
+                            // We allow editing paid value for Cheque if needed, but it defaults to full.
 
                             // Requirement 2: Pix/Dinheiro Paid Value rules
                             // If Sem Entrada (hasZeroDownPayment), 1st installment is 0 and disabled
@@ -517,10 +539,10 @@ export function AcertoPaymentSummary({
                             const isEditableEntry =
                               isEntrada && !entry.hasZeroDownPayment
 
+                            // Logic for disabling paid value input
                             const isPaidDisabled =
                               disabled ||
                               isBoleto ||
-                              isCheque ||
                               isZeroEntry ||
                               (!isEntrada && isPixOrDinheiro)
 

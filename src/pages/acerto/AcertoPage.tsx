@@ -10,6 +10,7 @@ import { AcertoFiscalSection } from '@/components/acerto/AcertoFiscalSection'
 import { SignatureModal } from '@/components/acerto/SignatureModal'
 import { AcertoHistoryTable } from '@/components/acerto/AcertoHistoryTable'
 import { ProductSelector } from '@/components/acerto/ProductSelector'
+import { ZeroStockAlert } from '@/components/acerto/ZeroStockAlert'
 import { ClientRow } from '@/types/client'
 import { Employee } from '@/types/employee'
 import { AcertoItem, PendingStockAdjustment } from '@/types/acerto'
@@ -18,6 +19,7 @@ import { ProductRow } from '@/types/product'
 import { bancoDeDadosService } from '@/services/bancoDeDadosService'
 import { acertoService } from '@/services/acertoService'
 import { employeesService } from '@/services/employeesService'
+import { clientsService } from '@/services/clientsService'
 import { useToast } from '@/hooks/use-toast'
 import { useUserStore } from '@/stores/useUserStore'
 import {
@@ -46,6 +48,7 @@ export default function AcertoPage() {
   const [notaFiscal, setNotaFiscal] = useState<string>('')
   const [signature, setSignature] = useState<string | null>(null)
   const [signatureOpen, setSignatureOpen] = useState(false)
+  const [zeroStockDialogOpen, setZeroStockDialogOpen] = useState(false)
 
   // Pending Stock Adjustments Queue (Requirement 4)
   const [pendingAdjustments, setPendingAdjustments] = useState<
@@ -303,7 +306,7 @@ export default function AcertoPage() {
     }
   }
 
-  const handleSave = async () => {
+  const handlePreSaveValidation = () => {
     if (!client) return
     const emp = employees.find((e) => e.id.toString() === selectedEmployeeId)
     if (!emp) {
@@ -345,6 +348,40 @@ export default function AcertoPage() {
       setSignatureOpen(true)
       return
     }
+
+    // Zero-Stock Inactivity Alert Check
+    const totalStock = items.reduce(
+      (acc, item) => acc + (item.saldoFinal || 0),
+      0,
+    )
+    if (totalStock === 0) {
+      setZeroStockDialogOpen(true)
+    } else {
+      executeSave()
+    }
+  }
+
+  const handleZeroStockConfirm = async () => {
+    if (client) {
+      try {
+        await clientsService.update(client.CODIGO, { situacao: 'INATIVO' })
+        setZeroStockDialogOpen(false)
+        executeSave()
+      } catch (error) {
+        console.error('Failed to update client status', error)
+        toast({
+          title: 'Erro',
+          description: 'Falha ao atualizar status do cliente.',
+          variant: 'destructive',
+        })
+      }
+    }
+  }
+
+  const executeSave = async () => {
+    if (!client) return
+    const emp = employees.find((e) => e.id.toString() === selectedEmployeeId)
+    if (!emp) return
 
     setSaving(true)
     try {
@@ -543,7 +580,7 @@ export default function AcertoPage() {
 
             <Button
               size="lg"
-              onClick={handleSave}
+              onClick={handlePreSaveValidation}
               disabled={saving || items.length === 0}
               className="min-w-[200px]"
             >
@@ -575,6 +612,13 @@ export default function AcertoPage() {
         open={signatureOpen}
         onOpenChange={setSignatureOpen}
         onSave={setSignature}
+      />
+
+      <ZeroStockAlert
+        open={zeroStockDialogOpen}
+        onOpenChange={setZeroStockDialogOpen}
+        onConfirm={handleZeroStockConfirm}
+        onCancel={() => setZeroStockDialogOpen(false)}
       />
     </div>
   )

@@ -16,7 +16,7 @@ export const cobrancaService = {
     const { data: dbData, error: dbError } = await supabase
       .from('BANCO_DE_DADOS')
       .select(
-        '"NÚMERO DO PEDIDO", "CÓDIGO DO CLIENTE", "CLIENTE", "VALOR VENDIDO", "DESCONTO POR GRUPO", "DATA DO ACERTO", "DETALHES_PAGAMENTO", "VALOR DEVIDO", "FORMA", "CODIGO FUNCIONARIO", data_combinada',
+        '"NÚMERO DO PEDIDO", "CÓDIGO DO CLIENTE", "CLIENTE", "VALOR VENDIDO", "DESCONTO POR GRUPO", "DATA DO ACERTO", "DETALHES_PAGAMENTO", "VALOR DEVIDO", "FORMA", "CODIGO FUNCIONARIO", "FUNCIONÁRIO", data_combinada',
       )
       .not('NÚMERO DO PEDIDO', 'is', null)
       .limit(50000)
@@ -49,7 +49,7 @@ export const cobrancaService = {
       }
     })
 
-    // 3. Fetch Client Types, Groups and Address Info efficiently with chunking
+    // 3. Fetch Client Types, Groups, Address Info and Situacao efficiently with chunking
     const clientIds = [
       ...new Set(dbData?.map((r) => r['CÓDIGO DO CLIENTE']) || []),
     ] as number[]
@@ -63,6 +63,7 @@ export const cobrancaService = {
         address: string | null
         neighborhood: string | null
         city: string | null
+        situacao: string | null
       }
     >()
 
@@ -73,7 +74,7 @@ export const cobrancaService = {
         const { data: clientData, error: clientError } = await supabase
           .from('CLIENTES')
           .select(
-            'CODIGO, "TIPO DE CLIENTE", GRUPO, "GRUPO ROTA", ENDEREÇO, BAIRRO, MUNICÍPIO',
+            'CODIGO, "TIPO DE CLIENTE", GRUPO, "GRUPO ROTA", ENDEREÇO, BAIRRO, MUNICÍPIO, situacao',
           )
           .in('CODIGO', chunk)
 
@@ -91,6 +92,7 @@ export const cobrancaService = {
               address: (c as any)['ENDEREÇO'] || null,
               neighborhood: (c as any)['BAIRRO'] || null,
               city: (c as any)['MUNICÍPIO'] || null,
+              situacao: (c as any)['situacao'] || 'ATIVO',
             })
           })
         }
@@ -163,6 +165,7 @@ export const cobrancaService = {
           totalValorDevido: 0,
           formaPagamento: row['FORMA'] || 'N/D',
           funcionarioId: row['CODIGO FUNCIONARIO'],
+          funcionarioNome: row['FUNCIONÁRIO'],
           dataCombinada: row.data_combinada,
         })
       }
@@ -264,6 +267,7 @@ export const cobrancaService = {
         formaPagamento: order.formaPagamento,
         valorDevido: netValue,
         collectionActionCount: cobrancaCounts.get(order.orderId) || 0,
+        employeeName: order.funcionarioNome || null,
       }
 
       if (!clientsMap.has(order.clientId)) {
@@ -277,6 +281,7 @@ export const cobrancaService = {
           address: clientInfo?.address || null,
           neighborhood: clientInfo?.neighborhood || null,
           city: clientInfo?.city || null,
+          situacao: clientInfo?.situacao || 'ATIVO',
           totalDebt: 0,
           orderCount: 0,
           status: 'SEM DÉBITO', // Default start

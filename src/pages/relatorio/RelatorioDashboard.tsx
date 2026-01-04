@@ -11,6 +11,7 @@ import {
   ShoppingCart,
   BarChart3,
   RotateCcw,
+  UserX,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
@@ -55,6 +56,14 @@ const RelatorioDashboard = () => {
       to: '/relatorio/ajustes-saldo',
       color: 'text-red-600',
       bg: 'bg-red-100',
+    },
+    {
+      title: 'Confirmar cliente INATIVO',
+      description: 'Gerencie clientes que finalizaram acerto sem estoque.',
+      icon: UserX,
+      to: '/relatorio/clientes-inativos',
+      color: 'text-gray-600',
+      bg: 'bg-gray-200',
     },
   ]
 

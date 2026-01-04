@@ -62,7 +62,7 @@ export default function AdjustmentReportsPage() {
                     <TableHead>Data</TableHead>
                     <TableHead>Cliente</TableHead>
                     <TableHead>Vendedor</TableHead>
-                    <TableHead>Produto ID</TableHead>
+                    {/* Column removed as per user story */}
                     <TableHead className="text-right">Saldo Anterior</TableHead>
                     <TableHead className="text-right">Saldo Novo</TableHead>
                     <TableHead className="text-right">Diferença</TableHead>
@@ -72,7 +72,7 @@ export default function AdjustmentReportsPage() {
                   {data.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={7}
+                        colSpan={6}
                         className="text-center h-24 text-muted-foreground"
                       >
                         Nenhum ajuste encontrado.
@@ -98,7 +98,6 @@ export default function AdjustmentReportsPage() {
                           </div>
                         </TableCell>
                         <TableCell>{row.vendedor_nome}</TableCell>
-                        <TableCell>{row.produto_id}</TableCell>
                         <TableCell className="text-right font-mono">
                           {row.saldo_anterior}
                         </TableCell>
