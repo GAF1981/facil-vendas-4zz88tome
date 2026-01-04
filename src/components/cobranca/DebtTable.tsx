@@ -9,7 +9,13 @@ import {
 } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Search, Eraser, MessageSquareText, ArrowUpDown } from 'lucide-react'
+import {
+  Search,
+  Eraser,
+  MessageSquareText,
+  ArrowUpDown,
+  PlusCircle,
+} from 'lucide-react'
 import { ClientDebt } from '@/types/cobranca'
 import { formatCurrency } from '@/lib/formatters'
 import { format, parseISO } from 'date-fns'
@@ -358,7 +364,25 @@ export function DebtTable({
                       {formatCurrency(row.valorPago)}
                     </TableCell>
                     <TableCell className="text-right font-mono text-xs text-red-600 font-bold">
-                      {formatCurrency(row.debito)}
+                      <div className="flex items-center justify-end gap-2">
+                        {formatCurrency(row.debito)}
+                        {/* New Action Button Adjacent to Debt Value */}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-blue-600 hover:bg-blue-100"
+                          onClick={() =>
+                            handleOpenActions(
+                              row.orderId,
+                              row.clientId,
+                              row.clientName,
+                            )
+                          }
+                          title="Registrar Ação de Cobrança"
+                        >
+                          <PlusCircle className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                     <TableCell className="text-center">
                       <Badge
@@ -405,6 +429,7 @@ export function DebtTable({
                             </SelectItem>
                             <SelectItem value="BOLETO">BOLETO</SelectItem>
                             <SelectItem value="DEPOSITO">DEPOSITO</SelectItem>
+                            <SelectItem value="MENSAGEM">MENSAGEM</SelectItem>
                           </SelectContent>
                         </Select>
                         <Button
@@ -450,7 +475,7 @@ export function DebtTable({
                       </div>
                     </TableCell>
 
-                    {/* Collection Actions Column */}
+                    {/* Collection Actions Column (History Icon) */}
                     <TableCell className="text-center">
                       <div className="flex items-center justify-center gap-2">
                         <span
@@ -474,7 +499,7 @@ export function DebtTable({
                               row.clientName,
                             )
                           }
-                          title="Ver Ações de Cobrança"
+                          title="Ver Histórico de Cobrança"
                         >
                           <MessageSquareText className="h-4 w-4" />
                         </Button>

@@ -148,10 +148,11 @@ export function AcertoTable({
           <TableRow>
             <VerticalHeader className="w-[50px]">ID VENDA ITENS</VerticalHeader>
             <VerticalHeader className="w-[50px]">CÓDIGO</VerticalHeader>
+            {/* Reordered Columns: TIPO before PRODUTO */}
+            <VerticalHeader>TIPO</VerticalHeader>
             <VerticalHeader className="w-[300px] items-start justify-start">
               PRODUTO
             </VerticalHeader>
-            <VerticalHeader>TIPO</VerticalHeader>
             <VerticalHeader>SALDO INICIAL</VerticalHeader>
             <VerticalHeader className="bg-blue-50/50 font-bold text-blue-700">
               CONTAGEM
@@ -171,8 +172,8 @@ export function AcertoTable({
                 colSpan={10}
                 className="h-24 text-center text-muted-foreground"
               >
-                Nenhum produto adicionado. Clique em "Inserir Produto" para
-                começar.
+                Nenhum produto adicionado. Clique em "Incluir Novos Produtos"
+                para começar.
               </TableCell>
             </TableRow>
           ) : (
@@ -191,11 +192,12 @@ export function AcertoTable({
                     </span>
                   </div>
                 </TableCell>
-                <TableCell className="font-medium">
-                  {item.produtoNome}
-                </TableCell>
+                {/* Reordered Data Cells: TIPO before PRODUTO */}
                 <TableCell className="text-center text-xs text-muted-foreground">
                   {item.tipo || '-'}
+                </TableCell>
+                <TableCell className="font-medium">
+                  {item.produtoNome}
                 </TableCell>
                 <TableCell className="text-center font-mono">
                   {item.saldoInicial}

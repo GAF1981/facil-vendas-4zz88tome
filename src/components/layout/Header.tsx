@@ -95,7 +95,8 @@ export function Header() {
   const initials = employee?.nome_completo
     ? getInitials(employee.nome_completo)
     : ''
-  const hasPhoto = !!employee?.foto_url
+  // Use foto_url if available
+  const photoUrl = employee?.foto_url
 
   return (
     <header className="flex min-h-16 shrink-0 items-center gap-2 border-b bg-background px-4 sticky top-0 z-10 shadow-sm py-2">
@@ -180,29 +181,28 @@ export function Header() {
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
-              className={cn(
-                'relative h-auto p-1 rounded-full hover:bg-transparent focus-visible:ring-1 focus-visible:ring-offset-1 px-2',
-                hasPhoto ? 'flex flex-col gap-1' : '',
-              )}
+              className="relative h-auto p-1 rounded-full hover:bg-transparent focus-visible:ring-1 focus-visible:ring-offset-1 px-2 flex items-center gap-2"
             >
-              <div className="flex flex-col items-center gap-1">
-                <Avatar className="h-10 w-10 border border-border">
-                  <AvatarImage
-                    src={employee?.foto_url || undefined}
-                    alt={employee?.nome_completo || 'User'}
-                    className="object-cover"
-                  />
-                  <AvatarFallback className="text-[12px] font-bold bg-primary/10 text-primary">
-                    {initials || <User className="h-5 w-5" />}
-                  </AvatarFallback>
-                </Avatar>
-                {/* If photo exists, show initials below it as requested */}
-                {hasPhoto && initials && (
-                  <span className="text-[10px] font-bold leading-none text-muted-foreground uppercase">
-                    {initials}
+              <div className="flex flex-col items-end hidden sm:flex">
+                <span className="text-sm font-medium leading-none">
+                  {employee?.nome_completo || 'Usuário'}
+                </span>
+                {employee?.setor && (
+                  <span className="text-xs text-muted-foreground uppercase font-semibold">
+                    {employee.setor}
                   </span>
                 )}
               </div>
+              <Avatar className="h-10 w-10 border border-border">
+                <AvatarImage
+                  src={photoUrl || undefined}
+                  alt={employee?.nome_completo || 'User'}
+                  className="object-cover"
+                />
+                <AvatarFallback className="text-[12px] font-bold bg-primary/10 text-primary">
+                  {initials || <User className="h-5 w-5" />}
+                </AvatarFallback>
+              </Avatar>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-64" align="end" forceMount>

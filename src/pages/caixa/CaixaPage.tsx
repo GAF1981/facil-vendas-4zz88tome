@@ -32,6 +32,9 @@ import {
   ArrowUpCircle,
   PlusCircle,
   Printer,
+  Banknote,
+  Landmark,
+  QrCode,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { Link } from 'react-router-dom'
@@ -143,6 +146,17 @@ export default function CaixaPage() {
     0,
   )
   const totalSaldo = totalRecebido - totalDespesas
+
+  // Segmented Totals
+  const totalPix = allReceipts
+    .filter((r) => r.forma === 'Pix')
+    .reduce((acc, r) => acc + r.valor, 0)
+  const totalDinheiro = allReceipts
+    .filter((r) => r.forma === 'Dinheiro')
+    .reduce((acc, r) => acc + r.valor, 0)
+  const totalCheque = allReceipts
+    .filter((r) => r.forma === 'Cheque')
+    .reduce((acc, r) => acc + r.valor, 0)
 
   // Handlers
   const handleOpenGeneralExpense = () => {
@@ -364,7 +378,7 @@ export default function CaixaPage() {
         </CardContent>
       </Card>
 
-      {/* Main Summary Table - MOVED UP */}
+      {/* Main Summary Table */}
       <Card>
         <CardHeader>
           <CardTitle>Balanço por Funcionário</CardTitle>
@@ -386,12 +400,57 @@ export default function CaixaPage() {
         </CardContent>
       </Card>
 
-      {/* Financial Totalizers */}
+      {/* Segmented Financial Totalizers (New Feature) */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="bg-white border-green-200 shadow-sm border-l-4 border-l-green-600">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-green-700">
+              Recebimentos em PIX
+            </CardTitle>
+            <QrCode className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-700">
+              R$ {formatCurrency(totalPix)}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white border-green-200 shadow-sm border-l-4 border-l-green-600">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-green-700">
+              Recebimentos em Dinheiro
+            </CardTitle>
+            <Banknote className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-700">
+              R$ {formatCurrency(totalDinheiro)}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white border-green-200 shadow-sm border-l-4 border-l-green-600">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-green-700">
+              Recebimentos em Cheque
+            </CardTitle>
+            <Landmark className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-700">
+              R$ {formatCurrency(totalCheque)}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Overall Financial Totalizers */}
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="bg-green-50/50 border-green-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-green-700">
-              Entradas (Recebimentos)
+              Total Entradas (Geral)
             </CardTitle>
             <ArrowDownCircle className="h-4 w-4 text-green-600" />
           </CardHeader>

@@ -1,4 +1,4 @@
-export type PaymentMethodType = 'Boleto' | 'Pix' | 'Dinheiro' | 'Cheque'
+export type PaymentMethodType = 'Pix' | 'Dinheiro' | 'Boleto' | 'Cheque'
 
 export interface PaymentInstallment {
   number: number
@@ -13,12 +13,12 @@ export interface PaymentEntry {
   installments: number
   dueDate: string
   details?: PaymentInstallment[] // For granular control
-  // autoFill removed as per requirement
 }
 
+// Reordered to prioritize PIX
 export const PAYMENT_METHODS: PaymentMethodType[] = [
-  'Boleto',
   'Pix',
   'Dinheiro',
+  'Boleto',
   'Cheque',
 ]

@@ -147,11 +147,10 @@ export function AcertoPaymentSummary({
         let updated = { ...p, [field]: Number(p[field].toFixed(2)) }
 
         // Value Synchronization Logic:
-        // If 'Valor Registrado' > 1 AND 'Valor Pago' < 'Valor Registrado', update 'Valor Registrado' to 'Valor Pago'
+        // Automatically sync registered vs paid logic if needed
         if (field === 'paidValue') {
-          if (updated.value > 1 && updated.paidValue < updated.value) {
-            updated.value = updated.paidValue
-          }
+          // If we want paidValue never to exceed value by logic?
+          // For now we allow it but show error UI if overpaid
         }
 
         return updated
@@ -270,7 +269,8 @@ export function AcertoPaymentSummary({
                 const isFullyPaid =
                   Math.abs(entry.paidValue - entry.value) < 0.01 &&
                   entry.value > 0
-                const isBoleto = entry.method === 'Boleto'
+                // Removed Boleto restriction for 'Valor Pago' editing
+                // Removed special 'isBoleto' variable usage for disabling
 
                 return (
                   <div
@@ -324,7 +324,7 @@ export function AcertoPaymentSummary({
                           >
                             Valor Pago
                           </Label>
-                          {!disabled && !isBoleto && (
+                          {!disabled && (
                             <div className="flex items-center gap-1.5">
                               <Checkbox
                                 id={`auto-${entry.method}`}
@@ -356,11 +356,10 @@ export function AcertoPaymentSummary({
                               isOverpaid
                                 ? 'border-red-300 bg-red-50 text-red-700 focus-visible:ring-red-200'
                                 : 'border-green-200 bg-green-50/20 text-green-700',
-                              isBoleto &&
-                                'bg-muted text-muted-foreground opacity-70',
                             )}
                             value={entry.paidValue}
-                            disabled={disabled || isBoleto} // Boleto Restriction: Read-only (disabled)
+                            // Enabled for all methods including Boleto now
+                            disabled={disabled}
                             onChange={(e) =>
                               handleUpdateEntry(
                                 entry.method,
@@ -373,7 +372,7 @@ export function AcertoPaymentSummary({
                         </div>
                         {isOverpaid && (
                           <span className="text-[10px] text-red-600 font-medium block mt-1 animate-fade-in">
-                            Erro: Valor pago excede o registrado.
+                            Aviso: Valor pago maior que registrado.
                           </span>
                         )}
                       </div>

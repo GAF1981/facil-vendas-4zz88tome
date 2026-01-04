@@ -9,10 +9,12 @@ import { AcertoPaymentSummary } from '@/components/acerto/AcertoPaymentSummary'
 import { AcertoFiscalSection } from '@/components/acerto/AcertoFiscalSection'
 import { SignatureModal } from '@/components/acerto/SignatureModal'
 import { AcertoHistoryTable } from '@/components/acerto/AcertoHistoryTable'
+import { ProductSelector } from '@/components/acerto/ProductSelector' // Imported
 import { ClientRow } from '@/types/client'
 import { Employee } from '@/types/employee'
 import { AcertoItem } from '@/types/acerto'
 import { PaymentEntry } from '@/types/payment'
+import { ProductRow } from '@/types/product' // Imported
 import { bancoDeDadosService } from '@/services/bancoDeDadosService'
 import { acertoService } from '@/services/acertoService'
 import { employeesService } from '@/services/employeesService'
@@ -169,6 +171,29 @@ export default function AcertoPage() {
     setClient(c)
   }
 
+  const handleAddProducts = (newProducts: ProductRow[]) => {
+    const newItems: AcertoItem[] = newProducts.map((p) => ({
+      uid: Math.random().toString(36).substr(2, 9),
+      produtoId: p.ID,
+      produtoCodigo: p.CODIGO,
+      produtoNome: p.PRODUTO || 'Sem nome',
+      tipo: p.TIPO,
+      precoUnitario: parseCurrency(p.PREÇO),
+      saldoInicial: 0,
+      contagem: 0,
+      quantVendida: 0,
+      valorVendido: 0,
+      saldoFinal: 0,
+      idVendaItens: null, // New items don't have this yet
+    }))
+
+    setItems((prev) => [...prev, ...newItems])
+    toast({
+      title: 'Produtos Adicionados',
+      description: `${newProducts.length} produto(s) incluído(s) na lista.`,
+    })
+  }
+
   const handleGeneratePreview = async () => {
     if (!client) return
     const emp = employees.find((e) => e.id.toString() === selectedEmployeeId)
@@ -220,6 +245,17 @@ export default function AcertoPage() {
       toast({
         title: 'Funcionário obrigatório',
         description: 'Selecione um funcionário responsável.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    // Payment Validation
+    if (payments.length === 0 && amountToPay > 0.01) {
+      toast({
+        title: 'Pagamento Obrigatório',
+        description:
+          'Selecione pelo menos uma forma de pagamento para finalizar.',
         variant: 'destructive',
       })
       return
@@ -346,6 +382,10 @@ export default function AcertoPage() {
             lastAcerto={lastAcerto}
             loading={loadingAcerto}
           />
+
+          <div className="flex justify-end">
+            <ProductSelector onSelect={handleAddProducts} />
+          </div>
 
           <AcertoTable
             items={items}

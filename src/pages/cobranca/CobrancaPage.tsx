@@ -35,6 +35,7 @@ import { ClientDebt } from '@/types/cobranca'
 import { useToast } from '@/hooks/use-toast'
 import { formatCurrency } from '@/lib/formatters'
 import { parseISO, isSameDay } from 'date-fns'
+import { ScrollArea } from '@/components/ui/scroll-area' // Imported ScrollArea
 
 export default function CobrancaPage() {
   const [loading, setLoading] = useState(true)
@@ -130,6 +131,21 @@ export default function CobrancaPage() {
               return isSameDay(parseISO(inst.vencimento), targetDate)
             }
             return false
+          })
+        })
+        client.orders = client.orders.filter((o) => o.installments.length > 0)
+      })
+      res = res.filter((c) => c.orders.length > 0)
+    }
+
+    // Default Filter: Show only debts > 1.00
+    // We apply this filter *before* others unless specifically looking for 'SEM DÉBITO' or Paid items
+    if (statusFilter !== 'SEM DÉBITO') {
+      res.forEach((client) => {
+        client.orders.forEach((order) => {
+          order.installments = order.installments.filter((inst) => {
+            const debito = Math.max(0, inst.valorRegistrado - inst.valorPago)
+            return debito > 1.0 // Only show items with debt > 1.00
           })
         })
         client.orders = client.orders.filter((o) => o.installments.length > 0)
@@ -238,7 +254,7 @@ export default function CobrancaPage() {
   const selectedCount = selectedClients.size
 
   return (
-    <div className="space-y-6 animate-fade-in p-2 pb-20 sm:p-0">
+    <div className="space-y-6 animate-fade-in p-2 pb-20 sm:p-0 flex flex-col h-full">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <div className="p-3 bg-red-100 text-red-700 rounded-lg shrink-0">
@@ -469,18 +485,21 @@ export default function CobrancaPage() {
         </CardContent>
       </Card>
 
-      {loading && data.length === 0 ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      ) : (
-        <DebtTable
-          data={filteredData}
-          onRefresh={fetchDebts}
-          selectedClients={selectedClients}
-          onToggleClient={toggleClientSelection}
-        />
-      )}
+      {/* Scrollable Container for Desktop List */}
+      <ScrollArea className="h-[600px] border rounded-md bg-card">
+        {loading && data.length === 0 ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : (
+          <DebtTable
+            data={filteredData}
+            onRefresh={fetchDebts}
+            selectedClients={selectedClients}
+            onToggleClient={toggleClientSelection}
+          />
+        )}
+      </ScrollArea>
     </div>
   )
 }
