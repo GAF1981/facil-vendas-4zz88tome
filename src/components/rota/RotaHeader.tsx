@@ -4,6 +4,8 @@ import { Rota } from '@/types/rota'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Play, Square, Loader2, Download } from 'lucide-react'
+import { usePermissions } from '@/hooks/use-permissions'
+import { useUserStore } from '@/stores/useUserStore'
 
 interface RotaHeaderProps {
   activeRota: Rota | null
@@ -23,6 +25,24 @@ export function RotaHeader({
   loading,
 }: RotaHeaderProps) {
   const displayRota = activeRota || lastRota
+  const { canAccess } = usePermissions()
+  const { employee } = useUserStore()
+
+  // Logic for visibility of "Finalizar Rota"
+  // Visible if user has 'Relatório' permission OR is an Administrator/Manager
+  const canFinalize = (() => {
+    if (canAccess('Relatório')) return true
+
+    if (employee?.setor) {
+      const sectors = Array.isArray(employee.setor)
+        ? employee.setor
+        : [employee.setor]
+      if (sectors.includes('Administrador') || sectors.includes('Gerente')) {
+        return true
+      }
+    }
+    return false
+  })()
 
   return (
     <Card className="w-full border-l-4 border-l-primary shadow-sm bg-muted/20">
@@ -86,19 +106,21 @@ export function RotaHeader({
               Iniciar Nova Rota
             </Button>
           ) : (
-            <Button
-              onClick={onEnd}
-              disabled={loading}
-              variant="destructive"
-              className="w-full sm:w-auto"
-            >
-              {loading ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Square className="mr-2 h-4 w-4" />
-              )}
-              Finalizar Rota
-            </Button>
+            canFinalize && (
+              <Button
+                onClick={onEnd}
+                disabled={loading}
+                variant="destructive"
+                className="w-full sm:w-auto"
+              >
+                {loading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Square className="mr-2 h-4 w-4" />
+                )}
+                Finalizar Rota
+              </Button>
+            )
           )}
         </div>
       </CardContent>

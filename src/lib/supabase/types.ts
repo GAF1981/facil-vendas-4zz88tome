@@ -552,7 +552,7 @@ export type Database = {
           id: number
           nome_completo: string
           senha: string
-          setor: string | null
+          setor: string[] | null
           situacao: string
         }
         Insert: {
@@ -564,7 +564,7 @@ export type Database = {
           id?: number
           nome_completo: string
           senha?: string
-          setor?: string | null
+          setor?: string[] | null
           situacao?: string
         }
         Update: {
@@ -576,7 +576,7 @@ export type Database = {
           id?: number
           nome_completo?: string
           senha?: string
-          setor?: string | null
+          setor?: string[] | null
           situacao?: string
         }
         Relationships: []
