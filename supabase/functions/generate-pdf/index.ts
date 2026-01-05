@@ -1,5 +1,9 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
+import {
+  PDFDocument,
+  StandardFonts,
+  rgb,
+} from 'https://cdn.skypack.dev/pdf-lib@1.17.1?dts'
 import { corsHeaders } from '../_shared/cors.ts'
 
 const removeAccents = (str: string) => {
@@ -69,10 +73,12 @@ serve(async (req) => {
         : 0
       const historyCount = body.history ? body.history.length : 0
 
-      // Height calculation adjusted for Card Layout (more lines per item)
-      // Header(150) + Client(200) + Items(count * 90) + Totals(200) + Payments(count * 40) + History(count * 90) + Footer(100)
+      // Height calculation adjusted for VERTICAL Card Layout (taller items)
+      // Item Card: Header + 5 fields + spacing = ~110
+      // History Card: Header + 7 fields + spacing = ~130
+      // Header(150) + Client(200) + Items(count * 110) + Totals(200) + Payments(count * 40) + History(count * 130) + Footer(100)
       const estimatedHeight =
-        900 + itemsCount * 90 + paymentsCount * 40 + historyCount * 90
+        900 + itemsCount * 110 + paymentsCount * 40 + historyCount * 130
 
       page = pdfDoc.addPage([226, Math.max(842, estimatedHeight)])
       width = page.getSize().width
@@ -180,7 +186,7 @@ serve(async (req) => {
       } = body
 
       if (isThermal) {
-        // --- THERMAL 80mm LAYOUT (CARD BASED) ---
+        // --- THERMAL 80mm LAYOUT (VERTICAL CARD BASED) ---
 
         if (preview) {
           drawText('PREVIA DE VISUALIZACAO', width / 2, y, {
@@ -208,7 +214,7 @@ serve(async (req) => {
         drawLine(y)
         y -= 15
 
-        // Order Info Header for Summary/Detail
+        // Order Info Header
         if (orderNumber) {
           drawText(`PEDIDO: ${orderNumber}`, margins.left, y, {
             size: 10,
@@ -233,7 +239,7 @@ serve(async (req) => {
         drawLine(y)
         y -= 15
 
-        // Client Info (Vertical Expansion)
+        // Client Info
         drawText(
           `CLIENTE: ${client['NOME CLIENTE'].substring(0, 30)}`,
           margins.left,
@@ -268,7 +274,6 @@ serve(async (req) => {
         const bairro = client.BAIRRO || ''
         const fullAddr = `${address}${bairro ? ' - ' + bairro : ''}`
 
-        // Address Wrapping
         if (fullAddr.length > 35) {
           drawText(`End: ${fullAddr.substring(0, 35)}`, margins.left, y, {
             size: 9,
@@ -288,23 +293,11 @@ serve(async (req) => {
         })
         y -= 12
 
-        // Last Acerto
-        const lastDate = lastAcertoDate || (lastOrder ? lastOrder.date : null)
-        if (lastDate) {
-          drawText(
-            `Ultimo Acerto: ${safeFormatDate(lastDate)}`,
-            margins.left,
-            y,
-            { size: 9 },
-          )
-          y -= 12
-        }
-
         y -= 5
         drawLine(y)
         y -= 15
 
-        // ITEMS - CARD LAYOUT (Extended Data)
+        // ITEMS - VERTICAL CARD LAYOUT
         if (items && items.length > 0) {
           drawText('ITENS', width / 2, y, {
             size: 11,
@@ -314,13 +307,14 @@ serve(async (req) => {
           y -= 15
 
           for (const item of items) {
-            if (checkPageBreak(90)) y -= 10
+            if (checkPageBreak(120)) y -= 10
 
             // Product Name (Wrapping Logic)
             const pName = item.produtoNome || ''
             const maxLen = 35
             let currentNameY = y
 
+            // Header for Card: Product Name
             if (pName.length > maxLen) {
               const line1 = pName.substring(0, maxLen)
               const line2 = pName.substring(maxLen, maxLen * 2)
@@ -343,51 +337,36 @@ serve(async (req) => {
             }
             y = currentNameY
 
-            // Line 1: S.Ini | Cont | S.Fin
-            drawText(`S.Ini: ${item.saldoInicial}`, margins.left, y, {
-              size: 9,
-              font: fontBold,
-            })
-            drawText(`Cont: ${item.contagem}`, width / 2 - 10, y, {
-              size: 9,
-              font: fontBold,
-              align: 'center',
-            })
-            drawText(`S.Fin: ${item.saldoFinal}`, width - margins.right, y, {
-              size: 9,
-              font: fontBold,
-              align: 'right',
-            })
-            y -= 12
+            // Vertical Fields (Left Aligned)
+            const fields = [
+              { label: 'Saldo Inicial', value: item.saldoInicial },
+              { label: 'Qtd. Vendida', value: item.quantVendida },
+              { label: 'Saldo Final', value: item.saldoFinal },
+              {
+                label: 'Valor Unitário',
+                value: `R$ ${formatCurrency(item.precoUnitario)}`,
+              },
+              {
+                label: 'Total',
+                value: `R$ ${formatCurrency(item.valorVendido)}`,
+              },
+            ]
 
-            // Line 2: Qtd Vend | Unit
-            drawText(`Qtd Vend: ${item.quantVendida}`, margins.left, y, {
-              size: 9,
-              font: fontBold,
-            })
-            drawText(
-              `Unit: ${formatCurrency(item.precoUnitario)}`,
-              width - margins.right,
-              y,
-              { size: 9, font: fontBold, align: 'right' },
-            )
-            y -= 12
+            for (const field of fields) {
+              drawText(`${field.label}: ${field.value}`, margins.left, y, {
+                size: 9,
+                font: fontBold,
+              })
+              y -= 12
+            }
 
-            // Line 3: Total
-            drawText(
-              `Total: R$ ${formatCurrency(item.valorVendido)}`,
-              width - margins.right,
-              y,
-              { size: 9, font: fontBold, align: 'right' },
-            )
-            y -= 8
-
+            y -= 5
             drawLine(y)
             y -= 12
           }
         }
 
-        // TOTALS - Vertical Stack with Extended Fields
+        // TOTALS
         checkPageBreak(150)
         drawText('RESUMO', width / 2, y, {
           size: 11,
@@ -416,7 +395,7 @@ serve(async (req) => {
         const summaryFields = [
           { label: 'Venda Total:', value: totalVendido, color: rgb(0, 0, 0) },
           { label: 'Desconto:', value: valorDesconto, color: rgb(0, 0, 0) },
-          { label: 'Saldo a Pagar:', value: valorAcerto, color: rgb(0, 0, 0) }, // Net to pay
+          { label: 'Saldo a Pagar:', value: valorAcerto, color: rgb(0, 0, 0) },
           { label: 'Valor Pago:', value: valorPago, color: rgb(0, 0, 0) },
           { label: 'Valor do Debito:', value: debito, color: rgb(0, 0, 0) },
         ]
@@ -450,7 +429,6 @@ serve(async (req) => {
           y -= 15
 
           for (const p of payments) {
-            // Check for details first
             const detailsList =
               p.details && p.details.length > 0
                 ? p.details
@@ -485,7 +463,7 @@ serve(async (req) => {
           y -= 15
         }
 
-        // HISTORY - CARD LAYOUT
+        // HISTORY - VERTICAL CARD LAYOUT
         if (history && history.length > 0) {
           checkPageBreak(120)
           drawText('HISTORICO (ULTIMOS)', width / 2, y, {
@@ -496,52 +474,42 @@ serve(async (req) => {
           y -= 15
 
           for (const h of history) {
-            if (checkPageBreak(70)) y -= 10
+            if (checkPageBreak(110)) y -= 10
 
-            // Header Line: Date | Order ID
-            drawText(`Data: ${safeFormatDate(h.data)}`, margins.left, y, {
-              size: 9,
-              font: fontBold,
-            })
-            drawText(`Ped: ${h.id}`, width - margins.right, y, {
-              size: 9,
-              font: fontBold,
-              align: 'right',
-            })
-            y -= 12
+            // Calculate discount value for display
+            const discountVal =
+              h.valorVendaTotal > h.saldoAPagar
+                ? h.valorVendaTotal - h.saldoAPagar
+                : 0
 
-            // Financial Line
-            drawText(
-              `Venda: ${formatCurrency(h.valorVendaTotal)}`,
-              margins.left,
-              y,
-              { size: 9, font: fontBold },
-            )
-            drawText(`Pago: ${formatCurrency(h.valorPago)}`, width / 2, y, {
-              size: 9,
-              font: fontBold,
-              align: 'center',
-            })
-            drawText(
-              `Deb: ${formatCurrency(h.debito)}`,
-              width - margins.right,
-              y,
-              { size: 9, font: fontBold, align: 'right' },
-            )
-            y -= 12
+            // Vertical Fields (Left Aligned)
+            const fields = [
+              { label: 'Data', value: safeFormatDate(h.data) },
+              {
+                label: 'Venda',
+                value: `R$ ${formatCurrency(h.valorVendaTotal)}`,
+              },
+              { label: 'Desconto', value: `R$ ${formatCurrency(discountVal)}` },
+              {
+                label: 'A pagar',
+                value: `R$ ${formatCurrency(h.saldoAPagar)}`,
+              },
+              { label: 'Pago', value: `R$ ${formatCurrency(h.valorPago)}` },
+              { label: 'Débito', value: `R$ ${formatCurrency(h.debito)}` },
+              { label: 'Vendedor', value: h.vendedor || '-' },
+            ]
 
-            if (h.vendedor) {
-              drawText(
-                `Vend: ${h.vendedor.substring(0, 20)}`,
-                margins.left,
-                y,
-                { size: 8, font: fontBold },
-              )
-              y -= 10
+            for (const field of fields) {
+              drawText(`${field.label}: ${field.value}`, margins.left, y, {
+                size: 9,
+                font: fontBold,
+              })
+              y -= 12
             }
 
+            y -= 5
             drawLine(y)
-            y -= 10
+            y -= 12
           }
         }
 
@@ -553,8 +521,8 @@ serve(async (req) => {
           font: fontBold,
           align: 'center',
         })
-        y -= 50 // Space for signature
-        drawLine(y + 40) // Line above text actually
+        y -= 50
+        drawLine(y + 40)
 
         if (signature) {
           try {
@@ -683,7 +651,7 @@ serve(async (req) => {
 
         y -= boxHeight + 20
 
-        // Items Table - Extended Columns
+        // Items Table - Extended Columns with Full Labels where possible
         if (items && items.length > 0) {
           drawText('ITENS DO PEDIDO', margins.left, y, {
             size: 12,
@@ -691,19 +659,19 @@ serve(async (req) => {
           })
           y -= 15
 
-          // Extended Columns Layout
+          // Extended Columns Layout - Adjusted to fit full labels
           const colX = {
             prod: margins.left,
-            sIni: 240,
-            cont: 290,
-            sFin: 340,
-            qtd: 390,
-            unit: 440,
+            sIni: 240, // Expanded space for Saldo Inicial
+            cont: 300, // Shifted
+            sFin: 350, // Expanded space for Saldo Final
+            qtd: 410, // Shifted
+            unit: 460, // Shifted
             total: width - margins.right,
           }
 
           drawText('Produto', colX.prod, y, { size: 8, font: fontBold })
-          drawText('S.Ini', colX.sIni, y, {
+          drawText('Saldo Inicial', colX.sIni, y, {
             size: 8,
             font: fontBold,
             align: 'right',
@@ -713,7 +681,7 @@ serve(async (req) => {
             font: fontBold,
             align: 'right',
           })
-          drawText('S.Fin', colX.sFin, y, {
+          drawText('Saldo Final', colX.sFin, y, {
             size: 8,
             font: fontBold,
             align: 'right',
@@ -745,7 +713,7 @@ serve(async (req) => {
 
           for (const item of items) {
             if (checkPageBreak(20)) y -= 20
-            drawText(item.produtoNome.substring(0, 35), colX.prod, y, {
+            drawText(item.produtoNome.substring(0, 30), colX.prod, y, {
               size: 8,
             })
             drawText(String(item.saldoInicial), colX.sIni, y, {
@@ -1024,7 +992,6 @@ serve(async (req) => {
               col = 1
             }
           }
-          // Reset y if we ended on col 1 to avoid overlap next (though end of doc)
           if (col === 1) y -= cardHeight + 10
         }
       }
