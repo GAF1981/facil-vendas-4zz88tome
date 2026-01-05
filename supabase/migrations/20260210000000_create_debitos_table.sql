@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS debitos_historico (
 CREATE OR REPLACE FUNCTION refresh_debitos_historico()
 RETURNS VOID
 LANGUAGE plpgsql
-AS $
+AS $$
 BEGIN
     DELETE FROM debitos_historico;
 
@@ -45,5 +45,4 @@ BEGIN
     WHERE bd."NÚMERO DO PEDIDO" IS NOT NULL
     GROUP BY bd."NÚMERO DO PEDIDO", bd."DATA DO ACERTO", bd."FUNCIONÁRIO", bd."VALOR VENDIDO", bd."VALOR DEVIDO";
 END;
-$;
-
+$$;
