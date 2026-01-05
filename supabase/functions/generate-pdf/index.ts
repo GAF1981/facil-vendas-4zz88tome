@@ -179,6 +179,7 @@ Deno.serve(async (req) => {
         clientMunicipio,
         lastAcertoDate,
         lastOrder,
+        monthlyAverage,
       } = body
 
       if (isThermal) {
@@ -363,7 +364,7 @@ Deno.serve(async (req) => {
         }
 
         // TOTALS
-        checkPageBreak(150)
+        checkPageBreak(170)
         drawText('RESUMO', width / 2, y, {
           size: 11,
           font: fontBold,
@@ -394,6 +395,11 @@ Deno.serve(async (req) => {
           { label: 'Saldo a Pagar:', value: valorAcerto, color: rgb(0, 0, 0) },
           { label: 'Valor Pago:', value: valorPago, color: rgb(0, 0, 0) },
           { label: 'Valor do Debito:', value: debito, color: rgb(0, 0, 0) },
+          {
+            label: 'Média Mensal:',
+            value: monthlyAverage || 0,
+            color: rgb(0, 0, 0),
+          },
         ]
 
         for (const field of summaryFields) {
@@ -865,55 +871,6 @@ Deno.serve(async (req) => {
           y -= 20
         }
 
-        // Signatures
-        checkPageBreak(100)
-        y -= 40
-        const sigLineLength = 200
-        page.drawLine({
-          start: { x: margins.left, y },
-          end: { x: margins.left + sigLineLength, y },
-          thickness: 1,
-        })
-        drawText(
-          'Assinatura do Cliente',
-          margins.left + sigLineLength / 2,
-          y - 15,
-          { size: 9, align: 'center' },
-        )
-
-        page.drawLine({
-          start: { x: width - margins.right - sigLineLength, y },
-          end: { x: width - margins.right, y },
-          thickness: 1,
-        })
-        drawText(
-          'Assinatura do Vendedor',
-          width - margins.right - sigLineLength / 2,
-          y - 15,
-          { size: 9, align: 'center' },
-        )
-
-        if (signature) {
-          try {
-            const base64Data = signature.split(',')[1]
-            const imageBytes = Uint8Array.from(atob(base64Data), (c) =>
-              c.charCodeAt(0),
-            )
-            const image = await pdfDoc.embedPng(imageBytes)
-            const imageDims = image.scale(0.4)
-            page.drawImage(image, {
-              x: margins.left + (sigLineLength - imageDims.width) / 2,
-              y: y + 5,
-              width: imageDims.width,
-              height: imageDims.height,
-            })
-          } catch (e) {
-            console.error(e)
-          }
-        }
-
-        y -= 50
-
         // History Section - Table Layout for A4 (UPDATED)
         if (history && history.length > 0) {
           checkPageBreak(200)
@@ -925,16 +882,21 @@ Deno.serve(async (req) => {
 
           // Table Header
           const histColX = {
-            pedido: margins.left,
-            data: 110,
-            media: 360, // Align Right
-            saldo: 425, // Align Right
-            pago: 490, // Align Right
+            pedido: margins.left, // 40
+            data: 90,
+            vendedor: 160, // New
+            media: 320, // Align Right
+            saldo: 395, // Align Right
+            pago: 470, // Align Right
             debito: 555, // Align Right
           }
 
           drawText('Pedido', histColX.pedido, y, { size: 9, font: fontBold })
-          drawText('Data do Acerto', histColX.data, y, {
+          drawText('Data', histColX.data, y, {
+            size: 9,
+            font: fontBold,
+          })
+          drawText('Vendedor', histColX.vendedor, y, {
             size: 9,
             font: fontBold,
           })
@@ -972,6 +934,14 @@ Deno.serve(async (req) => {
             if (checkPageBreak(20)) y -= 20
             drawText(String(h.id || '-'), histColX.pedido, y, { size: 9 })
             drawText(safeFormatDate(h.data), histColX.data, y, { size: 9 })
+            drawText(
+              (h.vendedor || '-').substring(0, 20),
+              histColX.vendedor,
+              y,
+              {
+                size: 9,
+              },
+            )
             drawText(formatCurrency(h.mediaMensal || 0), histColX.media, y, {
               size: 9,
               align: 'right',
@@ -995,6 +965,48 @@ Deno.serve(async (req) => {
             y -= 12
           }
         }
+
+        y -= 20
+
+        // Signatures (Moved to end for A4)
+        checkPageBreak(100)
+        y -= 30
+        const sigLineLength = 250
+        // Centered Client Signature
+        const centerX = width / 2
+        const startX = centerX - sigLineLength / 2
+        const endX = centerX + sigLineLength / 2
+
+        page.drawLine({
+          start: { x: startX, y },
+          end: { x: endX, y },
+          thickness: 1,
+        })
+        drawText('Assinatura do Cliente', centerX, y - 15, {
+          size: 9,
+          align: 'center',
+        })
+
+        if (signature) {
+          try {
+            const base64Data = signature.split(',')[1]
+            const imageBytes = Uint8Array.from(atob(base64Data), (c) =>
+              c.charCodeAt(0),
+            )
+            const image = await pdfDoc.embedPng(imageBytes)
+            const imageDims = image.scale(0.4)
+            page.drawImage(image, {
+              x: centerX - imageDims.width / 2,
+              y: y + 5,
+              width: imageDims.width,
+              height: imageDims.height,
+            })
+          } catch (e) {
+            console.error(e)
+          }
+        }
+
+        y -= 50
       }
     }
 

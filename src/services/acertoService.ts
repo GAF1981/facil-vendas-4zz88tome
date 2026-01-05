@@ -136,6 +136,9 @@ export const acertoService = {
     // Use the history fetched from debitos_historico directly
     const recentHistory = previousOrders // Already limited by the service
 
+    // Fetch Monthly Average for the PDF report
+    const monthlyAverage = await bancoDeDadosService.getMonthlyAverage(clientId)
+
     const items = dbItems.map((item) => ({
       uid: item['ID VENDA ITENS']?.toString() || Math.random().toString(),
       produtoId: 0,
@@ -201,6 +204,7 @@ export const acertoService = {
       issuerName,
       lastOrder: lastOrder ? { id: lastOrder.id, date: lastOrder.data } : null,
       history: recentHistory,
+      monthlyAverage, // Passed for PDF Summary
     }
 
     return this.generatePdf(data)
