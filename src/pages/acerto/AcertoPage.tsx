@@ -7,6 +7,7 @@ import { AcertoStockSummary } from '@/components/acerto/AcertoStockSummary'
 import { AcertoSalesSummary } from '@/components/acerto/AcertoSalesSummary'
 import { AcertoPaymentSummary } from '@/components/acerto/AcertoPaymentSummary'
 import { AcertoFiscalSection } from '@/components/acerto/AcertoFiscalSection'
+import { AcertoPrintOptions } from '@/components/acerto/AcertoPrintOptions'
 import { SignatureModal } from '@/components/acerto/SignatureModal'
 import { AcertoHistoryTable } from '@/components/acerto/AcertoHistoryTable'
 import { ProductSelector } from '@/components/acerto/ProductSelector'
@@ -51,6 +52,7 @@ export default function AcertoPage() {
   const [signature, setSignature] = useState<string | null>(null)
   const [signatureOpen, setSignatureOpen] = useState(false)
   const [zeroStockDialogOpen, setZeroStockDialogOpen] = useState(false)
+  const [pdfFormat, setPdfFormat] = useState<'A4' | '80mm'>('A4')
 
   // Pending Stock Adjustments Queue
   const [pendingAdjustments, setPendingAdjustments] = useState<
@@ -287,7 +289,7 @@ export default function AcertoPage() {
           orderNumber: nextOrderNumber,
           issuerName: loggedInUser?.nome_completo,
         },
-        { preview: true, signature },
+        { preview: true, signature, format: pdfFormat },
       )
 
       const url = window.URL.createObjectURL(pdfBlob)
@@ -458,7 +460,7 @@ export default function AcertoPage() {
           issuerName: loggedInUser?.nome_completo,
           history: history.slice(0, 10), // Limit to last 10 entries per requirement
         },
-        { preview: false, signature },
+        { preview: false, signature, format: pdfFormat },
       )
 
       const url = window.URL.createObjectURL(pdfBlob)
@@ -576,11 +578,16 @@ export default function AcertoPage() {
                   disabled={saving}
                 />
               </div>
-              <div className="lg:col-span-1">
+              <div className="lg:col-span-1 flex flex-col gap-6">
                 <AcertoFiscalSection
                   clientNotaFiscal={client['NOTA FISCAL']}
                   notaFiscalVenda={notaFiscal}
                   onNotaFiscalVendaChange={setNotaFiscal}
+                  disabled={saving}
+                />
+                <AcertoPrintOptions
+                  format={pdfFormat}
+                  onFormatChange={setPdfFormat}
                   disabled={saving}
                 />
               </div>

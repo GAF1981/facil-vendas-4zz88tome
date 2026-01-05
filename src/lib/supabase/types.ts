@@ -90,6 +90,41 @@ export type Database = {
         }
         Relationships: []
       }
+      acoes_cobranca_vencimentos: {
+        Row: {
+          acao_cobranca_id: number | null
+          created_at: string
+          forma_pagamento: string | null
+          id: number
+          valor: number
+          vencimento: string
+        }
+        Insert: {
+          acao_cobranca_id?: number | null
+          created_at?: string
+          forma_pagamento?: string | null
+          id?: number
+          valor: number
+          vencimento: string
+        }
+        Update: {
+          acao_cobranca_id?: number | null
+          created_at?: string
+          forma_pagamento?: string | null
+          id?: number
+          valor?: number
+          vencimento?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'acoes_cobranca_vencimentos_acao_cobranca_id_fkey'
+            columns: ['acao_cobranca_id']
+            isOneToOne: false
+            referencedRelation: 'acoes_cobranca'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       AJUSTE_SALDO_INICIAL: {
         Row: {
           cliente_id: number

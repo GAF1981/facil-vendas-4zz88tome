@@ -44,7 +44,11 @@ export const acertoService = {
 
   async generatePdf(
     data: any,
-    options?: { preview?: boolean; signature?: string | null },
+    options?: {
+      preview?: boolean
+      signature?: string | null
+      format?: 'A4' | '80mm'
+    },
   ) {
     const { data: blob, error } = await supabase.functions.invoke(
       'generate-pdf',
@@ -53,6 +57,7 @@ export const acertoService = {
           ...data,
           preview: options?.preview ?? false,
           signature: options?.signature ?? null,
+          format: options?.format ?? 'A4',
         },
         responseType: 'blob', // Important for file download
       } as any,
@@ -63,6 +68,8 @@ export const acertoService = {
   },
 
   async reprintOrder(orderId: number, issuerName?: string) {
+    // Reprints default to A4 unless we extend this method later,
+    // but the backend will handle A4 default if not passed.
     return this.generateDocument(
       orderId,
       'ACERTO (REIMPRESSÃO)',
