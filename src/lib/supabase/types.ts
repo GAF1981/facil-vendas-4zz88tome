@@ -1174,7 +1174,7 @@ export type Database = {
           setor: string[]
         }[]
       }
-      parse_currency_sql: { Args: { p_value: string }; Returns: number }
+      parse_currency_sql: { Args: { price: string }; Returns: number }
       process_inventory_batch: {
         Args: { p_funcionario_id: number; p_items: Json; p_session_id: number }
         Returns: undefined
@@ -1187,6 +1187,10 @@ export type Database = {
       safe_timestamp_combine: {
         Args: { p_date: string; p_time: string }
         Returns: string
+      }
+      update_debito_historico_order: {
+        Args: { p_pedido_id: number }
+        Returns: undefined
       }
       verify_employee_credentials: {
         Args: { p_email: string; p_senha: string }

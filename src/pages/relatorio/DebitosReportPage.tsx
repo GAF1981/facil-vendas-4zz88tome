@@ -22,6 +22,7 @@ import { formatCurrency, safeFormatDate } from '@/lib/formatters'
 import { ArrowLeft, Loader2, RefreshCw } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useToast } from '@/hooks/use-toast'
+import { Badge } from '@/components/ui/badge'
 
 export default function DebitosReportPage() {
   const [data, setData] = useState<DebitoReportRow[]>([])
@@ -33,6 +34,7 @@ export default function DebitosReportPage() {
   const [filters, setFilters] = useState({
     vendedor: 'todos',
     pedido: '',
+    client: '',
     dateStart: '',
     dateEnd: '',
     debitoMin: '',
@@ -89,6 +91,14 @@ export default function DebitosReportPage() {
         return false
       if (filters.pedido && !row.pedido_id.toString().includes(filters.pedido))
         return false
+      if (
+        filters.client &&
+        !row.cliente_nome
+          ?.toLowerCase()
+          .includes(filters.client.toLowerCase()) &&
+        !row.cliente_codigo?.toString().includes(filters.client)
+      )
+        return false
       if (filters.dateStart && row.data_acerto < filters.dateStart) return false
       if (filters.dateEnd && row.data_acerto > filters.dateEnd) return false
       if (filters.debitoMin && row.debito < Number(filters.debitoMin))
@@ -116,6 +126,13 @@ export default function DebitosReportPage() {
     )
   }, [filteredData])
 
+  const formatTime = (timeStr: string | null) => {
+    if (!timeStr) return ''
+    const parts = timeStr.split(':')
+    if (parts.length >= 2) return `${parts[0]}:${parts[1]}`
+    return timeStr
+  }
+
   return (
     <div className="space-y-6 animate-fade-in p-4 pb-20">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -130,7 +147,7 @@ export default function DebitosReportPage() {
               Relatório de Débitos
             </h1>
             <p className="text-muted-foreground">
-              Acompanhamento histórico de dívidas e pagamentos.
+              Acompanhamento detalhado de dívidas e pagamentos por pedido.
             </p>
           </div>
         </div>
@@ -147,7 +164,7 @@ export default function DebitosReportPage() {
           <CardTitle>Filtros</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Vendedor</label>
               <Select
@@ -174,6 +191,16 @@ export default function DebitosReportPage() {
                 value={filters.pedido}
                 onChange={(e) =>
                   setFilters({ ...filters, pedido: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Cliente (Nome/Cód)</label>
+              <Input
+                placeholder="Buscar..."
+                value={filters.client}
+                onChange={(e) =>
+                  setFilters({ ...filters, client: e.target.value })
                 }
               />
             </div>
@@ -218,12 +245,12 @@ export default function DebitosReportPage() {
             <Table>
               <TableHeader className="bg-muted/50">
                 <TableRow>
-                  <TableHead>Pedido</TableHead>
-                  <TableHead>Data Acerto</TableHead>
+                  <TableHead className="w-[80px]">Pedido</TableHead>
+                  <TableHead className="w-[120px]">Data Acerto</TableHead>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead>Rota</TableHead>
                   <TableHead>Vendedor</TableHead>
-                  <TableHead className="text-right">Média Mensal</TableHead>
                   <TableHead className="text-right">Valor Venda</TableHead>
-                  <TableHead className="text-right">Saldo a Pagar</TableHead>
                   <TableHead className="text-right text-green-600">
                     Valor Pago
                   </TableHead>
@@ -256,19 +283,39 @@ export default function DebitosReportPage() {
                           #{row.pedido_id}
                         </TableCell>
                         <TableCell>
-                          {safeFormatDate(row.data_acerto, 'dd/MM/yyyy')}
+                          <div className="flex flex-col">
+                            <span>
+                              {safeFormatDate(row.data_acerto, 'dd/MM/yyyy')}
+                            </span>
+                            {row.hora_acerto && (
+                              <span className="text-xs text-muted-foreground">
+                                {formatTime(row.hora_acerto)}
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-medium">
+                              {row.cliente_nome || '-'}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              Cód: {row.cliente_codigo || '-'}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {row.rota ? (
+                            <Badge variant="outline" className="font-normal">
+                              {row.rota}
+                            </Badge>
+                          ) : (
+                            '-'
+                          )}
                         </TableCell>
                         <TableCell>{row.vendedor_nome || '-'}</TableCell>
-                        <TableCell className="text-right font-mono text-muted-foreground">
-                          {row.media_mensal
-                            ? `R$ ${formatCurrency(row.media_mensal)}`
-                            : '-'}
-                        </TableCell>
                         <TableCell className="text-right">
                           R$ {formatCurrency(row.valor_venda)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          R$ {formatCurrency(row.saldo_a_pagar)}
                         </TableCell>
                         <TableCell className="text-right text-green-600">
                           R$ {formatCurrency(row.valor_pago)}
@@ -279,13 +326,10 @@ export default function DebitosReportPage() {
                       </TableRow>
                     ))}
                     {/* Totalizer */}
-                    <TableRow className="bg-muted font-bold border-t-2">
-                      <TableCell colSpan={4}>TOTAIS</TableCell>
+                    <TableRow className="bg-muted font-bold border-t-2 text-sm">
+                      <TableCell colSpan={5}>TOTAIS GERAIS</TableCell>
                       <TableCell className="text-right">
                         R$ {formatCurrency(totals.venda)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        R$ {formatCurrency(totals.saldo)}
                       </TableCell>
                       <TableCell className="text-right text-green-700">
                         R$ {formatCurrency(totals.pago)}

@@ -8,7 +8,6 @@ export interface ProjectionReportRow {
   clientName: string
   orderDate: string
   totalValue: number
-  // Calculated Columns
   daysBetweenOrders: number | null
   indexDays: number | null
   monthlyAverage: number | null
@@ -41,7 +40,11 @@ export interface DebitoReportRow {
   rota_id: number | null
   pedido_id: number
   data_acerto: string
+  hora_acerto: string | null
   vendedor_nome: string
+  cliente_codigo: number | null
+  cliente_nome: string | null
+  rota: string | null
   media_mensal: number
   valor_venda: number
   saldo_a_pagar: number
@@ -198,13 +201,12 @@ export const reportsService = {
         `Failed to auto-update debt history for order ${orderId}`,
         error,
       )
-      // We don't throw here to avoid blocking the user flow if this auxiliary stats update fails
     }
   },
 
   async getDebtsReport(): Promise<DebitoReportRow[]> {
-    // Attempt to fetch from materialized view/table
-    const { data, error } = await supabase
+    // 1. Fetch from debitos_historico
+    const { data: reportData, error } = await supabase
       .from('debitos_historico')
       .select('*')
       .order('data_acerto', { ascending: false })
@@ -214,6 +216,67 @@ export const reportsService = {
       console.warn('Error fetching debitos_historico:', error)
       return []
     }
-    return data as DebitoReportRow[]
+
+    // 2. Client-side join to ensure missing data (client_code, name, rota) is populated
+    // This handles cases where migration backfill might be incomplete or lagged
+    const incompleteRows = reportData.filter(
+      (r) => !r.cliente_codigo || !r.cliente_nome,
+    )
+
+    if (incompleteRows.length > 0) {
+      const orderIds = incompleteRows.map((r) => r.pedido_id)
+
+      // Fetch missing info from BANCO_DE_DADOS & CLIENTES
+      const { data: dbData } = await supabase
+        .from('BANCO_DE_DADOS')
+        .select(
+          '"NÚMERO DO PEDIDO", "CÓDIGO DO CLIENTE", "CLIENTE", "HORA DO ACERTO"',
+        )
+        .in('NÚMERO DO PEDIDO', orderIds)
+
+      // Fetch Rota info
+      const clientIds = [
+        ...new Set(dbData?.map((d) => d['CÓDIGO DO CLIENTE']) || []),
+      ] as number[]
+
+      let clientRotas = new Map<number, string>()
+      if (clientIds.length > 0) {
+        const { data: clients } = await supabase
+          .from('CLIENTES')
+          .select('CODIGO, "GRUPO ROTA"')
+          .in('CODIGO', clientIds)
+
+        clients?.forEach((c: any) => {
+          clientRotas.set(c.CODIGO, c['GRUPO ROTA'])
+        })
+      }
+
+      // Merge
+      const detailsMap = new Map<number, any>()
+      dbData?.forEach((d: any) => {
+        detailsMap.set(d['NÚMERO DO PEDIDO'], {
+          code: d['CÓDIGO DO CLIENTE'],
+          name: d['CLIENTE'],
+          time: d['HORA DO ACERTO'],
+          rota: clientRotas.get(d['CÓDIGO DO CLIENTE']),
+        })
+      })
+
+      return reportData.map((row) => {
+        if (!row.cliente_codigo && detailsMap.has(row.pedido_id)) {
+          const details = detailsMap.get(row.pedido_id)
+          return {
+            ...row,
+            cliente_codigo: details.code,
+            cliente_nome: details.name,
+            hora_acerto: row.hora_acerto || details.time,
+            rota: row.rota || details.rota,
+          }
+        }
+        return row as DebitoReportRow
+      })
+    }
+
+    return reportData as DebitoReportRow[]
   },
 }

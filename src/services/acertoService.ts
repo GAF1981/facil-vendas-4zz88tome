@@ -114,6 +114,14 @@ export const acertoService = {
 
     const client = await clientsService.getById(clientId)
 
+    // Fetch Last Order Info (Previous to current one)
+    const history = await bancoDeDadosService.getAcertoHistory(clientId)
+    const previousOrders = history.filter((h) => h.id !== orderId)
+    const lastOrder = previousOrders.length > 0 ? previousOrders[0] : null
+
+    // Filter history to last 10 (excluding current) for display
+    const recentHistory = previousOrders.slice(0, 10)
+
     const items = dbItems.map((item) => ({
       uid: item['ID VENDA ITENS']?.toString() || Math.random().toString(),
       produtoId: 0,
@@ -145,7 +153,10 @@ export const acertoService = {
     const debito = Math.max(0, valorAcerto - valorPago)
 
     const data = {
-      client,
+      client: {
+        ...client,
+        // Ensure explicit fields are present if needed, but client already has them from service
+      },
       employee: { nome_completo: funcionarioName },
       items,
       date: dateStr,
@@ -161,6 +172,8 @@ export const acertoService = {
       signature: null,
       isReceipt, // Flag for PDF generator
       issuerName,
+      lastOrder: lastOrder ? { id: lastOrder.id, date: lastOrder.data } : null,
+      history: recentHistory, // Pass explicit history
     }
 
     return this.generatePdf(data)

@@ -1,11 +1,14 @@
 export interface NotaFiscalSettlement {
   orderId: number
-  clientName: string // Added for global view
+  clientCode: number
+  clientName: string
   dataAcerto: string
   valorTotalVendido: number
   notaFiscalCadastro: string
   notaFiscalVenda: string
+  solicitacaoNf: string
   notaFiscalEmitida: string
+  numeroNotaFiscal?: string | null
 }
 
 export type NotaFiscalStatusFilter =
@@ -15,3 +18,10 @@ export type NotaFiscalStatusFilter =
   | 'Resolvida'
 
 export const NOTA_FISCAL_STATUSES = ['Emitida', 'Pendente', 'Resolvida']
+
+export interface EmitInvoicePayload {
+  pedidoId: number
+  clienteId: number
+  numeroNotaFiscal: string
+  funcionarioId: number
+}

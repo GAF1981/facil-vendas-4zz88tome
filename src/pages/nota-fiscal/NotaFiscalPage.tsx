@@ -17,9 +17,29 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
-import { Loader2, FileText, User, X } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import {
+  Loader2,
+  FileText,
+  User,
+  X,
+  Download,
+  FileCheck,
+  FileSignature,
+} from 'lucide-react'
 import { notaFiscalService } from '@/services/notaFiscalService'
+import { acertoService } from '@/services/acertoService'
 import {
   NotaFiscalSettlement,
   NotaFiscalStatusFilter,
@@ -29,14 +49,28 @@ import { useToast } from '@/hooks/use-toast'
 import { formatCurrency } from '@/lib/formatters'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { useUserStore } from '@/stores/useUserStore'
 
 export default function NotaFiscalPage() {
   const [selectedClient, setSelectedClient] = useState<ClientRow | null>(null)
   const [settlements, setSettlements] = useState<NotaFiscalSettlement[]>([])
   const [loading, setLoading] = useState(false)
   const [statusFilter, setStatusFilter] =
-    useState<NotaFiscalStatusFilter>('Pendente')
+    useState<NotaFiscalStatusFilter>('all')
   const { toast } = useToast()
+  const { employee } = useUserStore()
+
+  // Dialog States
+  const [requestDialog, setRequestDialog] = useState<{
+    open: boolean
+    item: NotaFiscalSettlement | null
+  }>({ open: false, item: null })
+  const [emitDialog, setEmitDialog] = useState<{
+    open: boolean
+    item: NotaFiscalSettlement | null
+    invoiceNumber: string
+  }>({ open: false, item: null, invoiceNumber: '' })
+  const [emitting, setEmitting] = useState(false)
 
   const fetchAllSettlements = async () => {
     setLoading(true)
@@ -75,7 +109,6 @@ export default function NotaFiscalPage() {
     }
   }
 
-  // Load all on mount
   useEffect(() => {
     fetchAllSettlements()
   }, [])
@@ -90,31 +123,99 @@ export default function NotaFiscalPage() {
     fetchAllSettlements()
   }
 
-  const handleStatusChange = async (orderId: number, newStatus: string) => {
-    // Optimistic update
-    const previous = settlements
-    setSettlements((prev) =>
-      prev.map((s) =>
-        s.orderId === orderId ? { ...s, notaFiscalEmitida: newStatus } : s,
-      ),
-    )
-
+  // Actions
+  const handleDownloadPdf = async (orderId: number) => {
     try {
-      await notaFiscalService.updateIssuanceStatus(orderId, newStatus)
-      toast({
-        title: 'Status atualizado',
-        description: `Nota Fiscal alterada para ${newStatus}.`,
-        duration: 2000,
-      })
+      const blob = await acertoService.reprintOrder(orderId)
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `Acerto-${orderId}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
     } catch (error) {
       console.error(error)
-      // Revert on error
-      setSettlements(previous)
       toast({
-        title: 'Erro ao atualizar',
-        description: 'Não foi possível salvar o status.',
+        title: 'Erro no download',
+        description: 'Não foi possível gerar o PDF.',
         variant: 'destructive',
       })
+    }
+  }
+
+  const handleToggleRequest = async () => {
+    if (!requestDialog.item) return
+    try {
+      const newVal = await notaFiscalService.toggleRequest(
+        requestDialog.item.orderId,
+        requestDialog.item.solicitacaoNf,
+      )
+
+      // Update local state
+      setSettlements((prev) =>
+        prev.map((s) =>
+          s.orderId === requestDialog.item!.orderId
+            ? {
+                ...s,
+                solicitacaoNf: newVal,
+                notaFiscalEmitida:
+                  newVal === 'SIM' && s.notaFiscalEmitida === 'Resolvida'
+                    ? 'Pendente'
+                    : s.notaFiscalEmitida,
+              }
+            : s,
+        ),
+      )
+
+      toast({ title: 'Solicitação atualizada' })
+      setRequestDialog({ open: false, item: null })
+    } catch (error) {
+      toast({ title: 'Erro ao atualizar solicitação', variant: 'destructive' })
+    }
+  }
+
+  const handleEmitInvoice = async () => {
+    if (!emitDialog.item || !emitDialog.invoiceNumber.trim()) return
+    if (!employee) {
+      toast({
+        title: 'Erro',
+        description: 'Usuário não identificado.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setEmitting(true)
+    try {
+      await notaFiscalService.emitInvoice({
+        pedidoId: emitDialog.item.orderId,
+        clienteId: emitDialog.item.clientCode,
+        numeroNotaFiscal: emitDialog.invoiceNumber,
+        funcionarioId: employee.id,
+      })
+
+      setSettlements((prev) =>
+        prev.map((s) =>
+          s.orderId === emitDialog.item!.orderId
+            ? {
+                ...s,
+                notaFiscalEmitida: 'Emitida',
+                numeroNotaFiscal: emitDialog.invoiceNumber,
+              }
+            : s,
+        ),
+      )
+
+      toast({
+        title: 'Nota Fiscal emitida com sucesso',
+        className: 'bg-green-600 text-white',
+      })
+      setEmitDialog({ open: false, item: null, invoiceNumber: '' })
+    } catch (error) {
+      toast({ title: 'Erro ao emitir nota', variant: 'destructive' })
+    } finally {
+      setEmitting(false)
     }
   }
 
@@ -144,7 +245,7 @@ export default function NotaFiscalPage() {
             Controle de Emissão de Nota Fiscal
           </h1>
           <p className="text-muted-foreground">
-            Gerencie a emissão de notas fiscais para acertos.
+            Gerencie solicitações, emissões e status de notas fiscais.
           </p>
         </div>
       </div>
@@ -199,37 +300,6 @@ export default function NotaFiscalPage() {
         </Card>
       </div>
 
-      {selectedClient && (
-        <Card className="border-l-4 border-l-blue-500 animate-fade-in">
-          <CardContent className="pt-6">
-            <div className="flex items-start gap-4">
-              <div className="p-3 bg-blue-50 rounded-full text-blue-600">
-                <User className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-lg">
-                  {selectedClient['NOME CLIENTE']}
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  Código: {selectedClient.CODIGO}
-                </p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {selectedClient.MUNICÍPIO} - {selectedClient.BAIRRO}
-                </p>
-                {selectedClient['NOTA FISCAL'] && (
-                  <div className="mt-3 p-2 bg-yellow-50 border border-yellow-100 rounded text-xs text-yellow-800">
-                    <span className="font-bold block mb-1">
-                      Obs. Nota Fiscal:
-                    </span>
-                    {selectedClient['NOTA FISCAL']}
-                  </div>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       <Card>
         <CardContent className="p-0">
           {loading ? (
@@ -240,25 +310,26 @@ export default function NotaFiscalPage() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">
-                  <TableHead className="w-[100px]">Pedido</TableHead>
+                  <TableHead className="w-[80px]">Pedido</TableHead>
+                  <TableHead className="w-[80px] text-center">PDF</TableHead>
                   <TableHead>Cliente</TableHead>
-                  <TableHead className="w-[120px]">Data Acerto</TableHead>
-                  <TableHead className="text-right">Valor Total</TableHead>
-                  <TableHead>NF Cadastro</TableHead>
+                  <TableHead>Data</TableHead>
+                  <TableHead className="text-right">Valor</TableHead>
+                  <TableHead className="text-center">NF Cadastro</TableHead>
                   <TableHead className="text-center">NF Venda</TableHead>
-                  <TableHead className="text-center w-[180px]">
-                    Status
-                  </TableHead>
+                  <TableHead className="text-center">Solicitação</TableHead>
+                  <TableHead className="text-center">Status</TableHead>
+                  <TableHead className="text-center">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredSettlements.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={7}
+                      colSpan={10}
                       className="h-24 text-center text-muted-foreground"
                     >
-                      Nenhum pedido encontrado para o filtro selecionado.
+                      Nenhum registro encontrado.
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -266,6 +337,16 @@ export default function NotaFiscalPage() {
                     <TableRow key={item.orderId} className="hover:bg-muted/30">
                       <TableCell className="font-mono font-medium">
                         #{item.orderId}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => handleDownloadPdf(item.orderId)}
+                        >
+                          <FileText className="h-4 w-4" />
+                        </Button>
                       </TableCell>
                       <TableCell
                         className="font-medium max-w-[200px] truncate"
@@ -277,33 +358,65 @@ export default function NotaFiscalPage() {
                       <TableCell className="text-right font-medium">
                         R$ {formatCurrency(item.valorTotalVendido)}
                       </TableCell>
-                      <TableCell
-                        className="text-xs text-muted-foreground max-w-[150px] truncate"
-                        title={item.notaFiscalCadastro}
-                      >
-                        {item.notaFiscalCadastro || '-'}
+                      <TableCell className="text-center text-muted-foreground text-xs">
+                        {item.notaFiscalCadastro}
                       </TableCell>
-                      <TableCell className="text-center text-muted-foreground">
-                        {item.notaFiscalVenda || '-'}
+                      <TableCell className="text-center text-muted-foreground text-xs">
+                        {item.notaFiscalVenda}
                       </TableCell>
                       <TableCell className="text-center">
-                        <Select
-                          value={item.notaFiscalEmitida}
-                          onValueChange={(val) =>
-                            handleStatusChange(item.orderId, val)
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={
+                            item.solicitacaoNf === 'SIM'
+                              ? 'text-blue-600 font-bold bg-blue-50'
+                              : 'text-muted-foreground'
+                          }
+                          onClick={() => setRequestDialog({ open: true, item })}
+                        >
+                          {item.solicitacaoNf}
+                        </Button>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge
+                          variant={
+                            item.notaFiscalEmitida === 'Emitida'
+                              ? 'default'
+                              : item.notaFiscalEmitida === 'Pendente'
+                                ? 'destructive'
+                                : 'secondary'
                           }
                         >
-                          <SelectTrigger className="h-8 w-full">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {NOTA_FISCAL_STATUSES.map((status) => (
-                              <SelectItem key={status} value={status}>
-                                {status}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          {item.notaFiscalEmitida}
+                        </Badge>
+                        {item.numeroNotaFiscal && (
+                          <div className="text-[10px] text-muted-foreground mt-1">
+                            Nº: {item.numeroNotaFiscal}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {item.notaFiscalEmitida !== 'Emitida' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 text-xs border-blue-200 text-blue-700 hover:bg-blue-50"
+                            onClick={() =>
+                              setEmitDialog({
+                                open: true,
+                                item,
+                                invoiceNumber: '',
+                              })
+                            }
+                          >
+                            <FileSignature className="w-3.5 h-3.5 mr-1.5" />
+                            Emitir
+                          </Button>
+                        )}
+                        {item.notaFiscalEmitida === 'Emitida' && (
+                          <FileCheck className="w-5 h-5 mx-auto text-green-600" />
+                        )}
                       </TableCell>
                     </TableRow>
                   ))
@@ -313,6 +426,132 @@ export default function NotaFiscalPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Request Dialog */}
+      <Dialog
+        open={requestDialog.open}
+        onOpenChange={(open) =>
+          !open && setRequestDialog({ open: false, item: null })
+        }
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Gerenciar Solicitação de NF</DialogTitle>
+          </DialogHeader>
+          {requestDialog.item && (
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <Label className="text-muted-foreground">NF Cadastro</Label>
+                  <div className="font-medium mt-1">
+                    {requestDialog.item.notaFiscalCadastro}
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">NF Venda</Label>
+                  <div className="font-medium mt-1">
+                    {requestDialog.item.notaFiscalVenda}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between border p-4 rounded-lg bg-muted/20">
+                <div className="space-y-0.5">
+                  <Label className="text-base">Solicitação de NF</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Marque se o cliente solicitou NF para este pedido.
+                  </p>
+                </div>
+                <Switch
+                  checked={requestDialog.item.solicitacaoNf === 'SIM'}
+                  onCheckedChange={handleToggleRequest}
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="secondary"
+              onClick={() => setRequestDialog({ open: false, item: null })}
+            >
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Emit Invoice Dialog */}
+      <Dialog
+        open={emitDialog.open}
+        onOpenChange={(open) =>
+          !open && setEmitDialog({ open: false, item: null, invoiceNumber: '' })
+        }
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Emitir Nota Fiscal</DialogTitle>
+          </DialogHeader>
+          {emitDialog.item && (
+            <div className="space-y-4 py-4">
+              <div className="p-3 bg-muted/30 rounded border text-sm space-y-1">
+                <div>
+                  <strong>Cliente:</strong> {emitDialog.item.clientName}
+                </div>
+                <div>
+                  <strong>Pedido:</strong> #{emitDialog.item.orderId}
+                </div>
+                <div>
+                  <strong>Valor:</strong> R${' '}
+                  {formatCurrency(emitDialog.item.valorTotalVendido)}
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <Badge variant="outline">
+                    Cad: {emitDialog.item.notaFiscalCadastro}
+                  </Badge>
+                  <Badge variant="outline">
+                    Venda: {emitDialog.item.notaFiscalVenda}
+                  </Badge>
+                  <Badge variant="outline">
+                    Solic: {emitDialog.item.solicitacaoNf}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="nf-number">Número da Nota Fiscal</Label>
+                <Input
+                  id="nf-number"
+                  placeholder="Ex: 123456"
+                  value={emitDialog.invoiceNumber}
+                  onChange={(e) =>
+                    setEmitDialog({
+                      ...emitDialog,
+                      invoiceNumber: e.target.value,
+                    })
+                  }
+                  autoFocus
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() =>
+                setEmitDialog({ open: false, item: null, invoiceNumber: '' })
+              }
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleEmitInvoice}
+              disabled={emitting || !emitDialog.invoiceNumber}
+            >
+              {emitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Confirmar Emissão
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
