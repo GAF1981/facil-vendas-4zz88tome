@@ -24,6 +24,7 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { maskCPF, maskCNPJ, maskPhone, maskCEP, unmask } from '@/lib/masks'
 import { clientsService } from '@/services/clientsService'
+import { cobrancaService } from '@/services/cobrancaService'
 import { useToast } from '@/hooks/use-toast'
 import {
   Command,
@@ -40,7 +41,7 @@ import {
 } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 import { NewRouteDialog } from './NewRouteDialog'
-import { DuplicateClientDialog } from './DuplicateClientDialog'
+import { DuplicateWarningDialog } from './DuplicateWarningDialog'
 
 interface ClientFormProps {
   initialData?: ClientRow
@@ -61,7 +62,11 @@ export function ClientForm({
   const [searchingCep, setSearchingCep] = useState(false)
 
   // Duplicate check
-  const [duplicateClient, setDuplicateClient] = useState<any>(null)
+  const [duplicateWarning, setDuplicateWarning] = useState<{
+    open: boolean
+    data: { name: string; debt?: number } | null
+    resolve: (proceed: boolean) => void
+  } | null>(null)
 
   const { toast } = useToast()
 
@@ -71,7 +76,6 @@ export function ClientForm({
       ? {
           ...initialData,
           EMAIL: initialData.EMAIL || '',
-          // Ensure discount is just the number string for editing
           Desconto: initialData.Desconto
             ? initialData.Desconto.replace('%', '')
             : '30',
@@ -93,10 +97,10 @@ export function ClientForm({
           'FONE 2': '',
           'CONTATO 1': '',
           'CONTATO 2': '',
-          'FORMA DE PAGAMENTO': 'BOLETO', // Default
+          'FORMA DE PAGAMENTO': 'BOLETO',
           'NOTA FISCAL': 'NÃO',
-          EXPOSITOR: 'OUTROS', // Default
-          Desconto: '30', // Default without % for the input
+          EXPOSITOR: 'OUTROS',
+          Desconto: '30',
           'DESCONTO ACESSORIO CELULAR': '',
           'DESCONTO BRINQUEDO': '',
           'DESCONTO ACESSORIO': '',
@@ -106,13 +110,12 @@ export function ClientForm({
           'OBSERVAÇÃO FIXA': '',
           'ALTERAÇÃO CLIENTE': '',
         },
-    mode: 'onChange', // Enable real-time validation
+    mode: 'onChange',
   })
 
   useEffect(() => {
     clientsService.getRoutes().then((data) => setRoutes(data))
     clientsService.getUniqueClientTypes().then((data) => {
-      // Ensure "ATIVO" and "INATIVO - ROTA" are always available options
       const defaultTypes = ['ATIVO', 'INATIVO - ROTA']
       const mergedTypes = Array.from(new Set([...defaultTypes, ...data]))
       setClientTypes(mergedTypes)
@@ -155,27 +158,54 @@ export function ClientForm({
     }
   }
 
-  const handleCpfBlur = async (e: React.FocusEvent<HTMLInputElement>) => {
-    const val = e.target.value
-    if (!val) return
+  const checkDuplicate = async (
+    cpfCnpj: string,
+  ): Promise<'proceed' | 'cancel'> => {
+    // Don't check empty
+    if (!cpfCnpj) return 'proceed'
 
     try {
       const duplicate = await clientsService.checkDuplicateCpfCnpj(
-        val,
+        cpfCnpj,
         initialData?.CODIGO,
       )
+
       if (duplicate) {
-        setDuplicateClient(duplicate)
+        // Fetch debt info
+        const debt = await cobrancaService.getClientDebtSummary(
+          duplicate.CODIGO,
+        )
+
+        return new Promise((resolve) => {
+          setDuplicateWarning({
+            open: true,
+            data: {
+              name: duplicate['NOME CLIENTE'],
+              debt: debt,
+            },
+            resolve: (proceed) => {
+              setDuplicateWarning(null)
+              resolve(proceed ? 'proceed' : 'cancel')
+            },
+          })
+        })
       }
-    } catch (error) {
-      console.error(error)
+    } catch (e) {
+      console.error('Error checking duplicate', e)
     }
+    return 'proceed'
   }
 
   const onSubmit = async (data: ClientFormData) => {
     setLoading(true)
     try {
-      // Append % to discount before saving if not present
+      // Duplicate Check
+      const proceed = await checkDuplicate(data.CNPJ)
+      if (proceed === 'cancel') {
+        setLoading(false)
+        return
+      }
+
       const discountVal = data.Desconto
         ? data.Desconto.includes('%')
           ? data.Desconto
@@ -325,7 +355,6 @@ export function ClientForm({
                               field.onChange(maskCPF(v))
                             }
                           }}
-                          onBlur={handleCpfBlur}
                         />
                       </FormControl>
                       <FormMessage />
@@ -695,7 +724,6 @@ export function ClientForm({
                             {...field}
                             value={field.value || ''}
                             onChange={(e) => {
-                              // Ensure only numbers are entered and update
                               const val = e.target.value
                               field.onChange(val)
                             }}
@@ -1005,10 +1033,11 @@ export function ClientForm({
         </form>
       </Form>
 
-      <DuplicateClientDialog
-        open={!!duplicateClient}
-        onOpenChange={() => setDuplicateClient(null)}
-        existingClient={duplicateClient}
+      <DuplicateWarningDialog
+        open={!!duplicateWarning}
+        onOpenChange={(o) => !o && duplicateWarning?.resolve(false)}
+        onConfirm={() => duplicateWarning?.resolve(true)}
+        duplicateData={duplicateWarning?.data || null}
       />
     </>
   )

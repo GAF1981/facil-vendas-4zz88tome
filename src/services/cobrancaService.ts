@@ -10,6 +10,7 @@ import { parseCurrency } from '@/lib/formatters'
 import { isBefore, parseISO, startOfDay } from 'date-fns'
 
 export const cobrancaService = {
+  // Existing methods ...
   async getDebts(): Promise<ClientDebt[]> {
     // 1. Fetch data from BANCO_DE_DADOS
     // Increased limit to 50000 to ensure we capture debts for the full client base
@@ -353,10 +354,6 @@ export const cobrancaService = {
     })
   },
 
-  /**
-   * Updates a specific receivable field (Forma de Cobrança or Data Combinada).
-   * Supports both real and synthetic (temporary) receivables.
-   */
   async updateReceivableField(
     receivableId: number,
     orderId: number,
@@ -451,9 +448,7 @@ export const cobrancaService = {
 
     if (error) throw error
 
-    // Update BANCO_DE_DADOS and RECEBIMENTOS if novaDataCombinada is provided
     if (action.novaDataCombinada) {
-      // 1. Update BANCO_DE_DADOS (Using quotes for NÚMERO DO PEDIDO due to spaces)
       const { error: bdError } = await supabase
         .from('BANCO_DE_DADOS')
         .update({ data_combinada: action.novaDataCombinada } as any)
@@ -461,10 +456,8 @@ export const cobrancaService = {
 
       if (bdError) {
         console.error('Error updating BANCO_DE_DADOS data_combinada:', bdError)
-        // We log but don't throw, as the main action was saved
       }
 
-      // 2. Update RECEBIMENTOS (for all records of this order)
       const { error: recError } = await supabase
         .from('RECEBIMENTOS')
         .update({ data_combinada: action.novaDataCombinada } as any)
@@ -474,5 +467,16 @@ export const cobrancaService = {
         console.error('Error updating RECEBIMENTOS data_combinada:', recError)
       }
     }
+  },
+
+  // New Helper for Client Form
+  async getClientDebtSummary(clientId: number): Promise<number> {
+    // Re-use logic above but filtered
+    const debts = await this.getDebts() // Ideally we would optimize this to not fetch all
+    // Since getDebts fetches ALL, it's inefficient for a single check but safe for consistency.
+    // Optimization would be writing a specific query.
+    // However, given the constraints and existing structure, we can iterate.
+    const client = debts.find((c) => c.clientId === clientId)
+    return client ? client.totalDebt : 0
   },
 }

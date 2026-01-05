@@ -336,8 +336,6 @@ export default function AcertoPage() {
       }
     } catch (error) {
       console.error('Error checking closure status:', error)
-      // Continue or block? Let's warn but maybe allow if error? No, safer to block or warn.
-      // But standard is strict. Assuming if error we might want to be careful.
     }
 
     // Finalization Validation
@@ -386,7 +384,9 @@ export default function AcertoPage() {
   const handleZeroStockConfirm = async () => {
     if (client) {
       try {
-        await clientsService.update(client.CODIGO, { situacao: 'INATIVO' })
+        await clientsService.update(client.CODIGO, {
+          situacao: 'INATIVO - ROTA', // Explicitly setting for 'Fechamentos > Inativos' view
+        })
         setZeroStockDialogOpen(false)
         executeSave()
       } catch (error) {
@@ -433,7 +433,10 @@ export default function AcertoPage() {
         }
       }
 
-      // 3. Generate Final PDF
+      // 3. Fetch History for PDF
+      const history = await bancoDeDadosService.getAcertoHistory(client.CODIGO)
+
+      // 4. Generate Final PDF
       const pdfBlob = await acertoService.generatePdf(
         {
           client,
@@ -453,6 +456,7 @@ export default function AcertoPage() {
           monthlyAverage,
           orderNumber: finalOrderNumber,
           issuerName: loggedInUser?.nome_completo,
+          history: history.slice(0, 10), // Limit to last 10 entries per requirement
         },
         { preview: false, signature },
       )

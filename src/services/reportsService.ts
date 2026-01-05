@@ -37,9 +37,20 @@ export interface AdjustmentReportRow {
   produto_id: number
 }
 
+export interface DebitoReportRow {
+  rota_id: number | null
+  pedido_id: number
+  data_acerto: string
+  vendedor_nome: string
+  media_mensal: number
+  valor_venda: number
+  saldo_a_pagar: number
+  valor_pago: number
+  debito: number
+}
+
 export const reportsService = {
   async getProjectionsReport(): Promise<ProjectionReportRow[]> {
-    // Fetch recent transactions
     const { data, error } = await supabase
       .from('BANCO_DE_DADOS')
       .select(
@@ -55,7 +66,6 @@ export const reportsService = {
 
     const ordersMap = new Map<number, ProjectionReportRow>()
 
-    // 1. Aggregate items into Orders
     data?.forEach((row) => {
       const orderId = row['NÚMERO DO PEDIDO']
       if (!orderId) return
@@ -83,8 +93,6 @@ export const reportsService = {
     })
 
     const allOrders = Array.from(ordersMap.values())
-
-    // 2. Group Orders by Client
     const clientOrdersMap = new Map<number, ProjectionReportRow[]>()
     allOrders.forEach((order) => {
       const list = clientOrdersMap.get(order.clientCode) || []
@@ -95,16 +103,13 @@ export const reportsService = {
     const result: ProjectionReportRow[] = []
     const today = startOfDay(new Date())
 
-    // 3. Process Per-Client Logic
     clientOrdersMap.forEach((orders) => {
-      // Sort descending by date
       orders.sort((a, b) => {
         const dateA = new Date(a.orderDate).getTime()
         const dateB = new Date(b.orderDate).getTime()
         return dateB - dateA
       })
 
-      // Calculate Days Since Last Order (Client Context)
       const latestOrderDate =
         orders.length > 0 ? parseISO(orders[0].orderDate) : null
       const daysSinceLastForClient = latestOrderDate
@@ -112,32 +117,25 @@ export const reportsService = {
         : 0
 
       orders.forEach((currentOrder, index) => {
-        // Set Days Since Last Order (Dias para Projeção)
         currentOrder.daysSinceLastOrder = daysSinceLastForClient
 
-        // Find Previous Order (which is next in the sorted list)
         if (index < orders.length - 1) {
           const prevOrder = orders[index + 1]
           const currDate = parseISO(currentOrder.orderDate)
           const prevDate = parseISO(prevOrder.orderDate)
 
-          // Dias entre acertos
           const diffDays = differenceInDays(currDate, prevDate)
           currentOrder.daysBetweenOrders = diffDays
 
-          // Indice dias (Diff / 30)
           const indexD = diffDays / 30
           currentOrder.indexDays = indexD
 
-          // Média Mensal (Value / Indice)
           if (indexD > 0) {
             currentOrder.monthlyAverage = currentOrder.totalValue / indexD
           } else {
             currentOrder.monthlyAverage = 0
           }
 
-          // Projeção
-          // Formula: (DaysSinceLast / 30) * MonthlyAverage
           const daysSinceLastMonths = daysSinceLastForClient / 30
           if (currentOrder.monthlyAverage) {
             currentOrder.projection =
@@ -146,7 +144,6 @@ export const reportsService = {
             currentOrder.projection = 0
           }
         } else {
-          // No previous record available for comparison
           currentOrder.daysBetweenOrders = null
           currentOrder.indexDays = null
           currentOrder.monthlyAverage = null
@@ -157,7 +154,6 @@ export const reportsService = {
       })
     })
 
-    // Return flattened result sorted by Date Desc
     return result.sort(
       (a, b) =>
         new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime(),
@@ -186,5 +182,26 @@ export const reportsService = {
 
     if (error) throw error
     return data as AdjustmentReportRow[]
+  },
+
+  async refreshDebtsReport() {
+    const { error } = await supabase.rpc('refresh_debitos_historico')
+    if (error) throw error
+  },
+
+  async getDebtsReport(): Promise<DebitoReportRow[]> {
+    // Attempt to fetch from materialized view/table
+    const { data, error } = await supabase
+      .from('debitos_historico')
+      .select('*')
+      .order('data_acerto', { ascending: false })
+      .limit(2000)
+
+    if (error) {
+      // Fallback if table doesn't exist or empty, maybe return empty or handle gracefully
+      console.warn('Error fetching debitos_historico:', error)
+      return []
+    }
+    return data as DebitoReportRow[]
   },
 }

@@ -124,7 +124,30 @@ export function RotaTable({
             <TableHead className="w-[80px]">Código</TableHead>
             <TableHead className="min-w-[200px]">Cliente</TableHead>
             <SortableHeader label="Projeção" sortKey="projecao" align="right" />
-            <SortableHeader label="Estoque" sortKey="estoque" align="right" />
+
+            {/* Combined Stock & Order # */}
+            <TableHead className="text-right min-w-[100px]">
+              <div className="flex flex-col items-end">
+                <span className="text-[10px] text-muted-foreground uppercase font-semibold">
+                  Pedido Recente
+                </span>
+                <div
+                  className="flex items-center gap-1 cursor-pointer hover:text-primary"
+                  onClick={() => onSort('estoque')}
+                >
+                  Estoque
+                  <ArrowUpDown
+                    className={cn(
+                      'h-3 w-3',
+                      sortConfig.key === 'estoque'
+                        ? 'opacity-100'
+                        : 'opacity-30',
+                    )}
+                  />
+                </div>
+              </div>
+            </TableHead>
+
             <SortableHeader label="Débito" sortKey="debito" align="right" />
             <TableHead className="w-[140px] text-center">Vencimento</TableHead>
             <SortableHeader
@@ -182,9 +205,19 @@ export function RotaTable({
                 <TableCell className="text-right text-xs font-medium text-blue-700">
                   {formatCurrency(row.projecao)}
                 </TableCell>
+
+                {/* Stock Cell with Order Number Above */}
                 <TableCell className="text-right text-xs font-mono">
-                  {formatCurrency(row.estoque)}
+                  <div className="flex flex-col items-end gap-0.5">
+                    {row.numero_pedido && (
+                      <span className="text-[10px] text-muted-foreground font-bold bg-muted px-1 rounded">
+                        #{row.numero_pedido}
+                      </span>
+                    )}
+                    <span>{formatCurrency(row.estoque)}</span>
+                  </div>
                 </TableCell>
+
                 <TableCell
                   className={cn(
                     'text-right text-xs font-mono',

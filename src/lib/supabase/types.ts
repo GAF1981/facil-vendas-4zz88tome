@@ -1015,6 +1015,13 @@ export type Database = {
           projecao: number
         }[]
       }
+      get_clients_last_stock_value: {
+        Args: never
+        Returns: {
+          client_id: number
+          stock_value: number
+        }[]
+      }
       get_inventory_data: {
         Args: { p_funcionario_id: number; p_session_id: number }
         Returns: {

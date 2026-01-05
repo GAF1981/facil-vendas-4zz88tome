@@ -12,6 +12,7 @@ import {
   ShoppingCart,
   BarChart3,
   RotateCcw,
+  CreditCard,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useUserStore } from '@/stores/useUserStore'
@@ -37,12 +38,7 @@ const RelatorioDashboard = () => {
 
   useEffect(() => {
     const checkAllClosed = async () => {
-      // Check permission (only allow if authorized user, usually Admin or Manager)
-      // Assuming 'Administrador' or 'Financeiro' has right, or based on module access.
-      // User Story says: "When an authorized user (with 'Relatório' permission) clicks 'Relatório'"
-      // This component IS the 'Relatório' dashboard, so access is already guarded by PermissionGuard.
-      // We just need to check the condition.
-
+      // Logic only runs if user is likely authorized (e.g. Admin/Manager), handled by Route Guards mostly.
       try {
         const activeRota = await rotaService.getActiveRota()
         if (!activeRota) return
@@ -114,6 +110,14 @@ const RelatorioDashboard = () => {
       bg: 'bg-orange-100',
     },
     {
+      title: 'Relatório de Débitos',
+      description: 'Acompanhamento histórico de dívidas e pagamentos.',
+      icon: CreditCard,
+      to: '/relatorio/debitos',
+      color: 'text-red-600',
+      bg: 'bg-red-100',
+    },
+    {
       title: 'Itens mais Vendidos',
       description: 'Análise de produtos com maior volume de vendas.',
       icon: BarChart3,
@@ -126,8 +130,8 @@ const RelatorioDashboard = () => {
       description: 'Histórico de ajustes manuais de saldo inicial.',
       icon: RotateCcw,
       to: '/relatorio/ajustes-saldo',
-      color: 'text-red-600',
-      bg: 'bg-red-100',
+      color: 'text-slate-600',
+      bg: 'bg-slate-100',
     },
   ]
 
@@ -142,7 +146,7 @@ const RelatorioDashboard = () => {
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {reports.map((report) => (
           <Link key={report.title} to={report.to}>
             <Card

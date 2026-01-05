@@ -40,12 +40,91 @@ export function AppSidebar() {
   const { canAccess } = usePermissions()
   const { employee } = useUserStore()
 
+  // Order matching Main Menu
   const items = [
     {
       title: 'Menu Principal',
       url: '/',
       icon: LayoutDashboard,
-      module: 'Menu', // Always visible
+      module: 'Menu',
+    },
+    {
+      title: 'Acerto',
+      url: '/acerto',
+      icon: Scale,
+      module: 'Acerto',
+    },
+    {
+      title: 'Rota',
+      url: '/rota',
+      icon: Map,
+      module: 'Rota',
+    },
+    {
+      title: 'Recebimento',
+      url: '/recebimento',
+      icon: ArrowDownCircle,
+      module: 'Recebimento',
+    },
+    {
+      title: 'Caixa',
+      url: '/caixa',
+      icon: Wallet,
+      module: 'Caixa',
+    },
+    {
+      title: 'Resumo Acertos',
+      url: '/resumo-acertos',
+      icon: FileBarChart,
+      module: 'Resumo Acertos',
+    },
+    {
+      title: 'Cobrança',
+      url: '/cobranca',
+      icon: CreditCard,
+      module: 'Cobrança',
+    },
+    {
+      title: 'Nota Fiscal',
+      url: '/nota-fiscal',
+      icon: FileText,
+      module: 'Nota Fiscal',
+    },
+    {
+      title: 'Fechamentos',
+      url: '/fechamentos',
+      icon: Lock,
+      module: 'Fechamentos',
+    },
+    {
+      title: 'Pendências',
+      url: '/pendencias',
+      icon: AlertCircle,
+      module: 'Pendências',
+    },
+    {
+      title: 'Inventário',
+      url: '/inventario',
+      icon: ClipboardList,
+      module: 'Inventário',
+    },
+    {
+      title: 'Relatório',
+      url: '/relatorio',
+      icon: BarChart3,
+      module: 'Relatório',
+    },
+    {
+      title: 'Permissões',
+      url: '/permissoes',
+      icon: Settings,
+      module: 'Permissões',
+    },
+    {
+      title: 'Backup',
+      url: '/backup',
+      icon: Database,
+      module: 'Backup',
     },
     {
       title: 'Clientes',
@@ -64,84 +143,6 @@ export function AppSidebar() {
       url: '/produtos',
       icon: Package,
       module: 'Produtos',
-    },
-    {
-      title: 'Acerto',
-      url: '/acerto',
-      icon: Scale,
-      module: 'Acerto',
-    },
-    {
-      title: 'Recebimento',
-      url: '/recebimento',
-      icon: ArrowDownCircle,
-      module: 'Recebimento',
-    },
-    {
-      title: 'Fechamentos',
-      url: '/fechamentos',
-      icon: Lock,
-      module: 'Fechamentos',
-    },
-    {
-      title: 'Cobrança',
-      url: '/cobranca',
-      icon: CreditCard,
-      module: 'Cobrança',
-    },
-    {
-      title: 'Nota Fiscal',
-      url: '/nota-fiscal',
-      icon: FileText,
-      module: 'Nota Fiscal',
-    },
-    {
-      title: 'Caixa',
-      url: '/caixa',
-      icon: Wallet,
-      module: 'Caixa',
-    },
-    {
-      title: 'Inventário',
-      url: '/inventario',
-      icon: ClipboardList,
-      module: 'Inventário',
-    },
-    {
-      title: 'Rota',
-      url: '/rota',
-      icon: Map,
-      module: 'Rota',
-    },
-    {
-      title: 'Resumo de Acertos',
-      url: '/resumo-acertos',
-      icon: FileBarChart,
-      module: 'Resumo Acertos',
-    },
-    {
-      title: 'Relatório',
-      url: '/relatorio',
-      icon: BarChart3,
-      module: 'Relatório',
-    },
-    {
-      title: 'Pendências',
-      url: '/pendencias',
-      icon: AlertCircle,
-      module: 'Pendências',
-    },
-    {
-      title: 'Backup e Exportação',
-      url: '/backup',
-      icon: Database,
-      module: 'Backup',
-    },
-    {
-      title: 'Permissões',
-      url: '/permissoes',
-      icon: Settings,
-      module: 'Permissões',
     },
   ]
 

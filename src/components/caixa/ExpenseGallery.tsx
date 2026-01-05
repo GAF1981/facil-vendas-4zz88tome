@@ -3,6 +3,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { formatCurrency, safeFormatDate } from '@/lib/formatters'
 import { ArrowUpCircle } from 'lucide-react'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 
 interface ExpenseGalleryProps {
   items: ExpenseDetail[]
@@ -24,48 +32,61 @@ export function ExpenseGallery({ items }: ExpenseGalleryProps) {
           </span>
         </div>
       </CardHeader>
-      <CardContent className="p-0 flex-1">
+      <CardContent className="p-0 flex-1 overflow-hidden">
         <ScrollArea className="h-[400px]">
-          <div className="divide-y">
-            {items.length === 0 ? (
-              <div className="p-8 text-center text-muted-foreground text-sm">
-                Nenhuma despesa registrada.
-              </div>
-            ) : (
-              items.map((item) => (
-                <div
-                  key={item.id}
-                  className="p-3 hover:bg-muted/50 transition-colors flex justify-between items-center text-sm"
-                >
-                  <div className="flex flex-col gap-1 overflow-hidden">
-                    <span
-                      className="font-medium truncate"
-                      title={item.detalhamento}
-                    >
-                      {item.detalhamento}
-                    </span>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span className="px-1.5 py-0.5 rounded bg-muted text-foreground/80 border">
-                        {item.grupo}
-                      </span>
-                      <span>{safeFormatDate(item.data, 'dd/MM/yy')}</span>
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-0.5 ml-2">
-                    <span className="font-semibold text-red-700 whitespace-nowrap">
+          <Table>
+            <TableHeader className="bg-muted/50 sticky top-0 z-10">
+              <TableRow>
+                <TableHead className="w-[100px]">Data</TableHead>
+                <TableHead>Detalhamento</TableHead>
+                <TableHead>Funcionário</TableHead>
+                {/* As requested: Caixa column (assuming status is irrelevant per row but context is) */}
+                <TableHead>Caixa</TableHead>
+                <TableHead className="text-right">Valor</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={5}
+                    className="text-center h-24 text-muted-foreground"
+                  >
+                    Nenhuma despesa registrada.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                items.map((item) => (
+                  <TableRow key={item.id} className="hover:bg-muted/30">
+                    <TableCell className="text-xs">
+                      {safeFormatDate(item.data, 'dd/MM/yy')}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="font-medium text-sm">
+                          {item.detalhamento}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground bg-muted px-1 rounded w-fit border">
+                          {item.grupo}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      {item.funcionarioNome
+                        ? item.funcionarioNome.split(' ')[0]
+                        : 'N/D'}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      -
+                    </TableCell>
+                    <TableCell className="text-right font-bold text-red-700">
                       R$ {formatCurrency(item.valor)}
-                    </span>
-                    <span
-                      className="text-[10px] text-muted-foreground truncate max-w-[80px]"
-                      title={item.funcionarioNome}
-                    >
-                      {item.funcionarioNome || 'N/D'}
-                    </span>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
         </ScrollArea>
       </CardContent>
       <div className="p-4 bg-muted/20 border-t mt-auto">

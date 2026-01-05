@@ -29,6 +29,7 @@ import SalesReportsPage from '@/pages/relatorio/SalesReportsPage'
 import StockReportsPage from '@/pages/relatorio/StockReportsPage'
 import TopSellingReportsPage from '@/pages/relatorio/TopSellingReportsPage'
 import AdjustmentReportsPage from '@/pages/relatorio/AdjustmentReportsPage'
+import DebitosReportPage from '@/pages/relatorio/DebitosReportPage'
 import InactiveClientsPage from '@/pages/relatorio/InactiveClientsPage'
 import CaixaPage from '@/pages/caixa/CaixaPage'
 import FechamentosPage from '@/pages/fechamento/FechamentosPage'
@@ -102,7 +103,6 @@ const App = () => (
                   />
                 </Route>
 
-                {/* Redirect old routes */}
                 <Route
                   path="/pix"
                   element={<Navigate to="/fechamentos" replace />}
@@ -112,8 +112,6 @@ const App = () => (
                   element={<Navigate to="/fechamentos" replace />}
                 />
 
-                {/* Keeping logic for Pix permission but routing to Fechamentos if needed, though permission is module based */}
-                {/* For Fechamentos we use Fechamentos module */}
                 <Route element={<PermissionGuard module="Fechamentos" />}>
                   <Route path="/fechamentos" element={<FechamentosPage />} />
                 </Route>
@@ -168,6 +166,10 @@ const App = () => (
                     element={<StockReportsPage />}
                   />
                   <Route
+                    path="/relatorio/debitos"
+                    element={<DebitosReportPage />}
+                  />
+                  <Route
                     path="/relatorio/itens-mais-vendidos"
                     element={<TopSellingReportsPage />}
                   />
@@ -193,7 +195,6 @@ const App = () => (
                   <Route path="/permissoes" element={<PermissionsPage />} />
                 </Route>
 
-                {/* New Route */}
                 <Route path="/complemento" element={<PlaceholderModule />} />
                 <Route path="/vendas" element={<PlaceholderModule />} />
               </Route>

@@ -124,6 +124,7 @@ export function PixTabContent() {
       }
     }
 
+    // Updated Logic for Rota Filter: Filter by `rota_id` which was added to PixReceiptRow
     if (filters.routeId && filters.routeId !== 'todos') {
       result = result.filter(
         (row) => row.rota_id?.toString() === filters.routeId,
