@@ -14,8 +14,6 @@ export const cobrancaService = {
   async getDebts(): Promise<ClientDebt[]> {
     // 1. Fetch data from BANCO_DE_DADOS
     // Increased limit to 50000 to ensure we capture debts for the full client base
-    // Requirement: Ensure ordering by Order Number to guarantee the "Confirmar cliente INATIVO"
-    // report picks up the correct latest order.
     const { data: dbData, error: dbError } = await supabase
       .from('BANCO_DE_DADOS')
       .select(
@@ -413,7 +411,7 @@ export const cobrancaService = {
   async getCollectionActions(orderId: string): Promise<CollectionAction[]> {
     const { data, error } = await supabase
       .from('acoes_cobranca')
-      .select('*')
+      .select('*, acoes_cobranca_vencimentos(*)')
       .eq('pedido_id', Number(orderId))
       .order('data_acao', { ascending: false })
 
@@ -429,6 +427,12 @@ export const cobrancaService = {
       pedidoId: row.pedido_id,
       clienteId: row.cliente_id,
       clienteNome: row.cliente_nome,
+      installments: row.acoes_cobranca_vencimentos?.map((inst: any) => ({
+        id: inst.id,
+        vencimento: inst.vencimento,
+        valor: inst.valor,
+        forma_pagamento: inst.forma_pagamento,
+      })),
     }))
   },
 
@@ -444,9 +448,35 @@ export const cobrancaService = {
       cliente_nome: action.clienteNome,
     }
 
-    const { error } = await supabase.from('acoes_cobranca').insert(payload)
+    // Insert Main Action
+    const { data: insertedAction, error } = await supabase
+      .from('acoes_cobranca')
+      .insert(payload)
+      .select()
+      .single()
 
     if (error) throw error
+
+    // Insert Installments if present
+    if (action.installments && action.installments.length > 0) {
+      const installmentsPayload = action.installments.map((inst) => ({
+        acao_cobranca_id: insertedAction.id,
+        vencimento: inst.vencimento,
+        valor: inst.valor,
+        forma_pagamento: inst.forma_pagamento,
+      }))
+
+      const { error: instError } = await supabase
+        .from('acoes_cobranca_vencimentos')
+        .insert(installmentsPayload)
+
+      if (instError) {
+        console.error('Error inserting collection installments:', instError)
+        // We don't throw here to avoid rolling back the main action if possible, or should we?
+        // Ideally transactional, but Supabase SDK doesn't support complex transactions easily without RPC.
+        // We log error.
+      }
+    }
 
     if (action.novaDataCombinada) {
       const { error: bdError } = await supabase
@@ -469,13 +499,9 @@ export const cobrancaService = {
     }
   },
 
-  // New Helper for Client Form
   async getClientDebtSummary(clientId: number): Promise<number> {
     // Re-use logic above but filtered
-    const debts = await this.getDebts() // Ideally we would optimize this to not fetch all
-    // Since getDebts fetches ALL, it's inefficient for a single check but safe for consistency.
-    // Optimization would be writing a specific query.
-    // However, given the constraints and existing structure, we can iterate.
+    const debts = await this.getDebts()
     const client = debts.find((c) => c.clientId === clientId)
     return client ? client.totalDebt : 0
   },

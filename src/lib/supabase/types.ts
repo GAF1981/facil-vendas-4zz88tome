@@ -435,6 +435,7 @@ export type Database = {
           created_at: string | null
           data_acerto: string | null
           debito: number | null
+          desconto: number | null
           hora_acerto: string | null
           id: number
           media_mensal: number | null
@@ -452,6 +453,7 @@ export type Database = {
           created_at?: string | null
           data_acerto?: string | null
           debito?: number | null
+          desconto?: number | null
           hora_acerto?: string | null
           id?: number
           media_mensal?: number | null
@@ -469,6 +471,7 @@ export type Database = {
           created_at?: string | null
           data_acerto?: string | null
           debito?: number | null
+          desconto?: number | null
           hora_acerto?: string | null
           id?: number
           media_mensal?: number | null

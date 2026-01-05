@@ -218,10 +218,14 @@ export const reportsService = {
       return []
     }
 
-    // 2. Client-side join to ensure missing data (client_code, name, rota) is populated
+    // 2. Client-side join to ensure missing data (client_code, name, rota, DISCOUNT) is populated
     // This handles cases where migration backfill might be incomplete or lagged
     const incompleteRows = reportData.filter(
-      (r) => !r.cliente_codigo || !r.cliente_nome,
+      (r) =>
+        !r.cliente_codigo ||
+        !r.cliente_nome ||
+        r.desconto === undefined ||
+        r.desconto === null,
     )
 
     if (incompleteRows.length > 0) {
@@ -231,9 +235,38 @@ export const reportsService = {
       const { data: dbData } = await supabase
         .from('BANCO_DE_DADOS')
         .select(
-          '"NÚMERO DO PEDIDO", "CÓDIGO DO CLIENTE", "CLIENTE", "HORA DO ACERTO"',
+          '"NÚMERO DO PEDIDO", "CÓDIGO DO CLIENTE", "CLIENTE", "HORA DO ACERTO", "DESCONTO POR GRUPO", "VALOR VENDIDO"',
         )
         .in('NÚMERO DO PEDIDO', orderIds)
+
+      // Calculate discounts map per order
+      const discountsMap = new Map<number, number>()
+      const dbInfoMap = new Map<number, any>()
+
+      dbData?.forEach((row: any) => {
+        const orderId = row['NÚMERO DO PEDIDO']
+        if (!orderId) return
+
+        // Populate info map
+        if (!dbInfoMap.has(orderId)) {
+          dbInfoMap.set(orderId, {
+            code: row['CÓDIGO DO CLIENTE'],
+            name: row['CLIENTE'],
+            time: row['HORA DO ACERTO'],
+            // Parse discount
+            discount: 0,
+          })
+        }
+
+        // Calculate discount for this row
+        const val = parseCurrency(row['VALOR VENDIDO'])
+        const discountStr = row['DESCONTO POR GRUPO'] || '0'
+        const discountVal = parseCurrency(discountStr.replace('%', ''))
+        const discountFactor = discountVal > 1 ? discountVal / 100 : discountVal
+
+        const currentInfo = dbInfoMap.get(orderId)
+        currentInfo.discount += val * discountFactor
+      })
 
       // Fetch Rota info
       const clientIds = [
@@ -252,26 +285,21 @@ export const reportsService = {
         })
       }
 
-      // Merge
-      const detailsMap = new Map<number, any>()
-      dbData?.forEach((d: any) => {
-        detailsMap.set(d['NÚMERO DO PEDIDO'], {
-          code: d['CÓDIGO DO CLIENTE'],
-          name: d['CLIENTE'],
-          time: d['HORA DO ACERTO'],
-          rota: clientRotas.get(d['CÓDIGO DO CLIENTE']),
-        })
-      })
-
       return reportData.map((row) => {
-        if (!row.cliente_codigo && detailsMap.has(row.pedido_id)) {
-          const details = detailsMap.get(row.pedido_id)
+        if (dbInfoMap.has(row.pedido_id)) {
+          const details = dbInfoMap.get(row.pedido_id)
+          const rota = clientRotas.get(details.code)
+
           return {
             ...row,
-            cliente_codigo: details.code,
-            cliente_nome: details.name,
+            cliente_codigo: row.cliente_codigo || details.code,
+            cliente_nome: row.cliente_nome || details.name,
             hora_acerto: row.hora_acerto || details.time,
-            rota: row.rota || details.rota,
+            rota: row.rota || rota,
+            desconto:
+              row.desconto !== null && row.desconto !== undefined
+                ? row.desconto
+                : details.discount,
           }
         }
         return row as DebitoReportRow

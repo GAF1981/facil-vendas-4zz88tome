@@ -12,6 +12,38 @@ export interface Receivable {
   dataCombinada?: string | null
 }
 
+export interface CollectionInstallment {
+  id?: number
+  vencimento: string
+  valor: number
+  forma_pagamento: string
+}
+
+export interface CollectionAction {
+  id: number
+  acao: string | null
+  dataAcao: string | null
+  novaDataCombinada: string | null
+  funcionarioNome: string | null
+  funcionarioId: number | null
+  pedidoId: number | null
+  clienteId: number | null
+  clienteNome: string | null
+  installments?: CollectionInstallment[]
+}
+
+export interface CollectionActionInsert {
+  acao: string
+  dataAcao: string
+  novaDataCombinada: string | null
+  funcionarioNome: string
+  funcionarioId: number
+  pedidoId: number
+  clienteId: number
+  clienteNome: string
+  installments?: CollectionInstallment[]
+}
+
 export interface OrderDebt {
   orderId: number
   date: string // Data do Acerto
@@ -52,27 +84,4 @@ export interface ClientDebt {
   city: string | null
   // New situation field
   situacao: string | null
-}
-
-export interface CollectionAction {
-  id: number
-  acao: string | null
-  dataAcao: string | null
-  novaDataCombinada: string | null
-  funcionarioNome: string | null
-  funcionarioId: number | null
-  pedidoId: number | null
-  clienteId: number | null
-  clienteNome: string | null
-}
-
-export interface CollectionActionInsert {
-  acao: string
-  dataAcao: string
-  novaDataCombinada: string | null
-  funcionarioNome: string
-  funcionarioId: number
-  pedidoId: number
-  clienteId: number
-  clienteNome: string
 }

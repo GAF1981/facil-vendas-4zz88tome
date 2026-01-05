@@ -15,6 +15,7 @@ import {
   MessageSquareText,
   ArrowUpDown,
   PlusCircle,
+  Info,
 } from 'lucide-react'
 import { ClientDebt } from '@/types/cobranca'
 import { formatCurrency } from '@/lib/formatters'
@@ -33,6 +34,11 @@ import { cobrancaService } from '@/services/cobrancaService'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 
 interface DebtTableProps {
   data: ClientDebt[]
@@ -68,6 +74,9 @@ interface FlatRow {
   dataCombinada: string | null
   // New field
   collectionActionCount: number
+  // For Popover Details
+  orderTotal: number
+  orderPayments: { method: string; value: number; dueDate: string }[]
 }
 
 type SortConfig = {
@@ -162,6 +171,12 @@ export function DebtTable({
             formaCobranca: currentFormaCobranca,
             dataCombinada: currentDataCombinada,
             collectionActionCount: order.collectionActionCount,
+            orderTotal: order.netValue,
+            orderPayments: order.paymentDetails.map((pd) => ({
+              method: pd.method,
+              value: pd.value,
+              dueDate: pd.dueDate,
+            })),
           }
         })
       }),
@@ -364,11 +379,51 @@ export function DebtTable({
                         ? format(parseISO(row.vencimento), 'dd/MM/yyyy')
                         : '-'}
                     </TableCell>
-                    <TableCell
-                      className="text-xs truncate max-w-[100px]"
-                      title={row.formaPagamento}
-                    >
-                      {row.formaPagamento}
+                    <TableCell className="text-xs">
+                      <div className="flex items-center gap-1">
+                        <span
+                          className="truncate max-w-[80px]"
+                          title={row.formaPagamento}
+                        >
+                          {row.formaPagamento}
+                        </span>
+                        {/* New Icon for Payment Details */}
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5 p-0 text-muted-foreground hover:text-primary"
+                            >
+                              <Info className="h-3 w-3" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-64 p-3 text-xs">
+                            <h4 className="font-semibold mb-2">
+                              Detalhes do Pedido #{row.orderId}
+                            </h4>
+                            <div className="space-y-2">
+                              <div className="flex justify-between border-b pb-1">
+                                <span>Total Pedido:</span>
+                                <span className="font-bold">
+                                  {formatCurrency(row.orderTotal)}
+                                </span>
+                              </div>
+                              <div className="space-y-1">
+                                {row.orderPayments.map((p, i) => (
+                                  <div
+                                    key={i}
+                                    className="flex justify-between text-muted-foreground"
+                                  >
+                                    <span>{p.method}</span>
+                                    <span>{formatCurrency(p.value)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
                     </TableCell>
                     <TableCell className="text-right font-mono text-xs">
                       {formatCurrency(row.valorRegistrado)}

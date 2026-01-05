@@ -462,12 +462,19 @@ export default function AcertoPage() {
       )
 
       const url = window.URL.createObjectURL(pdfBlob)
+
+      // Robust download trigger for mobile/desktop
       const a = document.createElement('a')
       a.href = url
       a.download = `Pedido_${finalOrderNumber}_${client['NOME CLIENTE']}.pdf`
       document.body.appendChild(a)
       a.click()
-      a.remove()
+      document.body.removeChild(a)
+
+      // Also open in new tab for mobile convenience
+      setTimeout(() => {
+        window.open(url, '_blank')
+      }, 100)
 
       toast({
         title: 'Acerto Realizado',

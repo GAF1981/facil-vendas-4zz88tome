@@ -108,8 +108,8 @@ serve(async (req) => {
         isReceipt,
         issuerName,
         lastOrder,
-        clientMunicipio, // NEW
-        lastAcertoDate, // NEW
+        clientMunicipio, // NEW Field
+        lastAcertoDate,
       } = body
 
       if (preview) {
@@ -153,7 +153,7 @@ serve(async (req) => {
       y -= 15
 
       // Client Box with Extra Info
-      const boxHeight = 85 // Increased height for new fields
+      const boxHeight = 85
       page.drawRectangle({
         x: margins.left,
         y: y - boxHeight,
@@ -170,7 +170,7 @@ serve(async (req) => {
         { size: 10, font: fontBold },
       )
 
-      // New Header Fields
+      // Added Municipio
       const city = clientMunicipio || client.MUNICÍPIO || client.city || '-'
       drawText(`Municipio: ${city}`, width - margins.right - 10, textY, {
         size: 10,
@@ -336,9 +336,7 @@ serve(async (req) => {
 
         y -= 12
 
-        // Detailed Payment Listing (Installments)
         for (const p of payments) {
-          // Check for detailed installments (passed as 'details')
           if (p.details && p.details.length > 0) {
             for (const inst of p.details) {
               if (checkPageBreak(20)) y -= 20
@@ -356,7 +354,6 @@ serve(async (req) => {
               y -= 12
             }
           } else {
-            // Fallback to legacy
             if (checkPageBreak(20)) y -= 20
             drawText(p.method, margins.left, y, { size: 9 })
             drawText(
@@ -423,7 +420,7 @@ serve(async (req) => {
 
       y -= 50
 
-      // History Section (Enhanced)
+      // History Section
       if (history && history.length > 0) {
         checkPageBreak(200)
         drawText(
@@ -437,7 +434,6 @@ serve(async (req) => {
         )
         y -= 20
 
-        // Revised Columns per User Story: Pedido, Data, Venda Total, Desconto, Valor Pago, Débito
         const hCol = {
           pedido: margins.left,
           date: margins.left + 60,
@@ -465,8 +461,6 @@ serve(async (req) => {
         for (const h of history) {
           if (checkPageBreak(20)) y -= 20
 
-          // h object comes from acertoService.generateDocument -> history array
-          // mapped from bancoDeDadosService.getAcertoHistory
           const vendaTotal = h.valorVendaTotal
           const totalAPagar = h.saldoAPagar
           const desconto = vendaTotal - totalAPagar

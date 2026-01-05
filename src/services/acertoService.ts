@@ -142,11 +142,6 @@ export const acertoService = {
 
     const payments: PaymentEntry[] = dbPayments.map((p) => {
       // Logic to recreate granular details if possible or assume logic
-      // Ideally if details were stored in JSON we'd use them.
-      // But dbPayments comes from RECEBIMENTOS row
-      // We'll map as a single installment per row, but group if needed.
-      // Current implementation in bancoDeDadosService handles JSON details at save time,
-      // but only RECEBIMENTOS rows are retrieved here.
       return {
         method: p.forma_pagamento as any,
         value: p.valor_registrado || 0,
