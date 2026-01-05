@@ -17,6 +17,9 @@ CREATE TABLE IF NOT EXISTS debitos_historico (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_debitos_historico_pedido_id ON debitos_historico(pedido_id);
 
 -- Helper for currency parsing
+-- Fix: Drop function first to avoid parameter name conflict (p_value vs price)
+DROP FUNCTION IF EXISTS parse_currency_sql(text);
+
 CREATE OR REPLACE FUNCTION parse_currency_sql(price text) RETURNS numeric
     LANGUAGE plpgsql
     AS $$
