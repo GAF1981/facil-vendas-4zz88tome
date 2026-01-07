@@ -12,12 +12,13 @@ import { formatCurrency } from '@/lib/formatters'
 import { MovementDetailsPopover } from './MovementDetailsPopover'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Ban } from 'lucide-react'
+import { Ban, CheckCircle2 } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { Badge } from '@/components/ui/badge'
 
 interface Props {
   items: InventoryGeneralItem[]
@@ -77,7 +78,7 @@ export function InventoryGeneralTable({
   onUpdateItem,
 }: Props) {
   return (
-    <div className="rounded-md border bg-card overflow-x-auto shadow-sm max-h-[70vh] relative">
+    <div className="rounded-md border bg-card overflow-auto shadow-sm max-h-[70vh] relative">
       <Table>
         <TableHeader className="bg-muted sticky top-0 z-10 shadow-sm">
           <TableRow>
@@ -219,10 +220,10 @@ export function InventoryGeneralTable({
                     <>
                       {item.has_count_record ? (
                         <span>{item.contagem}</span>
-                      ) : item.saldo_final > 0 ? (
-                        <span className="text-muted-foreground italic text-xs">
+                      ) : item.is_mandatory ? (
+                        <Badge variant="destructive" className="text-xs">
                           Pendente
-                        </span>
+                        </Badge>
                       ) : (
                         <span className="text-muted-foreground text-xs">-</span>
                       )}
@@ -240,7 +241,10 @@ export function InventoryGeneralTable({
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p>Marcar como Zero (Não encontrado)</p>
+                            <p>
+                              Confirmar contagem ZERO{' '}
+                              {item.is_mandatory && '(Obrigatório)'}
+                            </p>
                           </TooltipContent>
                         </Tooltip>
                       )}

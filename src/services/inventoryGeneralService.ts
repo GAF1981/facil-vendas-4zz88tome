@@ -3,7 +3,6 @@ import {
   InventoryGeneralSession,
   InventoryGeneralItem,
   InventoryMovementType,
-  MovementDetail,
   InventoryReportMetrics,
 } from '@/types/inventory_general'
 import { productsService } from './productsService'
@@ -185,6 +184,7 @@ export const inventoryGeneralService = {
         ajustes: 0,
         novo_saldo_final: 0,
         has_count_record: countedProductIds.has(p.ID),
+        is_mandatory: false,
         details_carro_para_estoque: [],
         details_estoque_para_carro: [],
       })
@@ -246,6 +246,14 @@ export const inventoryGeneralService = {
         item.carro_para_estoque -
         item.saidas_perdas -
         item.estoque_para_carro
+
+      // Mandatory Logic: Balance > 0 OR Any Movement > 0
+      item.is_mandatory =
+        item.saldo_final > 0 ||
+        item.compras > 0 ||
+        item.carro_para_estoque > 0 ||
+        item.saidas_perdas > 0 ||
+        item.estoque_para_carro > 0
 
       item.diferenca_qty = item.contagem - item.saldo_final
       item.diferenca_val = item.diferenca_qty * item.preco

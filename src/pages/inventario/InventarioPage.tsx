@@ -69,9 +69,10 @@ export default function InventarioPage() {
 
   const canEdit = selectedSession?.status === 'ABERTO'
 
+  // Mandatory Count Logic: All items that are mandatory must have a count record
   const allItemsCounted = useMemo(() => {
     if (!items.length) return false
-    return items.every((i) => i.has_count_record)
+    return items.every((i) => !i.is_mandatory || i.has_count_record)
   }, [items])
 
   const loadSessions = useCallback(async () => {
@@ -417,8 +418,9 @@ export default function InventarioPage() {
                     {!allItemsCounted && (
                       <TooltipContent>
                         <p>
-                          Todos os produtos devem ter contagem registrada (mesmo
-                          que 0) para finalizar.
+                          Todos os produtos obrigatórios (saldo {'>'} 0 ou com
+                          movimentação) devem ter contagem registrada (mesmo que
+                          0) para finalizar.
                         </p>
                       </TooltipContent>
                     )}

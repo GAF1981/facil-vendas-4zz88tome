@@ -32,6 +32,9 @@ export interface InventoryGeneralItem {
   // Status to track if a count has been explicitly recorded for validation
   has_count_record: boolean
 
+  // Mandatory count flag based on logic: Saldo Final > 0 OR Any Movement > 0
+  is_mandatory: boolean
+
   // Details for popovers
   details_carro_para_estoque: MovementDetail[]
   details_estoque_para_carro: MovementDetail[]
