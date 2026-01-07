@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   Card,
   CardContent,
@@ -11,387 +11,157 @@ import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import {
   ClipboardList,
-  RefreshCw,
-  Loader2,
-  ArrowLeft,
-  Calendar,
-  Hash,
-  PlayCircle,
-  StopCircle,
-  Truck,
-  RotateCcw,
-  AlertCircle,
-  AlertTriangle,
-  Eraser,
   Search,
-  ScanBarcode,
-  PackagePlus,
-  Clock,
+  RefreshCw,
+  AlertCircle,
+  Play,
+  StopCircle,
+  Hash,
+  Calendar,
+  User,
+  History,
 } from 'lucide-react'
 import { InventarioTable } from '@/components/inventario/InventarioTable'
-import { InventarioSummary } from '@/components/inventario/InventarioSummary'
-import { InventarioPagination } from '@/components/inventario/InventarioPagination'
-import { inventarioService } from '@/services/inventarioService'
-import {
-  InventarioItem,
-  DatasDeInventario,
-  InventarioSummaryData,
-} from '@/types/inventario'
-import { useToast } from '@/hooks/use-toast'
-import { Link } from 'react-router-dom'
-import { EmployeeSelectionDialog } from '@/components/inventario/EmployeeSelectionDialog'
-import { MovementDialog } from '@/components/inventario/MovementDialog'
-import { safeFormatDate } from '@/lib/formatters'
 import { InventarioTableSkeleton } from '@/components/inventario/InventarioTableSkeleton'
+import { InventarioPagination } from '@/components/inventario/InventarioPagination'
+import { StartSessionDialog } from '@/components/inventario/StartSessionDialog'
+import { inventarioService } from '@/services/inventarioService'
+import { InventoryProduct, InventorySession } from '@/types/inventario'
+import { useToast } from '@/hooks/use-toast'
+import { safeFormatDate } from '@/lib/formatters'
+import { cn } from '@/lib/utils'
 
 export default function InventarioPage() {
+  // Data State
+  const [products, setProducts] = useState<InventoryProduct[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [totalCount, setTotalCount] = useState(0)
+
   // Session State
-  const [activeSession, setActiveSession] = useState<DatasDeInventario | null>(
+  const [activeSession, setActiveSession] = useState<InventorySession | null>(
     null,
   )
   const [sessionLoading, setSessionLoading] = useState(true)
 
-  // Decoupled Data States
-  const [tableData, setTableData] = useState<InventarioItem[]>([])
-  const [tableLoading, setTableLoading] = useState(true)
-  const [tableError, setTableError] = useState<string | null>(null)
-  const [totalCount, setTotalCount] = useState(0)
+  // Filter & Pagination State
+  const [page, setPage] = useState(1)
+  const [pageSize] = useState(50)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
 
-  const [summaryData, setSummaryData] = useState<
-    InventarioSummaryData | undefined
-  >(undefined)
-  const [summaryLoading, setSummaryLoading] = useState(true)
-  const [summaryError, setSummaryError] = useState<string | null>(null)
+  // Dialog State
+  const [isStartDialogOpen, setIsStartDialogOpen] = useState(false)
 
   const { toast } = useToast()
-
-  // Actions State
-  const [isEmployeeDialogOpen, setIsEmployeeDialogOpen] = useState(false)
-  const [actionLoading, setActionLoading] = useState(false)
-  const [isReposicaoOpen, setIsReposicaoOpen] = useState(false)
-  const [isDevolucaoOpen, setIsDevolucaoOpen] = useState(false)
-
-  // Pagination & Filters State
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(50)
-  const [searchTerm, setSearchTerm] = useState('')
-
   const totalPages = Math.ceil(totalCount / pageSize)
 
-  // Initial Session Fetch
-  const fetchSession = async () => {
+  // Search Debounce
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm)
+      setPage(1) // Reset to first page on new search
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
+  // Fetch Session
+  const fetchSession = useCallback(async () => {
     setSessionLoading(true)
     try {
       const session = await inventarioService.getActiveSession()
       setActiveSession(session)
-    } catch (error) {
-      console.error('Error fetching session:', error)
+    } catch (err) {
+      console.error('Failed to fetch session:', err)
       toast({
-        title: 'Aviso',
-        description: 'Não foi possível carregar a sessão ativa.',
+        title: 'Erro',
+        description: 'Não foi possível carregar o status da sessão.',
         variant: 'destructive',
       })
     } finally {
       setSessionLoading(false)
     }
-  }
+  }, [toast])
 
+  // Fetch Products
+  const fetchProducts = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const { data, totalCount } = await inventarioService.getProducts(
+        page,
+        pageSize,
+        debouncedSearch,
+      )
+      setProducts(data)
+      setTotalCount(totalCount)
+    } catch (err) {
+      console.error('Failed to fetch products:', err)
+      setError('Falha ao carregar a lista de produtos.')
+    } finally {
+      setLoading(false)
+    }
+  }, [page, pageSize, debouncedSearch])
+
+  // Initial Load
   useEffect(() => {
     fetchSession()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [fetchSession])
 
-  // Independent Fetcher: Table Data
-  const fetchTableData = useCallback(async () => {
-    if (sessionLoading) return // Wait for session check
-
-    setTableLoading(true)
-    setTableError(null)
-
-    const targetId = activeSession?.['CODIGO FUNCIONARIO'] ?? undefined
-    const targetSessionId = activeSession?.['ID INVENTÁRIO']
-
-    try {
-      const { data, totalCount } =
-        await inventarioService.getInventoryPaginated(
-          targetId,
-          targetSessionId,
-          page,
-          pageSize,
-          searchTerm,
-        )
-      setTableData(data)
-      setTotalCount(totalCount)
-    } catch (error) {
-      console.error('Table Fetch Error:', error)
-      const errorMessage =
-        error instanceof Error ? error.message : 'Erro ao buscar itens.'
-      setTableError(errorMessage)
-    } finally {
-      setTableLoading(false)
-    }
-  }, [activeSession, page, pageSize, searchTerm, sessionLoading])
-
-  // Independent Fetcher: Summary Data
-  const fetchSummaryData = useCallback(async () => {
-    if (sessionLoading) return // Wait for session check
-
-    setSummaryLoading(true)
-    setSummaryError(null)
-
-    const targetId = activeSession?.['CODIGO FUNCIONARIO'] ?? undefined
-    const targetSessionId = activeSession?.['ID INVENTÁRIO']
-
-    try {
-      const summary = await inventarioService.getInventorySummary(
-        targetId,
-        targetSessionId,
-        searchTerm,
-      )
-      setSummaryData(summary)
-    } catch (error) {
-      console.error('Summary Fetch Error:', error)
-      const errorMessage =
-        error instanceof Error ? error.message : 'Erro ao calcular resumo.'
-      setSummaryError(errorMessage)
-    } finally {
-      setSummaryLoading(false)
-    }
-  }, [activeSession, searchTerm, sessionLoading])
-
-  // Trigger Fetches - Decoupled Effects
-  // 1. Table Fetch Trigger
   useEffect(() => {
-    fetchTableData()
-  }, [fetchTableData])
+    fetchProducts()
+  }, [fetchProducts])
 
-  // 2. Summary Fetch Trigger
-  // Note: Summary does NOT depend on 'page', preventing unnecessary re-fetches during pagination
-  useEffect(() => {
-    fetchSummaryData()
-  }, [fetchSummaryData])
-
-  const handleClearCache = () => {
-    setPage(1)
-    setSearchTerm('')
-    setTableData([])
-    setSummaryData(undefined)
-    fetchSession().then(() => {
-      fetchTableData()
-      fetchSummaryData()
-    })
-    toast({
-      title: 'Cache Limpo',
-      description: 'Dados recarregados do servidor.',
-    })
-  }
-
-  const handleRefresh = () => {
-    fetchTableData()
-    fetchSummaryData()
-  }
-
-  const handleStartGeneralInventory = async () => {
-    setActionLoading(true)
+  // Handlers
+  const handleStartSession = async (employeeId: number | null) => {
     try {
-      const session = await inventarioService.startSession('GERAL')
+      const session = await inventarioService.startSession(employeeId)
       setActiveSession(session)
-      // activeSession change will trigger useEffects for data
       toast({
-        title: 'Inventário Geral Iniciado',
-        description: `Sessão #${session['ID INVENTÁRIO']} iniciada.`,
+        title: 'Inventário Iniciado',
+        description: `Sessão #${session.id} criada com sucesso.`,
+        className: 'bg-green-600 text-white',
+      })
+    } catch (error) {
+      console.error(error)
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível iniciar o inventário.',
+        variant: 'destructive',
+      })
+    }
+  }
+
+  const handleFinishSession = async () => {
+    if (!activeSession) return
+    if (
+      !confirm(
+        'Tem certeza que deseja finalizar esta sessão de inventário? Esta ação não pode ser desfeita.',
+      )
+    )
+      return
+
+    try {
+      await inventarioService.finishSession(activeSession.id)
+      setActiveSession(null)
+      toast({
+        title: 'Inventário Finalizado',
+        description: 'A sessão foi encerrada com sucesso.',
         className: 'bg-blue-600 text-white',
       })
     } catch (error) {
       console.error(error)
       toast({
-        title: 'Erro ao iniciar',
-        description: 'Não foi possível iniciar o inventário.',
-        variant: 'destructive',
-      })
-    } finally {
-      setActionLoading(false)
-    }
-  }
-
-  const handleStartEmployeeInventory = (employeeId: number) => {
-    const start = async () => {
-      setActionLoading(true)
-      try {
-        const session = await inventarioService.startSession(
-          'FUNCIONARIO',
-          employeeId,
-        )
-        setActiveSession(session)
-        setIsEmployeeDialogOpen(false)
-        toast({
-          title: 'Inventário de Funcionário Iniciado',
-          description: `Sessão #${session['ID INVENTÁRIO']} iniciada para funcionário ${employeeId}.`,
-          className: 'bg-blue-600 text-white',
-        })
-      } catch (error) {
-        console.error(error)
-        toast({
-          title: 'Erro ao iniciar',
-          description: 'Não foi possível iniciar o inventário.',
-          variant: 'destructive',
-        })
-      } finally {
-        setActionLoading(false)
-      }
-    }
-    start()
-  }
-
-  const handleCloseInventory = async () => {
-    if (!activeSession) return
-    setActionLoading(true)
-    try {
-      await inventarioService.closeSession(activeSession['ID INVENTÁRIO'])
-      setActiveSession(null)
-      toast({
-        title: 'Inventário Finalizado',
-        description: 'A sessão de inventário foi encerrada com sucesso.',
-        className: 'bg-green-600 text-white',
-      })
-    } catch (error) {
-      console.error(error)
-      toast({
-        title: 'Erro ao finalizar',
-        description: 'Não foi possível encerrar o inventário.',
-        variant: 'destructive',
-      })
-    } finally {
-      setActionLoading(false)
-    }
-  }
-
-  const handleMovement = async (
-    type: 'REPOSICAO' | 'DEVOLUCAO',
-    employeeId: number,
-    productId: number,
-    quantity: number,
-  ) => {
-    if (!activeSession) return
-    try {
-      await inventarioService.createMovement({
-        TIPO: type,
-        funcionario_id: employeeId,
-        produto_id: productId,
-        quantidade: quantity,
-        session_id: activeSession['ID INVENTÁRIO'],
-      })
-      toast({
-        title:
-          type === 'REPOSICAO'
-            ? 'Reposição Registrada'
-            : 'Devolução Registrada',
-        description: 'A movimentação foi salva com sucesso.',
-        className: 'bg-green-600 text-white',
-      })
-      // Refresh both to update stocks and totals
-      handleRefresh()
-    } catch (error) {
-      console.error(error)
-      toast({
-        title: 'Erro na movimentação',
-        description: 'Não foi possível salvar a movimentação.',
+        title: 'Erro',
+        description: 'Não foi possível finalizar o inventário.',
         variant: 'destructive',
       })
     }
-  }
-
-  const getHeaderTitle = () => {
-    if (activeSession?.TIPO === 'GERAL') return 'Inventário Estoque Geral'
-    if (activeSession?.TIPO === 'FUNCIONARIO') return 'Inventário Funcionário'
-    return 'Inventário de Mercadorias'
-  }
-
-  const renderActionButtons = () => {
-    if (activeSession) {
-      return (
-        <>
-          <Button
-            variant="outline"
-            className="gap-2 text-blue-700 border-blue-200 bg-blue-50 hover:bg-blue-100"
-            onClick={() => setIsReposicaoOpen(true)}
-          >
-            <Truck className="h-4 w-4" />
-            Reposição
-          </Button>
-          <Button
-            variant="outline"
-            className="gap-2 text-red-700 border-red-200 bg-red-50 hover:bg-red-100"
-            onClick={() => setIsDevolucaoOpen(true)}
-          >
-            <RotateCcw className="h-4 w-4" />
-            Devolução
-          </Button>
-          <Button
-            variant="outline"
-            className="gap-2 text-purple-700 border-purple-200 bg-purple-50 hover:bg-purple-100"
-            asChild
-          >
-            <Link to="/produtos/novo">
-              <PackagePlus className="h-4 w-4" />
-              Inserir Mercadorias
-            </Link>
-          </Button>
-          <div className="w-px h-8 bg-gray-200 mx-2 hidden md:block" />
-          <Button asChild className="gap-2 bg-blue-600 hover:bg-blue-700">
-            <Link to="/inventario/contagem">
-              <ScanBarcode className="h-4 w-4" />
-              Contagem de Saldo Final
-            </Link>
-          </Button>
-          <Button
-            variant="destructive"
-            onClick={handleCloseInventory}
-            disabled={actionLoading}
-            className="gap-2"
-          >
-            {actionLoading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <StopCircle className="h-4 w-4" />
-            )}
-            {activeSession.TIPO === 'GERAL'
-              ? 'Fechar Inventário Geral'
-              : 'Fechar Inventário de Funcionário'}
-          </Button>
-        </>
-      )
-    }
-
-    return (
-      <>
-        <Button
-          onClick={handleStartGeneralInventory}
-          disabled={actionLoading}
-          className="bg-green-600 hover:bg-green-700 gap-2"
-        >
-          {actionLoading ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <PlayCircle className="h-4 w-4" />
-          )}
-          Iniciar Inventário Estoque Geral
-        </Button>
-        <Button
-          onClick={() => setIsEmployeeDialogOpen(true)}
-          disabled={actionLoading}
-          variant="outline"
-          className="gap-2"
-        >
-          <PlayCircle className="h-4 w-4" />
-          Iniciar Inventário Funcionário
-        </Button>
-      </>
-    )
   }
 
   return (
     <div className="space-y-6 animate-fade-in pb-10">
+      {/* Header Section */}
       <div className="flex flex-col gap-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -399,154 +169,113 @@ export default function InventarioPage() {
               <ClipboardList className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">
-                {getHeaderTitle()}
-              </h1>
+              <h1 className="text-3xl font-bold tracking-tight">Inventário</h1>
               <p className="text-muted-foreground">
-                Visão geral do estoque, movimentações e conferência.
+                Gerencie contagens e visualize o estoque disponível.
               </p>
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={handleClearCache}
-              className="text-orange-700 border-orange-200 hover:bg-orange-50"
-              title="Limpar Cache e Recarregar"
-            >
-              <Eraser className="mr-2 h-4 w-4" />
-              Limpar Cache
-            </Button>
-
-            <Button variant="outline" size="icon" asChild>
-              <Link to="/">
-                <ArrowLeft className="h-4 w-4" />
-              </Link>
-            </Button>
-            <Button
-              variant="outline"
-              onClick={handleRefresh}
-              disabled={tableLoading || summaryLoading}
-            >
-              <RefreshCw
-                className={`mr-2 h-4 w-4 ${tableLoading || summaryLoading ? 'animate-spin' : ''}`}
-              />
-              Atualizar
-            </Button>
+          <div className="flex gap-2 w-full sm:w-auto">
+            {activeSession ? (
+              <Button
+                variant="destructive"
+                className="w-full sm:w-auto gap-2"
+                onClick={handleFinishSession}
+              >
+                <StopCircle className="h-4 w-4" />
+                Finalizar Inventário
+              </Button>
+            ) : (
+              <Button
+                className="w-full sm:w-auto gap-2 bg-green-600 hover:bg-green-700"
+                onClick={() => setIsStartDialogOpen(true)}
+                disabled={sessionLoading}
+              >
+                <Play className="h-4 w-4" />
+                Iniciar Novo Inventário
+              </Button>
+            )}
           </div>
         </div>
 
+        {/* Active Session Banner */}
         {activeSession && (
-          <div className="flex flex-wrap items-center gap-4 text-sm text-violet-700 bg-violet-50 px-4 py-2 rounded-md border border-violet-100 shadow-sm">
-            <div className="flex items-center gap-1.5 font-mono font-semibold">
-              <Hash className="h-4 w-4" />
-              ID INVENTÁRIO: {activeSession['ID INVENTÁRIO']}
+          <div className="flex flex-wrap items-center gap-4 text-sm text-green-700 bg-green-50 px-4 py-3 rounded-md border border-green-100 shadow-sm animate-fade-in-down">
+            <div className="flex items-center gap-2 font-semibold">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+              </span>
+              Sessão em Andamento
             </div>
-            <div className="w-px h-4 bg-violet-200 hidden sm:block" />
+            <div className="hidden sm:block w-px h-4 bg-green-200" />
+            <div className="flex items-center gap-1.5 font-mono">
+              <Hash className="h-3.5 w-3.5" />#{activeSession.id}
+            </div>
             <div className="flex items-center gap-1.5">
-              <Calendar className="h-4 w-4" />
-              Data de Início:{' '}
-              {safeFormatDate(activeSession['Data de Início de Inventário'])}
+              <Calendar className="h-3.5 w-3.5" />
+              Início: {safeFormatDate(activeSession.data_inicio)}
             </div>
-            <div className="w-px h-4 bg-violet-200 hidden sm:block" />
-            <div className="flex items-center gap-1.5 text-muted-foreground">
-              <Clock className="h-4 w-4" />
-              Data de Fechamento:{' '}
-              {activeSession['Data de Fechamento de Inventário']
-                ? safeFormatDate(
-                    activeSession['Data de Fechamento de Inventário'],
-                  )
-                : 'Em Aberto'}
-            </div>
+            {activeSession.funcionario_id && (
+              <>
+                <div className="hidden sm:block w-px h-4 bg-green-200" />
+                <div className="flex items-center gap-1.5">
+                  <User className="h-3.5 w-3.5" />
+                  Resp: Func#{activeSession.funcionario_id}
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
 
-      {/* Independent Summary Section */}
-      <InventarioSummary
-        summary={summaryData}
-        loading={summaryLoading}
-        error={summaryError}
-      />
-
-      {/* Filters and Actions */}
-      <div className="flex flex-col xl:flex-row gap-4 justify-between items-start xl:items-center bg-muted/20 p-4 rounded-lg border">
-        <div className="flex flex-wrap items-center gap-4 w-full xl:w-auto">
-          <div className="relative w-full max-w-sm">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Buscar por produto..."
-              className="pl-8 w-full md:w-[300px]"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  setPage(1)
-                }
-              }}
-            />
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2 justify-end w-full xl:w-auto">
-          {renderActionButtons()}
-        </div>
-      </div>
-
-      {/* Main Content (Table) */}
+      {/* Main Content */}
       <Card>
         <CardHeader>
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <CardTitle>Inventário de Mercadorias</CardTitle>
+              <CardTitle>Produtos do Estoque</CardTitle>
               <CardDescription>
-                Acompanhamento detalhado de entradas, saídas e saldo final.
+                Lista completa de produtos cadastrados no sistema.
               </CardDescription>
             </div>
-            <div className="text-xs text-muted-foreground flex flex-col items-end">
-              <span>
-                Exibindo {tableData.length} de {totalCount} itens
-              </span>
-              {tableData.some((i) => i.hasError) && (
-                <span className="text-red-500 font-medium flex items-center inline-flex mt-1">
-                  <AlertTriangle className="h-3 w-3 mr-1" />
-                  Alguns itens contêm erros
-                </span>
-              )}
+            <div className="flex items-center gap-2">
+              <div className="relative w-full md:w-[300px]">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Buscar por nome, código ou grupo..."
+                  className="pl-8"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={fetchProducts}
+                disabled={loading}
+                title="Atualizar Lista"
+              >
+                <RefreshCw
+                  className={cn('h-4 w-4', loading && 'animate-spin')}
+                />
+              </Button>
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          {tableLoading ? (
-            <InventarioTableSkeleton />
-          ) : tableError ? (
-            <Alert variant="destructive" className="animate-fade-in">
+          {error ? (
+            <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Erro na Tabela</AlertTitle>
-              <AlertDescription>
-                Não foi possível carregar os itens do inventário. Isso pode
-                ocorrer devido a dados corrompidos ou instabilidade na conexão.
-                <br />
-                <span className="font-mono text-xs mt-2 block opacity-80">
-                  {tableError}
-                </span>
-                <div className="mt-3">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => fetchTableData()}
-                    className="border-red-200 hover:bg-red-50 text-red-900"
-                  >
-                    <RefreshCw className="mr-2 h-3 w-3" />
-                    Tentar Novamente
-                  </Button>
-                </div>
-              </AlertDescription>
+              <AlertTitle>Erro ao carregar</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
             </Alert>
+          ) : loading ? (
+            <InventarioTableSkeleton />
           ) : (
             <>
-              <InventarioTable data={tableData} />
+              <InventarioTable data={products} />
               <InventarioPagination
                 currentPage={page}
                 totalPages={totalPages}
@@ -557,29 +286,10 @@ export default function InventarioPage() {
         </CardContent>
       </Card>
 
-      <EmployeeSelectionDialog
-        open={isEmployeeDialogOpen}
-        onOpenChange={setIsEmployeeDialogOpen}
-        onConfirm={handleStartEmployeeInventory}
-        loading={actionLoading}
-      />
-
-      <MovementDialog
-        open={isReposicaoOpen}
-        onOpenChange={setIsReposicaoOpen}
-        type="REPOSICAO"
-        onConfirm={(empId, prodId, qty) =>
-          handleMovement('REPOSICAO', empId, prodId, qty)
-        }
-      />
-
-      <MovementDialog
-        open={isDevolucaoOpen}
-        onOpenChange={setIsDevolucaoOpen}
-        type="DEVOLUCAO"
-        onConfirm={(empId, prodId, qty) =>
-          handleMovement('DEVOLUCAO', empId, prodId, qty)
-        }
+      <StartSessionDialog
+        open={isStartDialogOpen}
+        onOpenChange={setIsStartDialogOpen}
+        onConfirm={handleStartSession}
       />
     </div>
   )
