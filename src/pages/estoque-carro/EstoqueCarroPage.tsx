@@ -1,5 +1,11 @@
 import { useState, useEffect } from 'react'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { employeesService } from '@/services/employeesService'
@@ -17,7 +23,8 @@ import { EstoqueCarroCountDialog } from '@/components/estoque-carro/EstoqueCarro
 export default function EstoqueCarroPage() {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('')
-  const [currentSession, setCurrentSession] = useState<EstoqueCarroSession | null>(null)
+  const [currentSession, setCurrentSession] =
+    useState<EstoqueCarroSession | null>(null)
   const [items, setItems] = useState<EstoqueCarroItem[]>([])
   const [loading, setLoading] = useState(false)
   const [saldoFilter, setSaldoFilter] = useState('todos')
@@ -26,7 +33,7 @@ export default function EstoqueCarroPage() {
 
   useEffect(() => {
     employeesService.getEmployees(1, 100).then(({ data }) => {
-      setEmployees(data.filter(e => e.situacao === 'ATIVO'))
+      setEmployees(data.filter((e) => e.situacao === 'ATIVO'))
     })
   }, [])
 
@@ -66,7 +73,10 @@ export default function EstoqueCarroPage() {
     setLoading(true)
     try {
       await estoqueCarroService.startSession(parseInt(selectedEmployeeId))
-      toast({ title: 'Estoque Carro Iniciado', className: 'bg-green-600 text-white' })
+      toast({
+        title: 'Estoque Carro Iniciado',
+        className: 'bg-green-600 text-white',
+      })
       loadData()
     } catch (e) {
       toast({ title: 'Erro ao iniciar', variant: 'destructive' })
@@ -93,7 +103,10 @@ export default function EstoqueCarroPage() {
     setLoading(true)
     try {
       await estoqueCarroService.finishSession(currentSession, items)
-      toast({ title: 'Ciclo Finalizado e Novo Iniciado', className: 'bg-blue-600 text-white' })
+      toast({
+        title: 'Ciclo Finalizado e Novo Iniciado',
+        className: 'bg-blue-600 text-white',
+      })
       loadData()
     } catch (e) {
       toast({ title: 'Erro ao finalizar', variant: 'destructive' })
@@ -102,36 +115,47 @@ export default function EstoqueCarroPage() {
     }
   }
 
-  const filteredItems = items.filter(i => {
+  const filteredItems = items.filter((i) => {
     if (saldoFilter === 'igual a 0') return i.saldo_final === 0
     if (saldoFilter === 'maior que 0') return i.saldo_final > 0
     return true
   })
 
-  const selectedEmployeeName = employees.find(e => e.id.toString() === selectedEmployeeId)?.nome_completo || 'N/D'
+  const selectedEmployeeName =
+    employees.find((e) => e.id.toString() === selectedEmployeeId)
+      ?.nome_completo || 'N/D'
 
   return (
     <div className="space-y-6 animate-fade-in pb-20">
       <div className="flex items-center gap-4">
         <Button variant="outline" size="icon" asChild>
-          <Link to="/"><ArrowLeft className="h-4 w-4" /></Link>
+          <Link to="/">
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Estoque Carro</h1>
-          <p className="text-muted-foreground">Controle de estoque individual por veículo.</p>
+          <p className="text-muted-foreground">
+            Controle de estoque individual por veículo.
+          </p>
         </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4 items-end">
         <div className="w-full sm:w-[300px] space-y-2">
           <label className="text-sm font-medium">Selecione o Funcionário</label>
-          <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
+          <Select
+            value={selectedEmployeeId}
+            onValueChange={setSelectedEmployeeId}
+          >
             <SelectTrigger>
               <SelectValue placeholder="Funcionário..." />
             </SelectTrigger>
             <SelectContent>
-              {employees.map(emp => (
-                <SelectItem key={emp.id} value={emp.id.toString()}>{emp.nome_completo}</SelectItem>
+              {employees.map((emp) => (
+                <SelectItem key={emp.id} value={emp.id.toString()}>
+                  {emp.nome_completo}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -140,9 +164,12 @@ export default function EstoqueCarroPage() {
 
       {selectedEmployeeId && (
         <>
-          <EstoqueCarroHeader session={currentSession} employeeName={selectedEmployeeName} />
-          
-          <EstoqueCarroControlBar 
+          <EstoqueCarroHeader
+            session={currentSession}
+            employeeName={selectedEmployeeName}
+          />
+
+          <EstoqueCarroControlBar
             hasActiveSession={!!currentSession}
             onStart={handleStart}
             onReset={handleReset}
@@ -164,7 +191,9 @@ export default function EstoqueCarroPage() {
                     <SelectContent>
                       <SelectItem value="todos">Todos</SelectItem>
                       <SelectItem value="igual a 0">Saldo Final = 0</SelectItem>
-                      <SelectItem value="maior que 0">Saldo Final > 0</SelectItem>
+                      <SelectItem value="maior que 0">
+                        Saldo Final &gt; 0
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -184,8 +213,8 @@ export default function EstoqueCarroPage() {
       )}
 
       {currentSession && (
-        <EstoqueCarroCountDialog 
-          open={countDialogOpen} 
+        <EstoqueCarroCountDialog
+          open={countDialogOpen}
           onOpenChange={setCountDialogOpen}
           sessionId={currentSession.id}
           onSuccess={loadData}
