@@ -599,6 +599,7 @@ export type Database = {
       'ESTOQUE GERAL CARRO PARA ESTOQUE': {
         Row: {
           created_at: string | null
+          funcionario_id: number | null
           id: number
           id_inventario: number | null
           produto_id: number | null
@@ -606,6 +607,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          funcionario_id?: number | null
           id?: number
           id_inventario?: number | null
           produto_id?: number | null
@@ -613,12 +615,20 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          funcionario_id?: number | null
           id?: number
           id_inventario?: number | null
           produto_id?: number | null
           quantidade?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: 'ESTOQUE GERAL CARRO PARA ESTOQUE_funcionario_id_fkey'
+            columns: ['funcionario_id']
+            isOneToOne: false
+            referencedRelation: 'FUNCIONARIOS'
+            referencedColumns: ['id']
+          },
           {
             foreignKeyName: 'ESTOQUE GERAL CARRO PARA ESTOQUE_id_inventario_fkey'
             columns: ['id_inventario']
@@ -711,6 +721,7 @@ export type Database = {
       'ESTOQUE GERAL ESTOQUE PARA CARRO': {
         Row: {
           created_at: string | null
+          funcionario_id: number | null
           id: number
           id_inventario: number | null
           produto_id: number | null
@@ -718,6 +729,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          funcionario_id?: number | null
           id?: number
           id_inventario?: number | null
           produto_id?: number | null
@@ -725,12 +737,20 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          funcionario_id?: number | null
           id?: number
           id_inventario?: number | null
           produto_id?: number | null
           quantidade?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: 'ESTOQUE GERAL ESTOQUE PARA CARRO_funcionario_id_fkey'
+            columns: ['funcionario_id']
+            isOneToOne: false
+            referencedRelation: 'FUNCIONARIOS'
+            referencedColumns: ['id']
+          },
           {
             foreignKeyName: 'ESTOQUE GERAL ESTOQUE PARA CARRO_id_inventario_fkey'
             columns: ['id_inventario']
@@ -910,6 +930,7 @@ export type Database = {
       FORNECEDORES: {
         Row: {
           cnpj: string | null
+          contatos: Json | null
           created_at: string
           endereco: string | null
           id: number
@@ -918,6 +939,7 @@ export type Database = {
         }
         Insert: {
           cnpj?: string | null
+          contatos?: Json | null
           created_at?: string
           endereco?: string | null
           id?: number
@@ -926,6 +948,7 @@ export type Database = {
         }
         Update: {
           cnpj?: string | null
+          contatos?: Json | null
           created_at?: string
           endereco?: string | null
           id?: number

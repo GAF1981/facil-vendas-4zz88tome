@@ -9,6 +9,16 @@ import { productsService } from './productsService'
 import { parseCurrency } from '@/lib/formatters'
 
 export const inventoryGeneralService = {
+  async getSessions(): Promise<InventoryGeneralSession[]> {
+    const { data, error } = await supabase
+      .from('ID Inventário')
+      .select('*')
+      .order('id', { ascending: false })
+
+    if (error) throw error
+    return data as InventoryGeneralSession[]
+  },
+
   async getActiveSession(): Promise<InventoryGeneralSession | null> {
     const { data, error } = await supabase
       .from('ID Inventário')

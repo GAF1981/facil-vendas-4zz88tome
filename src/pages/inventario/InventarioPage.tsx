@@ -29,12 +29,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Label } from '@/components/ui/label'
+import { safeFormatDate } from '@/lib/formatters'
 
 export default function InventarioPage() {
-  const [activeSession, setActiveSession] =
-    useState<InventoryGeneralSession | null>(null)
+  const [sessions, setSessions] = useState<InventoryGeneralSession[]>([])
+  const [selectedSessionId, setSelectedSessionId] = useState<string>('')
   const [items, setItems] = useState<InventoryGeneralItem[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [actionType, setActionType] = useState<any>(null)
   const [isActionDialogOpen, setIsActionDialogOpen] = useState(false)
   const [saldoFinalFilter, setSaldoFinalFilter] = useState('all')
@@ -45,34 +47,73 @@ export default function InventarioPage() {
 
   const { toast } = useToast()
 
-  const loadData = useCallback(async () => {
-    setLoading(true)
+  // Computed
+  const selectedSession = useMemo(
+    () => sessions.find((s) => s.id.toString() === selectedSessionId) || null,
+    [sessions, selectedSessionId],
+  )
+
+  const activeSession = useMemo(
+    () => sessions.find((s) => s.status === 'ABERTO'),
+    [sessions],
+  )
+
+  const canEdit = selectedSession?.status === 'ABERTO'
+
+  const loadSessions = useCallback(async () => {
     try {
-      const session = await inventoryGeneralService.getActiveSession()
-      setActiveSession(session)
-      if (session) {
-        const inventoryData = await inventoryGeneralService.getInventoryData(
-          session.id,
-        )
-        setItems(inventoryData)
-      } else {
-        setItems([])
-      }
+      const data = await inventoryGeneralService.getSessions()
+      setSessions(data)
+      return data
     } catch (error) {
       console.error(error)
       toast({
         title: 'Erro',
-        description: 'Falha ao carregar dados do inventário.',
+        description: 'Falha ao carregar sessões.',
         variant: 'destructive',
       })
-    } finally {
-      setLoading(false)
+      return []
     }
   }, [toast])
 
+  const loadItems = useCallback(
+    async (id: number) => {
+      setLoading(true)
+      try {
+        const inventoryData = await inventoryGeneralService.getInventoryData(id)
+        setItems(inventoryData)
+      } catch (error) {
+        console.error(error)
+        toast({
+          title: 'Erro',
+          description: 'Falha ao carregar dados do inventário.',
+          variant: 'destructive',
+        })
+        setItems([])
+      } finally {
+        setLoading(false)
+      }
+    },
+    [toast],
+  )
+
+  // Initial Load
   useEffect(() => {
-    loadData()
-  }, [loadData])
+    loadSessions().then((data) => {
+      if (data.length > 0) {
+        setSelectedSessionId(data[0].id.toString())
+      }
+    })
+  }, [loadSessions])
+
+  // Load items when session changes
+  useEffect(() => {
+    if (selectedSessionId) {
+      loadItems(Number(selectedSessionId))
+    } else {
+      setItems([])
+    }
+  }, [selectedSessionId, loadItems])
 
   const filteredItems = useMemo(() => {
     if (saldoFinalFilter === 'all') return items
@@ -93,7 +134,10 @@ export default function InventarioPage() {
     try {
       await inventoryGeneralService.startNewSession()
       toast({ title: 'Sucesso', description: 'Novo inventário iniciado.' })
-      loadData()
+      const data = await loadSessions()
+      if (data.length > 0) {
+        setSelectedSessionId(data[0].id.toString())
+      }
     } catch (error) {
       toast({
         title: 'Erro',
@@ -104,7 +148,7 @@ export default function InventarioPage() {
   }
 
   const handleResetInitial = async () => {
-    if (!activeSession) return
+    if (!canEdit || !selectedSession) return
     if (
       !confirm(
         'Isso zerará o saldo inicial de todos os produtos no inventário atual. Deseja continuar?',
@@ -112,9 +156,9 @@ export default function InventarioPage() {
     )
       return
     try {
-      await inventoryGeneralService.resetInitialBalances(activeSession.id)
+      await inventoryGeneralService.resetInitialBalances(selectedSession.id)
       toast({ title: 'Sucesso', description: 'Saldos iniciais zerados.' })
-      loadData()
+      loadItems(selectedSession.id)
     } catch (error) {
       toast({
         title: 'Erro',
@@ -125,23 +169,29 @@ export default function InventarioPage() {
   }
 
   const handleOpenAction = (type: string) => {
-    if (!activeSession) return
+    if (!canEdit) return
     setActionType(type)
     setIsActionDialogOpen(true)
   }
 
   const handleFinalize = async () => {
-    if (!activeSession) return
+    if (!canEdit || !selectedSession) return
     if (!confirm('Deseja finalizar os ajustes e abrir um novo inventário?'))
       return
 
     try {
-      await inventoryGeneralService.finalizeAdjustments(activeSession.id, items)
+      await inventoryGeneralService.finalizeAdjustments(
+        selectedSession.id,
+        items,
+      )
       toast({
         title: 'Sucesso',
         description: 'Inventário finalizado e novo ciclo iniciado.',
       })
-      loadData()
+      const data = await loadSessions()
+      if (data.length > 0) {
+        setSelectedSessionId(data[0].id.toString())
+      }
     } catch (e) {
       toast({
         title: 'Erro',
@@ -149,6 +199,13 @@ export default function InventarioPage() {
         variant: 'destructive',
       })
     }
+  }
+
+  const handleRefresh = () => {
+    if (selectedSessionId) {
+      loadItems(Number(selectedSessionId))
+    }
+    loadSessions()
   }
 
   return (
@@ -167,25 +224,56 @@ export default function InventarioPage() {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={loadData} disabled={loading}>
+            <Button
+              variant="outline"
+              onClick={handleRefresh}
+              disabled={loading}
+            >
               <RefreshCw className="w-4 h-4" />
             </Button>
           </div>
         </div>
 
-        <InventoryInfoCard session={activeSession} />
+        {/* Filter Selection */}
+        <div className="flex items-end gap-4 bg-card p-4 rounded-lg border shadow-sm">
+          <div className="flex-1 max-w-md space-y-2">
+            <Label>ID Inventário</Label>
+            <Select
+              value={selectedSessionId}
+              onValueChange={setSelectedSessionId}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione um inventário" />
+              </SelectTrigger>
+              <SelectContent>
+                {sessions.map((session) => (
+                  <SelectItem key={session.id} value={session.id.toString()}>
+                    #{session.id} - {safeFormatDate(session.data_inicio)} (
+                    {session.status})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <InventoryInfoCard session={selectedSession} />
 
         {/* Actions Toolbar */}
         <Card>
           <CardContent className="p-4 flex flex-wrap gap-2 items-center">
-            {!activeSession ? (
+            {/* If no active session exists globally, user can start one. */}
+            {!activeSession && (
               <Button
                 onClick={handleStartSession}
                 className="bg-green-600 hover:bg-green-700"
               >
                 <Play className="mr-2 h-4 w-4" /> Iniciar Inventário Geral
               </Button>
-            ) : (
+            )}
+
+            {/* If user is viewing the active session, show actions */}
+            {canEdit && (
               <>
                 <Button
                   variant="outline"
@@ -235,10 +323,17 @@ export default function InventarioPage() {
                 </Button>
               </>
             )}
+
+            {/* If viewing historical (closed) session */}
+            {selectedSession && !canEdit && (
+              <div className="text-sm text-muted-foreground font-medium italic flex-1 text-center">
+                Visualizando histórico de inventário fechado (Somente Leitura)
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        {activeSession && (
+        {selectedSession && (
           <div className="flex justify-end mb-2">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">Filtrar Saldo Final:</span>
@@ -259,15 +354,17 @@ export default function InventarioPage() {
           </div>
         )}
 
-        {activeSession && <InventoryGeneralTable items={filteredItems} />}
+        {selectedSession && <InventoryGeneralTable items={filteredItems} />}
       </div>
 
       <InventoryActionDialog
         open={isActionDialogOpen}
         onOpenChange={setIsActionDialogOpen}
         type={actionType}
-        sessionId={activeSession?.id || 0}
-        onSuccess={loadData}
+        sessionId={selectedSession ? selectedSession.id : 0}
+        onSuccess={() =>
+          selectedSessionId && loadItems(Number(selectedSessionId))
+        }
         persistedEmployeeId={persistedEmployeeId}
         setPersistedEmployeeId={setPersistedEmployeeId}
         persistedSupplierId={persistedSupplierId}
