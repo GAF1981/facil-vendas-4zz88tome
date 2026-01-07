@@ -8,6 +8,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { formatCurrency } from '@/lib/formatters'
+import { MovementDetailsPopover } from './MovementDetailsPopover'
 
 interface Props {
   items: InventoryGeneralItem[]
@@ -15,9 +16,9 @@ interface Props {
 
 export function InventoryGeneralTable({ items }: Props) {
   return (
-    <div className="rounded-md border bg-card overflow-x-auto shadow-sm">
+    <div className="rounded-md border bg-card overflow-x-auto shadow-sm max-h-[70vh] relative">
       <Table>
-        <TableHeader className="bg-muted/50">
+        <TableHeader className="bg-muted/50 sticky top-0 z-10 shadow-sm">
           <TableRow>
             <TableHead className="w-[200px]">Produto</TableHead>
             <TableHead>Tipo</TableHead>
@@ -26,13 +27,17 @@ export function InventoryGeneralTable({ items }: Props) {
               Entradas (Compras)
             </TableHead>
             <TableHead className="text-right text-green-600">
-              Entradas (Carro)
+              <div className="flex items-center justify-end gap-1">
+                Entradas (Carro)
+              </div>
             </TableHead>
             <TableHead className="text-right text-red-600">
               Saídas (Perdas)
             </TableHead>
             <TableHead className="text-right text-red-600">
-              Saídas (Carro)
+              <div className="flex items-center justify-end gap-1">
+                Saídas (Carro)
+              </div>
             </TableHead>
             <TableHead className="text-right font-bold">
               Saldo Final (Teórico)
@@ -65,13 +70,27 @@ export function InventoryGeneralTable({ items }: Props) {
                 {item.compras}
               </TableCell>
               <TableCell className="text-right font-mono text-green-600">
-                {item.carro_para_estoque}
+                <div className="flex items-center justify-end gap-1">
+                  {item.carro_para_estoque}
+                  <MovementDetailsPopover
+                    title="Entradas (Carro -> Estoque)"
+                    details={item.details_carro_para_estoque}
+                    colorClass="text-green-600"
+                  />
+                </div>
               </TableCell>
               <TableCell className="text-right font-mono text-red-600">
                 {item.saidas_perdas}
               </TableCell>
               <TableCell className="text-right font-mono text-red-600">
-                {item.estoque_para_carro}
+                <div className="flex items-center justify-end gap-1">
+                  {item.estoque_para_carro}
+                  <MovementDetailsPopover
+                    title="Saídas (Estoque -> Carro)"
+                    details={item.details_estoque_para_carro}
+                    colorClass="text-red-600"
+                  />
+                </div>
               </TableCell>
               <TableCell className="text-right font-mono font-bold">
                 {item.saldo_final}

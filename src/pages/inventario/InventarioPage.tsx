@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
@@ -22,6 +22,13 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { InventoryInfoCard } from '@/components/inventario/InventoryInfoCard'
 import { InventoryActionDialog } from '@/components/inventario/InventoryActionDialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 export default function InventarioPage() {
   const [activeSession, setActiveSession] =
@@ -30,6 +37,12 @@ export default function InventarioPage() {
   const [loading, setLoading] = useState(true)
   const [actionType, setActionType] = useState<any>(null)
   const [isActionDialogOpen, setIsActionDialogOpen] = useState(false)
+  const [saldoFinalFilter, setSaldoFinalFilter] = useState('all')
+
+  // Persisted selections state (lifted from dialog)
+  const [persistedEmployeeId, setPersistedEmployeeId] = useState<string>('')
+  const [persistedSupplierId, setPersistedSupplierId] = useState<string>('')
+
   const { toast } = useToast()
 
   const loadData = useCallback(async () => {
@@ -60,6 +73,15 @@ export default function InventarioPage() {
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  const filteredItems = useMemo(() => {
+    if (saldoFinalFilter === 'all') return items
+    if (saldoFinalFilter === 'zero')
+      return items.filter((i) => i.saldo_final === 0)
+    if (saldoFinalFilter === 'positive')
+      return items.filter((i) => i.saldo_final > 0)
+    return items
+  }, [items, saldoFinalFilter])
 
   const handleStartSession = async () => {
     if (
@@ -155,7 +177,7 @@ export default function InventarioPage() {
 
         {/* Actions Toolbar */}
         <Card>
-          <CardContent className="p-4 flex flex-wrap gap-2">
+          <CardContent className="p-4 flex flex-wrap gap-2 items-center">
             {!activeSession ? (
               <Button
                 onClick={handleStartSession}
@@ -216,7 +238,28 @@ export default function InventarioPage() {
           </CardContent>
         </Card>
 
-        {activeSession && <InventoryGeneralTable items={items} />}
+        {activeSession && (
+          <div className="flex justify-end mb-2">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Filtrar Saldo Final:</span>
+              <Select
+                value={saldoFinalFilter}
+                onValueChange={setSaldoFinalFilter}
+              >
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="zero">Igual a 0</SelectItem>
+                  <SelectItem value="positive">Maior que 0</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
+
+        {activeSession && <InventoryGeneralTable items={filteredItems} />}
       </div>
 
       <InventoryActionDialog
@@ -225,6 +268,10 @@ export default function InventarioPage() {
         type={actionType}
         sessionId={activeSession?.id || 0}
         onSuccess={loadData}
+        persistedEmployeeId={persistedEmployeeId}
+        setPersistedEmployeeId={setPersistedEmployeeId}
+        persistedSupplierId={persistedSupplierId}
+        setPersistedSupplierId={setPersistedSupplierId}
       />
     </div>
   )

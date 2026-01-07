@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -12,9 +12,20 @@ import { ProductSelectorTable } from '@/components/acerto/ProductSelectorTable'
 import { ProductRow } from '@/types/product'
 import { productsService } from '@/services/productsService'
 import { inventoryGeneralService } from '@/services/inventoryGeneralService'
+import { employeesService } from '@/services/employeesService'
+import { suppliersService } from '@/services/suppliersService'
 import { useToast } from '@/hooks/use-toast'
 import { Label } from '@/components/ui/label'
-import { Search } from 'lucide-react'
+import { Search, AlertTriangle } from 'lucide-react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Employee } from '@/types/employee'
+import { Supplier } from '@/types/supplier'
 
 interface Props {
   open: boolean
@@ -22,6 +33,10 @@ interface Props {
   type: string
   sessionId: number
   onSuccess: () => void
+  persistedEmployeeId: string
+  setPersistedEmployeeId: (id: string) => void
+  persistedSupplierId: string
+  setPersistedSupplierId: (id: string) => void
 }
 
 export function InventoryActionDialog({
@@ -30,6 +45,10 @@ export function InventoryActionDialog({
   type,
   sessionId,
   onSuccess,
+  persistedEmployeeId,
+  setPersistedEmployeeId,
+  persistedSupplierId,
+  setPersistedSupplierId,
 }: Props) {
   const [step, setStep] = useState(1) // 1: Select, 2: Input Details
   const [products, setProducts] = useState<ProductRow[]>([])
@@ -40,7 +59,54 @@ export function InventoryActionDialog({
   const [extraData, setExtraData] = useState<any>({})
   const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+
+  // Selectors State
+  const [employees, setEmployees] = useState<Employee[]>([])
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
+
+  // Inactivity Logic
+  const lastActivityRef = useRef<number>(Date.now())
+
   const { toast } = useToast()
+
+  // Track activity
+  useEffect(() => {
+    const updateActivity = () => {
+      lastActivityRef.current = Date.now()
+    }
+    window.addEventListener('mousemove', updateActivity)
+    window.addEventListener('keydown', updateActivity)
+    return () => {
+      window.removeEventListener('mousemove', updateActivity)
+      window.removeEventListener('keydown', updateActivity)
+    }
+  }, [])
+
+  // Initial Data Load for Selectors
+  useEffect(() => {
+    if (open) {
+      if (['CARRO_PARA_ESTOQUE', 'ESTOQUE_PARA_CARRO'].includes(type)) {
+        employeesService
+          .getEmployees(1, 100)
+          .then((res) => setEmployees(res.data))
+        if (persistedEmployeeId) {
+          setExtraData((prev: any) => ({
+            ...prev,
+            funcionarioId: persistedEmployeeId,
+          }))
+        }
+      }
+      if (type === 'COMPRA') {
+        suppliersService.getAll().then(setSuppliers)
+        if (persistedSupplierId) {
+          setExtraData((prev: any) => ({
+            ...prev,
+            fornecedorId: persistedSupplierId,
+          }))
+        }
+      }
+    }
+  }, [open, type, persistedEmployeeId, persistedSupplierId])
 
   const searchProducts = async (term: string) => {
     setLoading(true)
@@ -56,11 +122,41 @@ export function InventoryActionDialog({
     setSelectedProduct(p)
     setStep(2)
     setQuantity('')
-    setExtraData({})
+    // Keep persisted extraData like funcionarioId/fornecedorId
   }
 
   const handleSave = async () => {
     if (!selectedProduct || !quantity) return
+
+    // Inactivity Check (30 mins = 1800000 ms)
+    const inactivityTime = Date.now() - lastActivityRef.current
+    if (inactivityTime > 1800000) {
+      const fieldName = type === 'COMPRA' ? 'fornecedor' : 'funcionário'
+      if (
+        !confirm(
+          `A tela ficou 30 minutos INATIVA, favor conferir o nome do ${fieldName}!!!`,
+        )
+      ) {
+        return
+      }
+      // Reset activity on confirm so they can save immediately next click if they want,
+      // but usually confirm() blocks so this flow is sync.
+      // User confirms they checked. Proceed.
+      lastActivityRef.current = Date.now()
+    }
+
+    // Validation
+    if (['CARRO_PARA_ESTOQUE', 'ESTOQUE_PARA_CARRO'].includes(type)) {
+      if (!extraData.funcionarioId) {
+        toast({ title: 'Selecione um Funcionário', variant: 'destructive' })
+        return
+      }
+    }
+    if (type === 'COMPRA' && !extraData.fornecedorId) {
+      toast({ title: 'Selecione um Fornecedor', variant: 'destructive' })
+      return
+    }
+
     setLoading(true)
     try {
       await inventoryGeneralService.registerMovement(sessionId, type as any, [
@@ -70,12 +166,26 @@ export function InventoryActionDialog({
           extra: extraData,
         },
       ])
+
+      // Persist selection
+      if (extraData.funcionarioId)
+        setPersistedEmployeeId(extraData.funcionarioId)
+      if (extraData.fornecedorId) setPersistedSupplierId(extraData.fornecedorId)
+
       toast({ title: 'Movimento Salvo' })
       onSuccess()
+
       // Reset for next
       setStep(1)
       setQuantity('')
       setSelectedProduct(null)
+      // Do NOT clear extraData fully, keep persisted IDs
+      const keptData: any = {}
+      if (extraData.funcionarioId)
+        keptData.funcionarioId = extraData.funcionarioId
+      if (extraData.fornecedorId) keptData.fornecedorId = extraData.fornecedorId
+      setExtraData(keptData)
+
       onOpenChange(false)
     } catch (e) {
       toast({ title: 'Erro', variant: 'destructive' })
@@ -154,19 +264,64 @@ export function InventoryActionDialog({
               />
             </div>
 
-            {type === 'COMPRA' && (
+            {['CARRO_PARA_ESTOQUE', 'ESTOQUE_PARA_CARRO'].includes(type) && (
               <div className="grid gap-2">
-                <Label>Valor Unitário (Custo)</Label>
-                <Input
-                  type="number"
-                  onChange={(e) =>
-                    setExtraData({
-                      ...extraData,
-                      valorUnitario: parseFloat(e.target.value),
-                    })
+                <Label>Funcionário *</Label>
+                <Select
+                  value={extraData.funcionarioId?.toString()}
+                  onValueChange={(val) =>
+                    setExtraData({ ...extraData, funcionarioId: val })
                   }
-                />
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o funcionário" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {employees.map((emp) => (
+                      <SelectItem key={emp.id} value={emp.id.toString()}>
+                        {emp.nome_completo}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
+            )}
+
+            {type === 'COMPRA' && (
+              <>
+                <div className="grid gap-2">
+                  <Label>Fornecedor *</Label>
+                  <Select
+                    value={extraData.fornecedorId?.toString()}
+                    onValueChange={(val) =>
+                      setExtraData({ ...extraData, fornecedorId: val })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o fornecedor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {suppliers.map((sup) => (
+                        <SelectItem key={sup.id} value={sup.id.toString()}>
+                          {sup.nome_fornecedor}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label>Valor Unitário (Custo)</Label>
+                  <Input
+                    type="number"
+                    onChange={(e) =>
+                      setExtraData({
+                        ...extraData,
+                        valorUnitario: parseFloat(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+              </>
             )}
 
             {type === 'PERDA' && (

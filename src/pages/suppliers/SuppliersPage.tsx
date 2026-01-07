@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import {
   Plus,
   Search,
@@ -17,6 +17,8 @@ import {
   Edit,
   Trash2,
   MessageCircle,
+  MapPin,
+  Users,
 } from 'lucide-react'
 import { suppliersService } from '@/services/suppliersService'
 import { Supplier } from '@/types/supplier'
@@ -32,6 +34,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 
 export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
@@ -142,8 +149,11 @@ export default function SuppliersPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Nome</TableHead>
-                  <TableHead>CNPJ</TableHead>
-                  <TableHead>Telefone</TableHead>
+                  <TableHead className="hidden md:table-cell">CNPJ</TableHead>
+                  <TableHead>Telefone / Contatos</TableHead>
+                  <TableHead className="hidden lg:table-cell">
+                    Endereço
+                  </TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -153,21 +163,79 @@ export default function SuppliersPage() {
                     <TableCell className="font-medium">
                       {s.nome_fornecedor}
                     </TableCell>
-                    <TableCell>{s.cnpj || '-'}</TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      {s.cnpj || '-'}
+                    </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <span>{s.telefone || '-'}</span>
-                        {s.telefone && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 text-green-600 hover:text-green-700 hover:bg-green-100"
-                            onClick={() => handleWhatsApp(s.telefone)}
-                          >
-                            <MessageCircle className="h-4 w-4" />
-                          </Button>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          <span>{s.telefone || 'S/ Tel Principal'}</span>
+                          {s.telefone && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-green-600 hover:text-green-700 hover:bg-green-100"
+                              onClick={() => handleWhatsApp(s.telefone)}
+                            >
+                              <MessageCircle className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+
+                        {s.contatos && s.contatos.length > 0 && (
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="link"
+                                className="p-0 h-auto text-xs text-blue-600 flex items-center justify-start gap-1"
+                              >
+                                <Users className="h-3 w-3" /> +{' '}
+                                {s.contatos.length} contatos
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-60">
+                              <div className="space-y-2">
+                                <h4 className="font-semibold text-sm">
+                                  Contatos Adicionais
+                                </h4>
+                                {s.contatos.map((c, i) => (
+                                  <div
+                                    key={i}
+                                    className="text-sm border-b pb-1 last:border-0"
+                                  >
+                                    <p className="font-medium">{c.nome}</p>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-muted-foreground">
+                                        {c.telefone}
+                                      </span>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-5 w-5 text-green-600 hover:text-green-700"
+                                        onClick={() =>
+                                          handleWhatsApp(c.telefone)
+                                        }
+                                      >
+                                        <MessageCircle className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </PopoverContent>
+                          </Popover>
                         )}
                       </div>
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell">
+                      {s.endereco ? (
+                        <div className="flex items-start gap-1 text-sm text-muted-foreground">
+                          <MapPin className="h-3 w-3 mt-1 shrink-0" />
+                          {s.endereco}
+                        </div>
+                      ) : (
+                        '-'
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button

@@ -555,6 +555,276 @@ export type Database = {
           },
         ]
       }
+      'ESTOQUE GERAL AJUSTES': {
+        Row: {
+          ajuste_quantidade: number | null
+          created_at: string | null
+          diferenca_quantidade: number | null
+          diferenca_valor: number | null
+          id: number
+          id_inventario: number | null
+          novo_saldo_final: number | null
+          produto_id: number | null
+        }
+        Insert: {
+          ajuste_quantidade?: number | null
+          created_at?: string | null
+          diferenca_quantidade?: number | null
+          diferenca_valor?: number | null
+          id?: number
+          id_inventario?: number | null
+          novo_saldo_final?: number | null
+          produto_id?: number | null
+        }
+        Update: {
+          ajuste_quantidade?: number | null
+          created_at?: string | null
+          diferenca_quantidade?: number | null
+          diferenca_valor?: number | null
+          id?: number
+          id_inventario?: number | null
+          novo_saldo_final?: number | null
+          produto_id?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'ESTOQUE GERAL AJUSTES_id_inventario_fkey'
+            columns: ['id_inventario']
+            isOneToOne: false
+            referencedRelation: 'ID Inventário'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      'ESTOQUE GERAL CARRO PARA ESTOQUE': {
+        Row: {
+          created_at: string | null
+          id: number
+          id_inventario: number | null
+          produto_id: number | null
+          quantidade: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: number
+          id_inventario?: number | null
+          produto_id?: number | null
+          quantidade?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: number
+          id_inventario?: number | null
+          produto_id?: number | null
+          quantidade?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'ESTOQUE GERAL CARRO PARA ESTOQUE_id_inventario_fkey'
+            columns: ['id_inventario']
+            isOneToOne: false
+            referencedRelation: 'ID Inventário'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      'ESTOQUE GERAL COMPRAS': {
+        Row: {
+          compras_quantidade: number | null
+          created_at: string | null
+          fornecedor_id: number | null
+          fornecedor_nome: string | null
+          id: number
+          id_inventario: number | null
+          produto_id: number | null
+          valor_unitario: number | null
+        }
+        Insert: {
+          compras_quantidade?: number | null
+          created_at?: string | null
+          fornecedor_id?: number | null
+          fornecedor_nome?: string | null
+          id?: number
+          id_inventario?: number | null
+          produto_id?: number | null
+          valor_unitario?: number | null
+        }
+        Update: {
+          compras_quantidade?: number | null
+          created_at?: string | null
+          fornecedor_id?: number | null
+          fornecedor_nome?: string | null
+          id?: number
+          id_inventario?: number | null
+          produto_id?: number | null
+          valor_unitario?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'ESTOQUE GERAL COMPRAS_fornecedor_id_fkey'
+            columns: ['fornecedor_id']
+            isOneToOne: false
+            referencedRelation: 'FORNECEDORES'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'ESTOQUE GERAL COMPRAS_id_inventario_fkey'
+            columns: ['id_inventario']
+            isOneToOne: false
+            referencedRelation: 'ID Inventário'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      'ESTOQUE GERAL CONTAGEM': {
+        Row: {
+          created_at: string | null
+          id: number
+          id_inventario: number | null
+          produto_id: number | null
+          quantidade: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: number
+          id_inventario?: number | null
+          produto_id?: number | null
+          quantidade?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: number
+          id_inventario?: number | null
+          produto_id?: number | null
+          quantidade?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'ESTOQUE GERAL CONTAGEM_id_inventario_fkey'
+            columns: ['id_inventario']
+            isOneToOne: false
+            referencedRelation: 'ID Inventário'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      'ESTOQUE GERAL ESTOQUE PARA CARRO': {
+        Row: {
+          created_at: string | null
+          id: number
+          id_inventario: number | null
+          produto_id: number | null
+          quantidade: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: number
+          id_inventario?: number | null
+          produto_id?: number | null
+          quantidade?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: number
+          id_inventario?: number | null
+          produto_id?: number | null
+          quantidade?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'ESTOQUE GERAL ESTOQUE PARA CARRO_id_inventario_fkey'
+            columns: ['id_inventario']
+            isOneToOne: false
+            referencedRelation: 'ID Inventário'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      'ESTOQUE GERAL SAÍDAS PERDAS': {
+        Row: {
+          created_at: string | null
+          id: number
+          id_inventario: number | null
+          motivo: string | null
+          produto_id: number | null
+          quantidade: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: number
+          id_inventario?: number | null
+          motivo?: string | null
+          produto_id?: number | null
+          quantidade?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: number
+          id_inventario?: number | null
+          motivo?: string | null
+          produto_id?: number | null
+          quantidade?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'ESTOQUE GERAL SAÍDAS PERDAS_id_inventario_fkey'
+            columns: ['id_inventario']
+            isOneToOne: false
+            referencedRelation: 'ID Inventário'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      'ESTOQUE GERAL SALDO INICIAL': {
+        Row: {
+          barcode: string | null
+          codigo_produto: number | null
+          funcionario: string | null
+          id: number
+          id_inventario: number | null
+          pedido_id: number | null
+          preco: number | null
+          produto: string | null
+          produto_id: number | null
+          saldo_inicial: number | null
+          timestamp: string | null
+        }
+        Insert: {
+          barcode?: string | null
+          codigo_produto?: number | null
+          funcionario?: string | null
+          id?: number
+          id_inventario?: number | null
+          pedido_id?: number | null
+          preco?: number | null
+          produto?: string | null
+          produto_id?: number | null
+          saldo_inicial?: number | null
+          timestamp?: string | null
+        }
+        Update: {
+          barcode?: string | null
+          codigo_produto?: number | null
+          funcionario?: string | null
+          id?: number
+          id_inventario?: number | null
+          pedido_id?: number | null
+          preco?: number | null
+          produto?: string | null
+          produto_id?: number | null
+          saldo_inicial?: number | null
+          timestamp?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'ESTOQUE GERAL SALDO INICIAL_id_inventario_fkey'
+            columns: ['id_inventario']
+            isOneToOne: false
+            referencedRelation: 'ID Inventário'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       fechamento_caixa: {
         Row: {
           cheque_aprovado: boolean | null
@@ -637,6 +907,33 @@ export type Database = {
           },
         ]
       }
+      FORNECEDORES: {
+        Row: {
+          cnpj: string | null
+          created_at: string
+          endereco: string | null
+          id: number
+          nome_fornecedor: string
+          telefone: string | null
+        }
+        Insert: {
+          cnpj?: string | null
+          created_at?: string
+          endereco?: string | null
+          id?: number
+          nome_fornecedor: string
+          telefone?: string | null
+        }
+        Update: {
+          cnpj?: string | null
+          created_at?: string
+          endereco?: string | null
+          id?: number
+          nome_fornecedor?: string
+          telefone?: string | null
+        }
+        Relationships: []
+      }
       FUNCIONARIOS: {
         Row: {
           apelido: string | null
@@ -673,6 +970,27 @@ export type Database = {
           senha?: string
           setor?: string[] | null
           situacao?: string
+        }
+        Relationships: []
+      }
+      'ID Inventário': {
+        Row: {
+          data_fim: string | null
+          data_inicio: string
+          id: number
+          status: string | null
+        }
+        Insert: {
+          data_fim?: string | null
+          data_inicio?: string
+          id?: number
+          status?: string | null
+        }
+        Update: {
+          data_fim?: string | null
+          data_inicio?: string
+          id?: number
+          status?: string | null
         }
         Relationships: []
       }

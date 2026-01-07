@@ -5,6 +5,12 @@ export interface InventoryGeneralSession {
   status: 'ABERTO' | 'FECHADO'
 }
 
+export interface MovementDetail {
+  date: string
+  quantity: number
+  employeeName: string
+}
+
 export interface InventoryGeneralItem {
   produto_id: number
   codigo: number | null
@@ -21,7 +27,11 @@ export interface InventoryGeneralItem {
   diferenca_qty: number // Saldo Final - Contagem
   diferenca_val: number
   ajustes: number
-  novo_saldo_final: number // Contagem + Ajustes (or Saldo Final + Diff + Ajustes?) - Spec: Contagem + Ajustes
+  novo_saldo_final: number // Spec: Contagem + Ajustes
+
+  // Details for popovers
+  details_carro_para_estoque: MovementDetail[]
+  details_estoque_para_carro: MovementDetail[]
 }
 
 export type InventoryMovementType =

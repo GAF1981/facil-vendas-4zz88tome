@@ -48,7 +48,7 @@ export const clientSchema = z.object({
     .optional()
     .or(z.literal(''))
     .nullable(),
-  'FONE 1': z.string().optional().nullable(),
+  'FONE 1': z.string().min(1, 'Telefone 1 é obrigatório'), // Made Mandatory
   'FONE 2': z.string().optional().nullable(),
   'CONTATO 1': z.string().min(1, 'Contato 1 é obrigatório'),
   'CONTATO 2': z.string().optional().nullable(),

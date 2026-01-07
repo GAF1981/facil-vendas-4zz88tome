@@ -110,7 +110,7 @@ export function ClientTable({
               <TableHead>TIPO CLIENTE</TableHead>
               <TableHead className="hidden md:table-cell">CPF/CNPJ</TableHead>
               <TableHead className="hidden lg:table-cell">Cidade</TableHead>
-              <TableHead className="hidden md:table-cell">Telefone</TableHead>
+              <TableHead className="md:table-cell">Telefone</TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -166,18 +166,25 @@ export function ClientTable({
                   <TableCell className="hidden lg:table-cell">
                     {client.MUNICÍPIO || '-'}
                   </TableCell>
-                  <TableCell className="hidden md:table-cell">
+                  <TableCell className="table-cell">
                     <div className="flex items-center gap-2">
-                      <span>{client['FONE 1'] || client['FONE 2'] || '-'}</span>
+                      <span className="hidden md:inline">
+                        {client['FONE 1'] || client['FONE 2'] || '-'}
+                      </span>
+                      {/* Mobile view only shows icon if valid phone */}
+                      <span className="md:hidden text-xs">
+                        {client['FONE 1'] ? '' : '-'}
+                      </span>
+
                       {client['FONE 1'] && (
                         <Button
                           size="icon"
                           variant="ghost"
-                          className="h-6 w-6 text-green-600 hover:text-green-700 hover:bg-green-100"
+                          className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-100"
                           onClick={() => handleWhatsApp(client['FONE 1'])}
                           title="Abrir WhatsApp"
                         >
-                          <MessageCircle className="h-4 w-4" />
+                          <MessageCircle className="h-5 w-5" />
                         </Button>
                       )}
                     </div>
