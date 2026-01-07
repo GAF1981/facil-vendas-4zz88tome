@@ -47,16 +47,16 @@ BEGIN
             4,                                      -- New Session ID
             a.produto_id,
             a.novo_saldo_final,                     -- Previous Final Balance becomes Initial
-            p.PRODUTO,
+            p."PRODUTO",
             -- Safe parsing of currency string '1.234,56' -> 1234.56
             CASE 
-                WHEN p.PREÇO IS NULL OR p.PREÇO = '' THEN 0
-                ELSE CAST(REPLACE(REPLACE(p.PREÇO, '.', ''), ',', '.') AS NUMERIC)
+                WHEN p."PREÇO" IS NULL OR p."PREÇO" = '' THEN 0
+                ELSE CAST(REPLACE(REPLACE(p."PREÇO", '.', ''), ',', '.') AS NUMERIC)
             END,
-            p.CODIGO,
+            p."CODIGO",
             CAST(p."CÓDIGO BARRAS" AS TEXT)
         FROM "ESTOQUE GERAL AJUSTES" a
-        JOIN "PRODUTOS" p ON a.produto_id = p.ID
+        JOIN "PRODUTOS" p ON a.produto_id = p."ID"
         WHERE a.id_inventario = 3;
 
     END IF;
