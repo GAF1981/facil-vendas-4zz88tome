@@ -32,6 +32,7 @@ import TopSellingReportsPage from '@/pages/relatorio/TopSellingReportsPage'
 import AdjustmentReportsPage from '@/pages/relatorio/AdjustmentReportsPage'
 import DebitosReportPage from '@/pages/relatorio/DebitosReportPage'
 import InactiveClientsPage from '@/pages/relatorio/InactiveClientsPage'
+import GeneralInventoryReportPage from '@/pages/relatorio/GeneralInventoryReportPage'
 import CaixaPage from '@/pages/caixa/CaixaPage'
 import FechamentosPage from '@/pages/fechamento/FechamentosPage'
 import PixPage from '@/pages/pix/PixPage'
@@ -157,6 +158,10 @@ const App = () => (
 
                 <Route element={<PermissionGuard module="Relatório" />}>
                   <Route path="/relatorio" element={<RelatorioDashboard />} />
+                  <Route
+                    path="/relatorio/estoque-geral"
+                    element={<GeneralInventoryReportPage />}
+                  />
                   <Route
                     path="/relatorio/projecoes"
                     element={<ProjectionsPage />}

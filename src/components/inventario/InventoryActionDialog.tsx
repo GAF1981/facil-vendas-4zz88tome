@@ -16,7 +16,7 @@ import { employeesService } from '@/services/employeesService'
 import { suppliersService } from '@/services/suppliersService'
 import { useToast } from '@/hooks/use-toast'
 import { Label } from '@/components/ui/label'
-import { Search, AlertTriangle } from 'lucide-react'
+import { Search } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -132,16 +132,29 @@ export function InventoryActionDialog({
     const inactivityTime = Date.now() - lastActivityRef.current
     if (inactivityTime > 1800000) {
       const fieldName = type === 'COMPRA' ? 'fornecedor' : 'funcionário'
-      if (
-        !confirm(
-          `A tela ficou 30 minutos INATIVA, favor conferir o nome do ${fieldName}!!!`,
-        )
-      ) {
+      const confirmed = confirm(
+        `A tela ficou 30 minutos INATIVA, favor conferir o nome do ${fieldName}!!!`,
+      )
+
+      // If inactive, we must reset the persistence regardless of confirmation to proceed
+      // But we should also let user know.
+      // Reset logic:
+      setPersistedEmployeeId('')
+      setPersistedSupplierId('')
+      // Clear current selection too to force re-selection?
+      setExtraData((prev: any) => ({
+        ...prev,
+        funcionarioId: undefined,
+        fornecedorId: undefined,
+      }))
+
+      if (!confirmed) {
+        lastActivityRef.current = Date.now()
         return
       }
-      // Reset activity on confirm so they can save immediately next click if they want,
-      // but usually confirm() blocks so this flow is sync.
-      // User confirms they checked. Proceed.
+
+      // Proceeding after confirmation implies user checked.
+      // But persistence is cleared for future.
       lastActivityRef.current = Date.now()
     }
 
@@ -167,7 +180,7 @@ export function InventoryActionDialog({
         },
       ])
 
-      // Persist selection
+      // Persist selection (re-apply if valid and not cleared by inactivity)
       if (extraData.funcionarioId)
         setPersistedEmployeeId(extraData.funcionarioId)
       if (extraData.fornecedorId) setPersistedSupplierId(extraData.fornecedorId)

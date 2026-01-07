@@ -13,6 +13,7 @@ import {
   BarChart3,
   RotateCcw,
   CreditCard,
+  ClipboardList,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useUserStore } from '@/stores/useUserStore'
@@ -85,6 +86,14 @@ const RelatorioDashboard = () => {
   }
 
   const reports = [
+    {
+      title: 'Estoque Geral',
+      description: 'Métricas de diferenças e compras do inventário.',
+      icon: ClipboardList,
+      to: '/relatorio/estoque-geral',
+      color: 'text-violet-600',
+      bg: 'bg-violet-100',
+    },
     {
       title: 'Projeções',
       description: 'Projeções de vendas e médias por cliente.',

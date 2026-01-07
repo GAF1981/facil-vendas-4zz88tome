@@ -31,6 +31,11 @@ import {
 } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { safeFormatDate } from '@/lib/formatters'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 export default function InventarioPage() {
   const [sessions, setSessions] = useState<InventoryGeneralSession[]>([])
@@ -59,6 +64,11 @@ export default function InventarioPage() {
   )
 
   const canEdit = selectedSession?.status === 'ABERTO'
+
+  const allItemsCounted = useMemo(() => {
+    if (!items.length) return false
+    return items.every((i) => i.has_count_record)
+  }, [items])
 
   const loadSessions = useCallback(async () => {
     try {
@@ -208,6 +218,25 @@ export default function InventarioPage() {
     loadSessions()
   }
 
+  const handleMarkAsZero = async (productId: number) => {
+    if (!selectedSession || !canEdit) return
+    try {
+      await inventoryGeneralService.registerMovement(
+        selectedSession.id,
+        'CONTAGEM',
+        [{ productId, quantity: 0 }],
+      )
+      toast({ title: 'Sucesso', description: 'Produto marcado como 0.' })
+      loadItems(selectedSession.id)
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Falha ao marcar como 0.',
+        variant: 'destructive',
+      })
+    }
+  }
+
   return (
     <div className="space-y-6 animate-fade-in pb-10">
       <div className="flex flex-col gap-4">
@@ -315,12 +344,28 @@ export default function InventarioPage() {
                   <CheckSquare className="mr-2 h-4 w-4" /> Contagem
                 </Button>
                 <div className="flex-1" />
-                <Button
-                  onClick={handleFinalize}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  <StopCircle className="mr-2 h-4 w-4" /> Finalizar e Novo Ciclo
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Button
+                        onClick={handleFinalize}
+                        disabled={!allItemsCounted}
+                        className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <StopCircle className="mr-2 h-4 w-4" /> Finalizar e Novo
+                        Ciclo
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {!allItemsCounted && (
+                    <TooltipContent>
+                      <p>
+                        Todos os produtos devem ter contagem registrada (mesmo
+                        que 0) para finalizar.
+                      </p>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
               </>
             )}
 
@@ -354,7 +399,13 @@ export default function InventarioPage() {
           </div>
         )}
 
-        {selectedSession && <InventoryGeneralTable items={filteredItems} />}
+        {selectedSession && (
+          <InventoryGeneralTable
+            items={filteredItems}
+            onMarkAsZero={handleMarkAsZero}
+            readOnly={!canEdit}
+          />
+        )}
       </div>
 
       <InventoryActionDialog

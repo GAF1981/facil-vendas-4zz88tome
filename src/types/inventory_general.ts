@@ -29,6 +29,9 @@ export interface InventoryGeneralItem {
   ajustes: number
   novo_saldo_final: number // Spec: Contagem + Ajustes
 
+  // Status to track if a count has been explicitly recorded for validation
+  has_count_record: boolean
+
   // Details for popovers
   details_carro_para_estoque: MovementDetail[]
   details_estoque_para_carro: MovementDetail[]
@@ -40,3 +43,14 @@ export type InventoryMovementType =
   | 'PERDA'
   | 'ESTOQUE_PARA_CARRO'
   | 'CONTAGEM'
+
+export interface InventoryReportMetrics {
+  diferencas: {
+    quantidade: number
+    valor: number
+  }
+  compras: {
+    total_quantidade: number
+    preco_medio: number
+  }
+}
