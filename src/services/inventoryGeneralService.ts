@@ -49,13 +49,12 @@ export const inventoryGeneralService = {
 
     if (error) throw error
 
-    // 3. Data Continuity: Fetch 'novo_saldo_final' from the LAST closed session (ID n)
-    // and insert as 'saldo_inicial' for the NEW session (ID n+1).
+    // 3. Data Continuity: Fetch 'novo_saldo_final' from the LAST closed session
     const { data: lastSession } = await supabase
       .from('ID Inventário')
       .select('id')
       .eq('status', 'FECHADO')
-      .neq('id', newSession.id) // Ensure we don't pick the one we just made if logic fails (though status is different)
+      .neq('id', newSession.id)
       .order('id', { ascending: false })
       .limit(1)
       .maybeSingle()
@@ -67,12 +66,8 @@ export const inventoryGeneralService = {
         .eq('id_inventario', lastSession.id)
 
       if (prevBalances && prevBalances.length > 0) {
-        // We need product details to insert into SALDO INICIAL table (denormalized structure)
-        // Optimizing: fetch only needed products
         const productIds = prevBalances.map((p) => p.produto_id)
 
-        // Fetch in chunks if too many? Supabase/Postgres handles `in` reasonably well for a few thousands.
-        // For strict robustness with >10k items, we should batch. Assuming <10k for now as per productsService logic.
         const { data: products } = await supabase
           .from('PRODUTOS')
           .select('ID, PREÇO, CODIGO, PRODUTO, CÓDIGO BARRAS')
@@ -97,7 +92,6 @@ export const inventoryGeneralService = {
           .filter(Boolean)
 
         if (initials.length > 0) {
-          // Batch insert
           const batchSize = 1000
           for (let i = 0; i < initials.length; i += batchSize) {
             await supabase
@@ -168,7 +162,6 @@ export const inventoryGeneralService = {
         .eq('id_inventario', sessionId),
     ])
 
-    // Identify which products have at least one count record
     const countedProductIds = new Set(counts.data?.map((c) => c.produto_id))
 
     const agg = new Map<number, InventoryGeneralItem>()
@@ -212,7 +205,7 @@ export const inventoryGeneralService = {
 
     sum(initial.data || [], 'saldo_inicial', 'saldo_inicial')
     sum(compras.data || [], 'compras_quantidade', 'compras')
-    // Sum manually for carToStock to handle details
+
     carToStock.data?.forEach((row) => {
       const item = agg.get(row.produto_id)
       if (item) {
@@ -229,7 +222,6 @@ export const inventoryGeneralService = {
 
     sum(losses.data || [], 'quantidade', 'saidas_perdas')
 
-    // Sum manually for stockToCar to handle details
     stockToCar.data?.forEach((row) => {
       const item = agg.get(row.produto_id)
       if (item) {
@@ -255,7 +247,7 @@ export const inventoryGeneralService = {
         item.saidas_perdas -
         item.estoque_para_carro
 
-      item.diferenca_qty = item.contagem - item.saldo_final // Fixed logic: Difference = Count - Theoretical
+      item.diferenca_qty = item.contagem - item.saldo_final
       item.diferenca_val = item.diferenca_qty * item.preco
 
       const adj = adjustments.data?.find(
@@ -264,10 +256,6 @@ export const inventoryGeneralService = {
       if (adj) {
         item.novo_saldo_final = adj.novo_saldo_final
       } else {
-        // By default, if no adjustment record (which happens before finalize), new balance = count
-        // "Ajustes" column is usually just "Diferença" but stored.
-        // Logic: New Balance = Count + Adjustments (if manual adjustments existed).
-        // Since we hide Adjustments column, we rely on Count being the source of truth for New Balance.
         item.novo_saldo_final = item.contagem + item.ajustes
       }
 
@@ -330,19 +318,93 @@ export const inventoryGeneralService = {
     }
   },
 
+  async updateItemQuantity(
+    sessionId: number,
+    productId: number,
+    type:
+      | 'COMPRA'
+      | 'CARRO_PARA_ESTOQUE'
+      | 'PERDA'
+      | 'ESTOQUE_PARA_CARRO'
+      | 'CONTAGEM',
+    newQuantity: number,
+  ) {
+    let table = ''
+    let qtyField = ''
+
+    switch (type) {
+      case 'COMPRA':
+        table = 'ESTOQUE GERAL COMPRAS'
+        qtyField = 'compras_quantidade'
+        break
+      case 'CARRO_PARA_ESTOQUE':
+        table = 'ESTOQUE GERAL CARRO PARA ESTOQUE'
+        qtyField = 'quantidade'
+        break
+      case 'PERDA':
+        table = 'ESTOQUE GERAL SAÍDAS PERDAS'
+        qtyField = 'quantidade'
+        break
+      case 'ESTOQUE_PARA_CARRO':
+        table = 'ESTOQUE GERAL ESTOQUE PARA CARRO'
+        qtyField = 'quantidade'
+        break
+      case 'CONTAGEM':
+        table = 'ESTOQUE GERAL CONTAGEM'
+        qtyField = 'quantidade'
+        break
+    }
+
+    // 1. Fetch one existing record to preserve metadata (like supplier, employee, reason)
+    const { data: existing } = await supabase
+      .from(table)
+      .select('*')
+      .eq('id_inventario', sessionId)
+      .eq('produto_id', productId)
+      .limit(1)
+      .maybeSingle()
+
+    // 2. Delete all records for this product/session/type to strictly enforce the new total
+    await supabase
+      .from(table)
+      .delete()
+      .eq('id_inventario', sessionId)
+      .eq('produto_id', productId)
+
+    // 3. Insert new record if quantity > 0 or if it's a Count (which can be 0)
+    // If quantity is 0 and it is NOT a count, we effectively leave it deleted (reset to 0)
+    if (newQuantity > 0 || type === 'CONTAGEM') {
+      const insertData: any = {
+        id_inventario: sessionId,
+        produto_id: productId,
+        [qtyField]: newQuantity,
+      }
+
+      // Preserve metadata from the last record if available
+      if (existing) {
+        if ('fornecedor_id' in existing)
+          insertData.fornecedor_id = existing.fornecedor_id
+        if ('funcionario_id' in existing)
+          insertData.funcionario_id = existing.funcionario_id
+        if ('motivo' in existing) insertData.motivo = existing.motivo
+        if ('valor_unitario' in existing)
+          insertData.valor_unitario = existing.valor_unitario
+      }
+
+      await supabase.from(table).insert(insertData)
+    }
+  },
+
   async finalizeAdjustments(sessionId: number, items: InventoryGeneralItem[]) {
     const adjustments = items.map((item) => ({
       id_inventario: sessionId,
       produto_id: item.produto_id,
-      ajuste_quantidade: 0, // We hide adjustments column, so we assume 0 manual adjustments
+      ajuste_quantidade: 0,
       diferenca_quantidade: item.diferenca_qty,
       diferenca_valor: item.diferenca_val,
       novo_saldo_final: item.novo_saldo_final,
     }))
 
-    // Use upsert or insert? Ideally we clear previous adjustments for this session or upsert.
-    // Assuming fresh insert for this flow as finalize happens once usually.
-    // If re-finalizing, we should delete old ones first.
     await supabase
       .from('ESTOQUE GERAL AJUSTES')
       .delete()

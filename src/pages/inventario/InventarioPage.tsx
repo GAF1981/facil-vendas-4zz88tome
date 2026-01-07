@@ -12,6 +12,9 @@ import {
   PackageMinus,
   Truck,
   CheckSquare,
+  Edit,
+  Check,
+  X,
 } from 'lucide-react'
 import { InventoryGeneralTable } from '@/components/inventario/InventoryGeneralTable'
 import { inventoryGeneralService } from '@/services/inventoryGeneralService'
@@ -45,6 +48,7 @@ export default function InventarioPage() {
   const [actionType, setActionType] = useState<any>(null)
   const [isActionDialogOpen, setIsActionDialogOpen] = useState(false)
   const [saldoFinalFilter, setSaldoFinalFilter] = useState('all')
+  const [isEditMode, setIsEditMode] = useState(false)
 
   // Persisted selections state (lifted from dialog)
   const [persistedEmployeeId, setPersistedEmployeeId] = useState<string>('')
@@ -237,6 +241,35 @@ export default function InventarioPage() {
     }
   }
 
+  const handleUpdateItem = async (
+    productId: number,
+    type: string,
+    value: number,
+  ) => {
+    if (!selectedSession || !canEdit) return
+    try {
+      await inventoryGeneralService.updateItemQuantity(
+        selectedSession.id,
+        productId,
+        type as any,
+        value,
+      )
+      toast({
+        title: 'Atualizado',
+        description: 'Valor atualizado com sucesso.',
+      })
+      // Reload to reflect calculations
+      loadItems(selectedSession.id)
+    } catch (error) {
+      console.error(error)
+      toast({
+        title: 'Erro',
+        description: 'Falha ao atualizar valor.',
+        variant: 'destructive',
+      })
+    }
+  }
+
   return (
     <div className="space-y-6 animate-fade-in pb-10">
       <div className="flex flex-col gap-4">
@@ -304,68 +337,93 @@ export default function InventarioPage() {
             {/* If user is viewing the active session, show actions */}
             {canEdit && (
               <>
+                {/* Edit Toggle Button */}
                 <Button
-                  variant="outline"
-                  onClick={handleResetInitial}
-                  className="text-red-600 border-red-200 hover:bg-red-50"
+                  variant={isEditMode ? 'default' : 'outline'}
+                  onClick={() => setIsEditMode(!isEditMode)}
+                  className={
+                    isEditMode
+                      ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                      : 'border-amber-200 text-amber-700 hover:bg-amber-50'
+                  }
                 >
-                  <RotateCcw className="mr-2 h-4 w-4" /> Reset Saldo Inicial
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={() => handleOpenAction('COMPRA')}
-                >
-                  <PackagePlus className="mr-2 h-4 w-4" /> Compras
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={() => handleOpenAction('CARRO_PARA_ESTOQUE')}
-                >
-                  <ArrowRightLeft className="mr-2 h-4 w-4" /> Devoluções (Carro
-                  &rarr; Est)
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={() => handleOpenAction('PERDA')}
-                >
-                  <PackageMinus className="mr-2 h-4 w-4" /> Perdas
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={() => handleOpenAction('ESTOQUE_PARA_CARRO')}
-                >
-                  <Truck className="mr-2 h-4 w-4" /> Reposições (Est &rarr;
-                  Carro)
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={() => handleOpenAction('CONTAGEM')}
-                >
-                  <CheckSquare className="mr-2 h-4 w-4" /> Contagem
-                </Button>
-                <div className="flex-1" />
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span>
-                      <Button
-                        onClick={handleFinalize}
-                        disabled={!allItemsCounted}
-                        className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <StopCircle className="mr-2 h-4 w-4" /> Finalizar e Novo
-                        Ciclo
-                      </Button>
-                    </span>
-                  </TooltipTrigger>
-                  {!allItemsCounted && (
-                    <TooltipContent>
-                      <p>
-                        Todos os produtos devem ter contagem registrada (mesmo
-                        que 0) para finalizar.
-                      </p>
-                    </TooltipContent>
+                  {isEditMode ? (
+                    <Check className="mr-2 h-4 w-4" />
+                  ) : (
+                    <Edit className="mr-2 h-4 w-4" />
                   )}
-                </Tooltip>
+                  {isEditMode ? 'Concluir Edição' : 'Editar Movimentações'}
+                </Button>
+
+                {!isEditMode && (
+                  <>
+                    <Button
+                      variant="outline"
+                      onClick={handleResetInitial}
+                      className="text-red-600 border-red-200 hover:bg-red-50"
+                    >
+                      <RotateCcw className="mr-2 h-4 w-4" /> Reset Saldo Inicial
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() => handleOpenAction('COMPRA')}
+                    >
+                      <PackagePlus className="mr-2 h-4 w-4" /> Compras
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() => handleOpenAction('CARRO_PARA_ESTOQUE')}
+                    >
+                      <ArrowRightLeft className="mr-2 h-4 w-4" /> Devoluções
+                      (Carro &rarr; Est)
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() => handleOpenAction('PERDA')}
+                    >
+                      <PackageMinus className="mr-2 h-4 w-4" /> Perdas
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() => handleOpenAction('ESTOQUE_PARA_CARRO')}
+                    >
+                      <Truck className="mr-2 h-4 w-4" /> Reposições (Est &rarr;
+                      Carro)
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() => handleOpenAction('CONTAGEM')}
+                    >
+                      <CheckSquare className="mr-2 h-4 w-4" /> Contagem
+                    </Button>
+                  </>
+                )}
+
+                <div className="flex-1" />
+                {!isEditMode && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span>
+                        <Button
+                          onClick={handleFinalize}
+                          disabled={!allItemsCounted}
+                          className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <StopCircle className="mr-2 h-4 w-4" /> Finalizar e
+                          Novo Ciclo
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    {!allItemsCounted && (
+                      <TooltipContent>
+                        <p>
+                          Todos os produtos devem ter contagem registrada (mesmo
+                          que 0) para finalizar.
+                        </p>
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                )}
               </>
             )}
 
@@ -404,6 +462,8 @@ export default function InventarioPage() {
             items={filteredItems}
             onMarkAsZero={handleMarkAsZero}
             readOnly={!canEdit}
+            isEditMode={isEditMode}
+            onUpdateItem={handleUpdateItem}
           />
         )}
       </div>

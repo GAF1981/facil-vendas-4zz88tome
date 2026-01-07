@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { InventoryGeneralItem } from '@/types/inventory_general'
 import {
   Table,
@@ -10,6 +11,7 @@ import {
 import { formatCurrency } from '@/lib/formatters'
 import { MovementDetailsPopover } from './MovementDetailsPopover'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Ban } from 'lucide-react'
 import {
   Tooltip,
@@ -21,12 +23,58 @@ interface Props {
   items: InventoryGeneralItem[]
   onMarkAsZero: (productId: number) => void
   readOnly?: boolean
+  isEditMode?: boolean
+  onUpdateItem?: (productId: number, type: string, value: number) => void
+}
+
+// Editable Cell Component
+function EditableCell({
+  value,
+  onChange,
+}: {
+  value: number
+  onChange: (val: number) => void
+}) {
+  const [localValue, setLocalValue] = useState(value.toString())
+
+  useEffect(() => {
+    setLocalValue(value.toString())
+  }, [value])
+
+  const handleBlur = () => {
+    const num = parseFloat(localValue)
+    if (!isNaN(num) && num !== value) {
+      onChange(num)
+    } else {
+      setLocalValue(value.toString())
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleBlur()
+      e.currentTarget.blur() // Remove focus
+    }
+  }
+
+  return (
+    <Input
+      type="number"
+      value={localValue}
+      onChange={(e) => setLocalValue(e.target.value)}
+      onBlur={handleBlur}
+      onKeyDown={handleKeyDown}
+      className="w-20 h-8 text-right px-2 py-1"
+    />
+  )
 }
 
 export function InventoryGeneralTable({
   items,
   onMarkAsZero,
   readOnly = false,
+  isEditMode = false,
+  onUpdateItem,
 }: Props) {
   return (
     <div className="rounded-md border bg-card overflow-x-auto shadow-sm max-h-[70vh] relative">
@@ -58,7 +106,6 @@ export function InventoryGeneralTable({
             <TableHead className="text-right bg-blue-50">Contagem</TableHead>
             <TableHead className="text-right bg-muted">Dif (Qtd)</TableHead>
             <TableHead className="text-right bg-muted">Dif (Val)</TableHead>
-            {/* Hidden per requirement: <TableHead className="text-right bg-yellow-50">Ajustes</TableHead> */}
             <TableHead className="text-right font-bold bg-gray-50">
               Novo Saldo Final
             </TableHead>
@@ -79,61 +126,125 @@ export function InventoryGeneralTable({
               <TableCell className="text-right font-mono">
                 {item.saldo_inicial}
               </TableCell>
+
+              {/* Compras */}
               <TableCell className="text-right font-mono text-green-600">
-                {item.compras}
+                {isEditMode && !readOnly && onUpdateItem ? (
+                  <EditableCell
+                    value={item.compras}
+                    onChange={(val) =>
+                      onUpdateItem(item.produto_id, 'COMPRA', val)
+                    }
+                  />
+                ) : (
+                  item.compras
+                )}
               </TableCell>
+
+              {/* Entradas Carro */}
               <TableCell className="text-right font-mono text-green-600">
                 <div className="flex items-center justify-end gap-1">
-                  {item.carro_para_estoque}
-                  <MovementDetailsPopover
-                    title="Entradas (Carro -> Estoque)"
-                    details={item.details_carro_para_estoque}
-                    colorClass="text-green-600"
-                  />
+                  {isEditMode && !readOnly && onUpdateItem ? (
+                    <EditableCell
+                      value={item.carro_para_estoque}
+                      onChange={(val) =>
+                        onUpdateItem(item.produto_id, 'CARRO_PARA_ESTOQUE', val)
+                      }
+                    />
+                  ) : (
+                    item.carro_para_estoque
+                  )}
+                  {!isEditMode && (
+                    <MovementDetailsPopover
+                      title="Entradas (Carro -> Estoque)"
+                      details={item.details_carro_para_estoque}
+                      colorClass="text-green-600"
+                    />
+                  )}
                 </div>
               </TableCell>
+
+              {/* Saídas Perdas */}
               <TableCell className="text-right font-mono text-red-600">
-                {item.saidas_perdas}
+                {isEditMode && !readOnly && onUpdateItem ? (
+                  <EditableCell
+                    value={item.saidas_perdas}
+                    onChange={(val) =>
+                      onUpdateItem(item.produto_id, 'PERDA', val)
+                    }
+                  />
+                ) : (
+                  item.saidas_perdas
+                )}
               </TableCell>
+
+              {/* Saídas Carro */}
               <TableCell className="text-right font-mono text-red-600">
                 <div className="flex items-center justify-end gap-1">
-                  {item.estoque_para_carro}
-                  <MovementDetailsPopover
-                    title="Saídas (Estoque -> Carro)"
-                    details={item.details_estoque_para_carro}
-                    colorClass="text-red-600"
-                  />
+                  {isEditMode && !readOnly && onUpdateItem ? (
+                    <EditableCell
+                      value={item.estoque_para_carro}
+                      onChange={(val) =>
+                        onUpdateItem(item.produto_id, 'ESTOQUE_PARA_CARRO', val)
+                      }
+                    />
+                  ) : (
+                    item.estoque_para_carro
+                  )}
+                  {!isEditMode && (
+                    <MovementDetailsPopover
+                      title="Saídas (Estoque -> Carro)"
+                      details={item.details_estoque_para_carro}
+                      colorClass="text-red-600"
+                    />
+                  )}
                 </div>
               </TableCell>
+
               <TableCell className="text-right font-mono font-bold">
                 {item.saldo_final}
               </TableCell>
+
+              {/* Contagem */}
               <TableCell className="text-right font-mono bg-blue-50/50">
                 <div className="flex items-center justify-end gap-2">
-                  {item.has_count_record ? (
-                    <span>{item.contagem}</span>
+                  {isEditMode && !readOnly && onUpdateItem ? (
+                    <EditableCell
+                      value={item.has_count_record ? item.contagem : 0}
+                      onChange={(val) =>
+                        onUpdateItem(item.produto_id, 'CONTAGEM', val)
+                      }
+                    />
                   ) : (
-                    <span className="text-muted-foreground italic text-xs">
-                      Pendente
-                    </span>
-                  )}
+                    <>
+                      {item.has_count_record ? (
+                        <span>{item.contagem}</span>
+                      ) : item.saldo_final > 0 ? (
+                        <span className="text-muted-foreground italic text-xs">
+                          Pendente
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">-</span>
+                      )}
 
-                  {!readOnly && !item.has_count_record && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-muted-foreground hover:text-red-600"
-                          onClick={() => onMarkAsZero(item.produto_id)}
-                        >
-                          <Ban className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Marcar como Zero (Não encontrado)</p>
-                      </TooltipContent>
-                    </Tooltip>
+                      {!readOnly && !item.has_count_record && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-muted-foreground hover:text-red-600"
+                              onClick={() => onMarkAsZero(item.produto_id)}
+                            >
+                              <Ban className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Marcar como Zero (Não encontrado)</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    </>
                   )}
                 </div>
               </TableCell>
@@ -145,7 +256,6 @@ export function InventoryGeneralTable({
               <TableCell className="text-right font-mono text-xs text-muted-foreground">
                 {formatCurrency(item.diferenca_val)}
               </TableCell>
-              {/* Hidden per requirement: <TableCell className="text-right font-mono bg-yellow-50/50">{item.ajustes}</TableCell> */}
               <TableCell className="text-right font-mono font-bold bg-gray-50/50">
                 {item.novo_saldo_final}
               </TableCell>
