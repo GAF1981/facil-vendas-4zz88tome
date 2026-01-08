@@ -40,7 +40,8 @@ import InventarioPage from '@/pages/inventario/InventarioPage'
 import ContagemPage from '@/pages/inventario/ContagemPage'
 import ResumoAcertosPage from '@/pages/resumo-acertos/ResumoAcertosPage'
 import PermissionsPage from '@/pages/admin/PermissionsPage'
-import EstoqueCarroPage from '@/pages/estoque-carro/EstoqueCarroPage' // New Page
+import EstoqueCarroPage from '@/pages/estoque-carro/EstoqueCarroPage'
+import InativarClientesPage from '@/pages/inativar-clientes/InativarClientesPage' // New Page
 import { AuthProvider } from '@/hooks/use-auth'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { PermissionsProvider } from '@/hooks/use-permissions'
@@ -63,7 +64,6 @@ const App = () => (
                 <Route path="/" element={<Index />} />
                 <Route path="/dashboard" element={<DashboardPage />} />
 
-                {/* Modules protected by PermissionGuard */}
                 <Route element={<PermissionGuard module="Clientes" />}>
                   <Route path="/clientes" element={<ClientsPage />} />
                   <Route path="/clientes/novo" element={<ClientFormPage />} />
@@ -184,6 +184,11 @@ const App = () => (
                     path="/relatorio/ajustes-saldo"
                     element={<AdjustmentReportsPage />}
                   />
+                  {/* New Report Route */}
+                  <Route
+                    path="/relatorio/inativar-clientes"
+                    element={<InativarClientesPage />}
+                  />
                 </Route>
 
                 <Route element={<PermissionGuard module="Caixa" />}>
@@ -196,8 +201,15 @@ const App = () => (
                     path="/inventario/contagem"
                     element={<ContagemPage />}
                   />
-                  {/* Reuse Inventory Permission for now */}
                   <Route path="/estoque-carro" element={<EstoqueCarroPage />} />
+                </Route>
+
+                {/* New Module Route */}
+                <Route element={<PermissionGuard module="Inativar Clientes" />}>
+                  <Route
+                    path="/inativar-clientes"
+                    element={<InativarClientesPage />}
+                  />
                 </Route>
 
                 <Route element={<PermissionGuard module="Permissões" />}>

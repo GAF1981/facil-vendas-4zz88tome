@@ -31,6 +31,7 @@ import {
   Lock,
   Truck,
   Car,
+  UserX,
 } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { usePermissions } from '@/hooks/use-permissions'
@@ -78,7 +79,7 @@ export function AppSidebar() {
       title: 'Estoque Carro',
       url: '/estoque-carro',
       icon: Car,
-      module: 'Inventário', // Using Inventário permission
+      module: 'Inventário',
     },
     {
       title: 'Resumo Acertos',
@@ -103,6 +104,12 @@ export function AppSidebar() {
       url: '/fechamentos',
       icon: Lock,
       module: 'Fechamentos',
+    },
+    {
+      title: 'INATIVAR CLIENTES',
+      url: '/inativar-clientes',
+      icon: UserX,
+      module: 'Inativar Clientes',
     },
     {
       title: 'Pendências',

@@ -18,6 +18,7 @@ import {
   Lock,
   Truck,
   Car,
+  UserX,
 } from 'lucide-react'
 import { usePermissions } from '@/hooks/use-permissions'
 
@@ -63,7 +64,7 @@ export default function Index() {
       to: '/estoque-carro',
       description: 'Controle de estoque por veículo',
       color: 'text-blue-500',
-      module: 'Inventário', // Using Inventário permission for now
+      module: 'Inventário',
     },
     {
       title: 'Resumo Acertos',
@@ -96,6 +97,14 @@ export default function Index() {
       description: 'Caixa, Conferência Pix e Inativos',
       color: 'text-purple-600',
       module: 'Fechamentos',
+    },
+    {
+      title: 'INATIVAR CLIENTES',
+      icon: UserX,
+      to: '/inativar-clientes',
+      description: 'Gestão de clientes para inativação',
+      color: 'text-red-700',
+      module: 'Inativar Clientes', // Using new permission
     },
     {
       title: 'Pendências',

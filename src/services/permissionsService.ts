@@ -25,8 +25,9 @@ const MODULES_LIST = [
   'Pendências',
   'Backup',
   'Permissões',
-  'Pagamentos', // Ensuring all modules are listed
+  'Pagamentos',
   'Controle',
+  'Inativar Clientes', // Added
 ]
 
 export const permissionsService = {
@@ -55,7 +56,7 @@ export const permissionsService = {
       'Motoqueiro',
       'Financeiro',
       'Administrador',
-      'Gerente', // Added new sector
+      'Gerente',
       'Outros',
     ])
 
@@ -94,8 +95,6 @@ export const permissionsService = {
 
   // Helper to init permissions if missing for a sector
   async initPermissionsForSetor(setor: string) {
-    // If sector is array or comma separated, we should init for each?
-    // This function handles a single sector string.
     const inserts = MODULES_LIST.map((m) => ({
       setor,
       modulo: m,

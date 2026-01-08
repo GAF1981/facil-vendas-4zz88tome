@@ -14,6 +14,7 @@ import {
   RotateCcw,
   CreditCard,
   ClipboardList,
+  UserX,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useUserStore } from '@/stores/useUserStore'
@@ -39,14 +40,12 @@ const RelatorioDashboard = () => {
 
   useEffect(() => {
     const checkAllClosed = async () => {
-      // Logic only runs if user is likely authorized (e.g. Admin/Manager), handled by Route Guards mostly.
       try {
         const activeRota = await rotaService.getActiveRota()
         if (!activeRota) return
 
         setCurrentRouteId(activeRota.id)
 
-        // Get all summaries to check status
         const summaries = await caixaService.getFinancialSummary(activeRota)
 
         if (summaries.length === 0) return
@@ -141,6 +140,14 @@ const RelatorioDashboard = () => {
       to: '/relatorio/ajustes-saldo',
       color: 'text-slate-600',
       bg: 'bg-slate-100',
+    },
+    {
+      title: 'INATIVAR CLIENTES',
+      description: 'Lista de clientes pendentes de inativação.',
+      icon: UserX,
+      to: '/inativar-clientes',
+      color: 'text-red-700',
+      bg: 'bg-red-100',
     },
   ]
 

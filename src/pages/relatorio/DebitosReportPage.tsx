@@ -119,12 +119,11 @@ export default function DebitosReportPage() {
     return filteredData.reduce(
       (acc, curr) => ({
         venda: acc.venda + curr.valor_venda,
-        desconto: acc.desconto + (curr.desconto || 0),
         saldo: acc.saldo + curr.saldo_a_pagar,
         pago: acc.pago + curr.valor_pago,
         debito: acc.debito + curr.debito,
       }),
-      { venda: 0, desconto: 0, saldo: 0, pago: 0, debito: 0 },
+      { venda: 0, saldo: 0, pago: 0, debito: 0 },
     )
   }, [filteredData])
 
@@ -247,9 +246,6 @@ export default function DebitosReportPage() {
                   <TableHead>Rota</TableHead>
                   <TableHead>Vendedor</TableHead>
                   <TableHead className="text-right">Valor Venda</TableHead>
-                  <TableHead className="text-right text-muted-foreground">
-                    Desconto
-                  </TableHead>
                   <TableHead className="text-right font-medium">
                     Saldo a Pagar
                   </TableHead>
@@ -264,14 +260,14 @@ export default function DebitosReportPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="h-24 text-center">
+                    <TableCell colSpan={10} className="h-24 text-center">
                       <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
                     </TableCell>
                   </TableRow>
                 ) : filteredData.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={11}
+                      colSpan={10}
                       className="h-24 text-center text-muted-foreground"
                     >
                       Nenhum registro encontrado.
@@ -315,9 +311,6 @@ export default function DebitosReportPage() {
                         <TableCell className="text-right">
                           R$ {formatCurrency(row.valor_venda)}
                         </TableCell>
-                        <TableCell className="text-right text-muted-foreground">
-                          R$ {formatCurrency(row.desconto || 0)}
-                        </TableCell>
                         <TableCell className="text-right font-medium">
                           R$ {formatCurrency(row.saldo_a_pagar)}
                         </TableCell>
@@ -334,9 +327,6 @@ export default function DebitosReportPage() {
                       <TableCell colSpan={6}>TOTAIS GERAIS</TableCell>
                       <TableCell className="text-right">
                         R$ {formatCurrency(totals.venda)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        R$ {formatCurrency(totals.desconto)}
                       </TableCell>
                       <TableCell className="text-right">
                         R$ {formatCurrency(totals.saldo)}

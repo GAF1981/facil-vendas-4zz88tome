@@ -295,6 +295,11 @@ export const reportsService = {
         ...row,
         cliente_codigo: clientCode,
         cliente_nome: clientName,
+        // Ensure saldo_a_pagar is present, if not fallback to calculation
+        saldo_a_pagar:
+          row.saldo_a_pagar !== undefined && row.saldo_a_pagar !== null
+            ? row.saldo_a_pagar
+            : row.valor_venda - (row.desconto || 0),
       }
     })
 

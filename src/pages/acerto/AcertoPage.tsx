@@ -20,7 +20,7 @@ import { ProductRow } from '@/types/product'
 import { bancoDeDadosService } from '@/services/bancoDeDadosService'
 import { acertoService } from '@/services/acertoService'
 import { employeesService } from '@/services/employeesService'
-import { clientsService } from '@/services/clientsService'
+import { inativarClientesService } from '@/services/inativarClientesService'
 import { useToast } from '@/hooks/use-toast'
 import { useUserStore } from '@/stores/useUserStore'
 import {
@@ -34,13 +34,14 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Save, Printer, Loader2 } from 'lucide-react'
 import { parseCurrency } from '@/lib/formatters'
-import { format } from 'date-fns'
 import { fechamentoService } from '@/services/fechamentoService'
 import { rotaService } from '@/services/rotaService'
+import { useNavigate } from 'react-router-dom'
 
 export default function AcertoPage() {
   const { employee: loggedInUser } = useUserStore()
   const { toast } = useToast()
+  const navigate = useNavigate()
 
   // State
   const [client, setClient] = useState<ClientRow | null>(null)
@@ -129,6 +130,13 @@ export default function AcertoPage() {
 
       // 4. Get Next Order Number (Preview)
       bancoDeDadosService.getNextNumeroPedido().then(setNextOrderNumber)
+
+      // 5. NF Logic: If 'Nota Fiscal Cadastro' is NO, set Venda to NO automatically
+      if (client['NOTA FISCAL'] === 'NÃO') {
+        setNotaFiscal('NÃO')
+      } else {
+        setNotaFiscal('') // Reset if SIM or other
+      }
     } else {
       setItems([])
       setLastAcerto(null)
@@ -152,38 +160,6 @@ export default function AcertoPage() {
   const discountFactor = discountVal > 1 ? discountVal / 100 : discountVal
   const discountAmount = totalSalesValue * discountFactor
   const amountToPay = totalSalesValue - discountAmount
-
-  // Auto-select PIX logic
-  useEffect(() => {
-    if (
-      amountToPay > 0.01 &&
-      payments.length === 0 &&
-      !loadingAcerto &&
-      client
-    ) {
-      const today = format(new Date(), 'yyyy-MM-dd')
-      const paymentValue = Number(amountToPay.toFixed(2))
-
-      setPayments([
-        {
-          method: 'Pix',
-          value: paymentValue,
-          paidValue: paymentValue,
-          installments: 1,
-          dueDate: today,
-          hasZeroDownPayment: false,
-          details: [
-            {
-              number: 1,
-              value: paymentValue,
-              paidValue: paymentValue,
-              dueDate: today,
-            },
-          ],
-        },
-      ])
-    }
-  }, [amountToPay, loadingAcerto, client])
 
   const handleUpdateContagem = (uid: string, newContagem: number) => {
     setItems((prevItems) =>
@@ -271,7 +247,6 @@ export default function AcertoPage() {
 
     setGeneratingPdf(true)
     try {
-      // Fetch history for preview to visualize the full document
       const history = await bancoDeDadosService.getAcertoHistory(client.CODIGO)
 
       const pdfBlob = await acertoService.generatePdf(
@@ -293,7 +268,7 @@ export default function AcertoPage() {
           monthlyAverage,
           orderNumber: nextOrderNumber,
           issuerName: loggedInUser?.nome_completo,
-          history: history.slice(0, 10), // Pass history to preview
+          history: history.slice(0, 10),
         },
         { preview: true, signature, format: pdfFormat },
       )
@@ -324,7 +299,6 @@ export default function AcertoPage() {
       return
     }
 
-    // CHECK CLOSURE BLOCK
     try {
       const activeRota = await rotaService.getActiveRota()
       if (activeRota) {
@@ -346,7 +320,6 @@ export default function AcertoPage() {
       console.error('Error checking closure status:', error)
     }
 
-    // Finalization Validation
     if (!notaFiscal) {
       toast({
         title: 'Nota Fiscal Obrigatória',
@@ -389,26 +362,13 @@ export default function AcertoPage() {
     }
   }
 
-  const handleZeroStockConfirm = async () => {
-    if (client) {
-      try {
-        await clientsService.update(client.CODIGO, {
-          situacao: 'INATIVO - ROTA', // Explicitly setting for 'Fechamentos > Inativos' view
-        })
-        setZeroStockDialogOpen(false)
-        executeSave()
-      } catch (error) {
-        console.error('Failed to update client status', error)
-        toast({
-          title: 'Erro',
-          description: 'Falha ao atualizar status do cliente.',
-          variant: 'destructive',
-        })
-      }
-    }
+  const handleZeroStockConfirm = () => {
+    setZeroStockDialogOpen(false)
+    // Pass true to flag for inactivation in the new table
+    executeSave(true)
   }
 
-  const executeSave = async () => {
+  const executeSave = async (flagInactivation: boolean = false) => {
     if (!client) return
     const emp = employees.find((e) => e.id.toString() === selectedEmployeeId)
     if (!emp) return
@@ -441,10 +401,27 @@ export default function AcertoPage() {
         }
       }
 
-      // 3. Fetch History for PDF
+      // 3. Handle Inactivation Flagging (New Requirement)
+      if (flagInactivation) {
+        const valorPagoTotal = payments.reduce((acc, p) => acc + p.paidValue, 0)
+        const debitoTotal = Math.max(0, amountToPay - valorPagoTotal)
+
+        await inativarClientesService.create({
+          pedido_id: finalOrderNumber,
+          funcionario_nome: emp.nome_completo,
+          cliente_codigo: client.CODIGO,
+          cliente_nome: client['NOME CLIENTE'],
+          valor_venda: totalSalesValue,
+          saldo_a_pagar: amountToPay,
+          valor_pago: valorPagoTotal,
+          debito: debitoTotal,
+        })
+      }
+
+      // 4. Fetch History for PDF
       const history = await bancoDeDadosService.getAcertoHistory(client.CODIGO)
 
-      // 4. Generate Final PDF
+      // 5. Generate Final PDF
       const pdfBlob = await acertoService.generatePdf(
         {
           client,
@@ -464,14 +441,13 @@ export default function AcertoPage() {
           monthlyAverage,
           orderNumber: finalOrderNumber,
           issuerName: loggedInUser?.nome_completo,
-          history: history.slice(0, 10), // Limit to last 10 entries per requirement
+          history: history.slice(0, 10),
         },
         { preview: false, signature, format: pdfFormat },
       )
 
       const url = window.URL.createObjectURL(pdfBlob)
 
-      // Robust download trigger for mobile/desktop
       const a = document.createElement('a')
       a.href = url
       a.download = `Pedido_${finalOrderNumber}_${client['NOME CLIENTE']}.pdf`
@@ -479,7 +455,6 @@ export default function AcertoPage() {
       a.click()
       document.body.removeChild(a)
 
-      // Also open in new tab for mobile convenience
       setTimeout(() => {
         window.open(url, '_blank')
       }, 100)
@@ -490,9 +465,14 @@ export default function AcertoPage() {
         className: 'bg-green-600 text-white',
       })
 
-      // Reset
+      // Reset or Redirect
       setClient(null)
       setPendingAdjustments([])
+
+      if (flagInactivation) {
+        // Redirect to Resumo Acertos as per user story
+        navigate('/resumo-acertos')
+      }
     } catch (err: any) {
       console.error(err)
       toast({
