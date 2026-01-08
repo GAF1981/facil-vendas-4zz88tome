@@ -77,10 +77,13 @@ export default function AcertoPage() {
 
   // Initialization
   useEffect(() => {
-    employeesService.getEmployees(1, 100).then(({ data }) => {
-      const activeEmployees = data.filter((e) => e.situacao === 'ATIVO')
-      setEmployees(activeEmployees)
-    })
+    employeesService
+      .getEmployees(1, 100)
+      .then(({ data }) => {
+        const activeEmployees = data.filter((e) => e.situacao === 'ATIVO')
+        setEmployees(activeEmployees)
+      })
+      .catch((err) => console.error('Failed to fetch employees', err))
   }, [])
 
   // Auto-select logged in employee
@@ -127,9 +130,13 @@ export default function AcertoPage() {
       bancoDeDadosService
         .getMonthlyAverage(client.CODIGO)
         .then(setMonthlyAverage)
+        .catch((e) => console.error('Avg error', e))
 
       // 4. Get Next Order Number (Preview)
-      bancoDeDadosService.getNextNumeroPedido().then(setNextOrderNumber)
+      bancoDeDadosService
+        .getNextNumeroPedido()
+        .then(setNextOrderNumber)
+        .catch((e) => console.error('Next order error', e))
 
       // 5. NF Logic: If 'Nota Fiscal Cadastro' is NO, set Venda to NO automatically
       if (client['NOTA FISCAL'] === 'NÃO') {

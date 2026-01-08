@@ -45,6 +45,7 @@ export default function InativarClientesPage() {
       const list = await inativarClientesService.getAll()
       setData(list)
     } catch (error) {
+      console.error(error)
       toast({
         title: 'Erro',
         description: 'Não foi possível carregar a lista de clientes.',
@@ -76,6 +77,7 @@ export default function InativarClientesPage() {
       setTargetClient(null)
       loadData()
     } catch (error) {
+      console.error(error)
       toast({
         title: 'Erro',
         description: 'Falha ao inativar cliente.',

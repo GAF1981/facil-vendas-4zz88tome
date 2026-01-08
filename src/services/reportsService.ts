@@ -64,7 +64,7 @@ export const reportsService = {
       .not('DATA DO ACERTO', 'is', null)
       .order('DATA DO ACERTO', { ascending: false })
       .order('HORA DO ACERTO', { ascending: false })
-      .limit(20000)
+      .limit(10000)
 
     if (error) throw error
 
@@ -211,7 +211,7 @@ export const reportsService = {
       .from('debitos_historico')
       .select('*')
       .order('data_acerto', { ascending: false })
-      .limit(2500)
+      .limit(1000)
 
     if (error) throw error
     if (!reportData || reportData.length === 0) return []
