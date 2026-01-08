@@ -179,11 +179,11 @@ export const rotaService = {
     if (!clients) return []
 
     // 2. Optimized Debt Fetching using debitos_historico (Source of Truth)
-    // We fetch rows with debt > 0
+    // Removed .gt('debito', 0) to ensure we include all records as per user story requirements
     const { data: debtData, error: debtError } = await supabase
       .from('debitos_historico')
       .select('cliente_codigo, debito, data_acerto')
-      .gt('debito', 0)
+    // .gt('debito', 0) // REMOVED to allow summing all debts, even 0.00
 
     if (debtError) {
       console.error('Error fetching debitos_historico:', debtError)
@@ -207,12 +207,21 @@ export const rotaService = {
           })
         }
         const entry = debtMap.get(cid)!
-        entry.totalDebt += row.debito || 0
-        entry.orderCount += 1
+        const val = row.debito || 0
 
-        if (row.data_acerto) {
-          if (!entry.oldestDate || row.data_acerto < entry.oldestDate) {
-            entry.oldestDate = row.data_acerto
+        // Always sum the debt, even if 0, to satisfy requirement:
+        // "Orders with a debt of R$ 0,00 must be included in the sum"
+        entry.totalDebt += val
+
+        // Only count as an "active" debt order if > 0.01 for status calculation purposes
+        // This ensures 'quant_debito' reflects number of pending bills, not all history
+        if (val > 0.01) {
+          entry.orderCount += 1
+
+          if (row.data_acerto) {
+            if (!entry.oldestDate || row.data_acerto < entry.oldestDate) {
+              entry.oldestDate = row.data_acerto
+            }
           }
         }
       })

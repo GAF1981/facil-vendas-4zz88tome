@@ -1472,6 +1472,45 @@ export type Database = {
         }
         Relationships: []
       }
+      inativar_clientes: {
+        Row: {
+          cliente_codigo: number
+          cliente_nome: string | null
+          created_at: string
+          debito: number | null
+          funcionario_nome: string | null
+          id: number
+          pedido_id: number
+          saldo_a_pagar: number | null
+          valor_pago: number | null
+          valor_venda: number | null
+        }
+        Insert: {
+          cliente_codigo: number
+          cliente_nome?: string | null
+          created_at?: string
+          debito?: number | null
+          funcionario_nome?: string | null
+          id?: number
+          pedido_id: number
+          saldo_a_pagar?: number | null
+          valor_pago?: number | null
+          valor_venda?: number | null
+        }
+        Update: {
+          cliente_codigo?: number
+          cliente_nome?: string | null
+          created_at?: string
+          debito?: number | null
+          funcionario_nome?: string | null
+          id?: number
+          pedido_id?: number
+          saldo_a_pagar?: number | null
+          valor_pago?: number | null
+          valor_venda?: number | null
+        }
+        Relationships: []
+      }
       NOTA_FISCAL: {
         Row: {
           cliente_id: number
