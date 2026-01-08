@@ -255,19 +255,22 @@ export default function DebitosReportPage() {
                   <TableHead className="text-right text-red-600 font-bold">
                     Débito
                   </TableHead>
+                  <TableHead className="text-right text-red-800 font-extrabold border-l">
+                    Débito Total
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="h-24 text-center">
+                    <TableCell colSpan={11} className="h-24 text-center">
                       <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
                     </TableCell>
                   </TableRow>
                 ) : filteredData.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={10}
+                      colSpan={11}
                       className="h-24 text-center text-muted-foreground"
                     >
                       Nenhum registro encontrado.
@@ -320,6 +323,11 @@ export default function DebitosReportPage() {
                         <TableCell className="text-right text-red-600 font-bold">
                           R$ {formatCurrency(row.debito)}
                         </TableCell>
+                        <TableCell className="text-right text-red-800 font-extrabold border-l bg-red-50/50">
+                          {row.debito_total !== undefined
+                            ? `R$ ${formatCurrency(row.debito_total)}`
+                            : '-'}
+                        </TableCell>
                       </TableRow>
                     ))}
                     {/* Totalizer */}
@@ -336,6 +344,9 @@ export default function DebitosReportPage() {
                       </TableCell>
                       <TableCell className="text-right text-red-700">
                         R$ {formatCurrency(totals.debito)}
+                      </TableCell>
+                      <TableCell className="text-right border-l text-muted-foreground text-xs font-normal">
+                        -
                       </TableCell>
                     </TableRow>
                   </>

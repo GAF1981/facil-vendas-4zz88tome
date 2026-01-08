@@ -51,6 +51,7 @@ export interface DebitoReportRow {
   valor_pago: number
   debito: number
   desconto: number
+  debito_total?: number // Added for Total Debt column
 }
 
 export const reportsService = {
@@ -206,9 +207,10 @@ export const reportsService = {
   },
 
   async getDebtsReport(): Promise<DebitoReportRow[]> {
-    // 1. Fetch base report data
+    // 1. Fetch base report data from the VIEW to get totals
+    // Using 'as any' because the view is not in the generated types yet
     const { data: reportData, error } = await supabase
-      .from('debitos_historico')
+      .from('debitos_com_total_view' as any)
       .select('*')
       .order('data_acerto', { ascending: false })
       .limit(1000)
@@ -220,7 +222,7 @@ export const reportsService = {
     const orderIdsToFetch = new Set<number>()
     const clientCodes = new Set<number>()
 
-    reportData.forEach((row) => {
+    reportData.forEach((row: any) => {
       if (row.cliente_codigo) {
         clientCodes.add(row.cliente_codigo)
       } else {
@@ -277,7 +279,7 @@ export const reportsService = {
     }
 
     // 5. Merge enriched data back into rows
-    const enrichedData = reportData.map((row) => {
+    const enrichedData = reportData.map((row: any) => {
       let clientCode = row.cliente_codigo
 
       // Try to fill missing code from Sales Order map
@@ -300,6 +302,8 @@ export const reportsService = {
           row.saldo_a_pagar !== undefined && row.saldo_a_pagar !== null
             ? row.saldo_a_pagar
             : row.valor_venda - (row.desconto || 0),
+        // Pass through the total debt from view
+        debito_total: row.debito_total,
       }
     })
 
