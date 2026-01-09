@@ -363,6 +363,11 @@ export function AcertoPaymentSummary({
                 const isPixOrDinheiro =
                   entry.method === 'Pix' || entry.method === 'Dinheiro'
 
+                // Logic for disabling installments field
+                // Pix/Dinheiro: Disabled by default. Enabled ONLY if "Sem Entrada" is checked.
+                const isInstallmentsDisabled =
+                  disabled || (isPixOrDinheiro && !entry.hasZeroDownPayment)
+
                 return (
                   <div
                     key={entry.method}
@@ -467,7 +472,7 @@ export function AcertoPaymentSummary({
                         </Label>
                         <Select
                           value={entry.installments.toString()}
-                          disabled={disabled}
+                          disabled={isInstallmentsDisabled}
                           onValueChange={(val) =>
                             handleUpdateEntry(
                               entry.method,
@@ -476,7 +481,13 @@ export function AcertoPaymentSummary({
                             )
                           }
                         >
-                          <SelectTrigger className="h-10 px-2">
+                          <SelectTrigger
+                            className={cn(
+                              'h-10 px-2',
+                              isInstallmentsDisabled &&
+                                'opacity-50 cursor-not-allowed bg-muted',
+                            )}
+                          >
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -536,8 +547,7 @@ export function AcertoPaymentSummary({
                               isEntrada && entry.hasZeroDownPayment
                             // If NOT Sem Entrada, 1st installment (Entry) is editable
                             // Future installments (idx > 0) usually 0 paid now
-                            const isEditableEntry =
-                              isEntrada && !entry.hasZeroDownPayment
+                            // const isEditableEntry = isEntrada && !entry.hasZeroDownPayment
 
                             // Logic for disabling paid value input
                             const isPaidDisabled =

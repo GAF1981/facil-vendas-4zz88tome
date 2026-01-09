@@ -3,9 +3,9 @@ import { Card, CardContent } from '@/components/ui/card'
 import {
   RotateCcw,
   Play,
-  StopCircle,
   Calculator,
   CheckCircle2,
+  RefreshCw,
 } from 'lucide-react'
 
 interface Props {
@@ -14,6 +14,7 @@ interface Props {
   onReset: () => void
   onCount: () => void
   onFinalize: () => void
+  onUpdateStock?: () => void
   loading: boolean
 }
 
@@ -23,6 +24,7 @@ export function EstoqueCarroControlBar({
   onReset,
   onCount,
   onFinalize,
+  onUpdateStock,
   loading,
 }: Props) {
   return (
@@ -42,6 +44,20 @@ export function EstoqueCarroControlBar({
               <RotateCcw className="mr-2 h-4 w-4 text-red-600" /> Reset Saldo
               Inicial
             </Button>
+
+            {onUpdateStock && (
+              <Button
+                variant="outline"
+                className="border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700"
+                onClick={onUpdateStock}
+                disabled={loading}
+              >
+                <RefreshCw
+                  className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`}
+                />
+                Atualizar estoque Carro
+              </Button>
+            )}
 
             <Button variant="secondary" onClick={onCount} disabled={loading}>
               <Calculator className="mr-2 h-4 w-4" /> Contagem Carro

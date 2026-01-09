@@ -30,3 +30,22 @@ export interface CountUpdatePayload {
   produto_id: number
   quantidade: number
 }
+
+export interface EstoqueCarroMovementInsert {
+  id_estoque_carro: number
+  produto_id: number | null
+  quantidade: number
+  created_at?: string
+  pedido?: number | null
+  data_horario?: string | null
+  funcionario?: string | null
+  codigo_produto?: number | null
+  barcode?: string | null
+  produto?: string | null
+  preco?: number | null
+  // Dynamic columns based on table
+  ENTRADAS_cliente_carro?: number
+  SAIDAS_carro_cliente?: number
+  ENTRADAS_estoque_carro?: number
+  SAIDAS_carro_estoque?: number
+}

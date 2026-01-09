@@ -1965,7 +1965,28 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      debitos_com_total_view: {
+        Row: {
+          cliente_codigo: number | null
+          cliente_nome: string | null
+          created_at: string | null
+          data_acerto: string | null
+          debito: number | null
+          debito_total: number | null
+          desconto: number | null
+          hora_acerto: string | null
+          id: number | null
+          media_mensal: number | null
+          pedido_id: number | null
+          rota: string | null
+          rota_id: number | null
+          saldo_a_pagar: number | null
+          valor_pago: number | null
+          valor_venda: number | null
+          vendedor_nome: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       auto_finalize_overdue_routes: { Args: never; Returns: Json }

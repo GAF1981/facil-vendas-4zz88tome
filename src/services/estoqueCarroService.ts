@@ -1,7 +1,12 @@
 import { supabase } from '@/lib/supabase/client'
-import { EstoqueCarroItem, EstoqueCarroSession } from '@/types/estoque_carro'
+import {
+  EstoqueCarroItem,
+  EstoqueCarroSession,
+  EstoqueCarroMovementInsert,
+} from '@/types/estoque_carro'
 import { productsService } from './productsService'
 import { parseCurrency } from '@/lib/formatters'
+import { parseISO, isAfter, isBefore, isEqual } from 'date-fns'
 
 export const estoqueCarroService = {
   async getActiveSession(funcionarioId: number) {
@@ -107,83 +112,68 @@ export const estoqueCarroService = {
       initialMap.set(i.produto_id, i.saldo_inicial),
     )
 
-    // 3. Fetch Movements (Calculated)
-    // 3a. Client -> Car (RECOLHIDO)
-    // 3b. Car -> Client (NOVAS CONSIGNAÇÕES)
-    const { data: dbData } = await supabase
-      .from('BANCO_DE_DADOS')
-      .select('"COD. PRODUTO", "RECOLHIDO", "NOVAS CONSIGNAÇÕES"')
-      .eq('"CODIGO FUNCIONARIO"', funcionarioId)
-      .gte('"DATA DO ACERTO"', startDate.split('T')[0])
-      .lte('"DATA DO ACERTO"', endDate.split('T')[0])
+    // 3. Fetch Movements from the DETAIL TABLES now (as they are the source of truth for the session)
+    // Client -> Car (RECOLHIDO) -> 'ESTOQUE CARRO: CLIENTE PARA O CARRO'
+    const { data: clientToCarData } = await supabase
+      .from('ESTOQUE CARRO: CLIENTE PARA O CARRO')
+      .select('produto_id, ENTRADAS_cliente_carro')
+      .eq('id_estoque_carro', sessionId)
 
     const clientToCarMap = new Map<number, number>()
+    clientToCarData?.forEach((row) => {
+      if (row.produto_id)
+        clientToCarMap.set(
+          row.produto_id,
+          (clientToCarMap.get(row.produto_id) || 0) +
+            (row.ENTRADAS_cliente_carro || 0),
+        )
+    })
+
+    // Car -> Client (NOVAS CONSIGNAÇÕES) -> 'ESTOQUE CARRO: CARRO PARA O CLIENTE'
+    const { data: carToClientData } = await supabase
+      .from('ESTOQUE CARRO: CARRO PARA O CLIENTE')
+      .select('produto_id, SAIDAS_carro_cliente')
+      .eq('id_estoque_carro', sessionId)
+
     const carToClientMap = new Map<number, number>()
-
-    dbData?.forEach((row: any) => {
-      const prodCode = row['COD. PRODUTO']
-      if (!prodCode) return
-
-      const recolhido = parseCurrency(row['RECOLHIDO'])
-      const novas = parseCurrency(row['NOVAS CONSIGNAÇÕES'])
-
-      if (recolhido > 0) {
-        // Need to map Code -> ID. Products service returns ID and CODE.
-        // We'll do mapping later. For now store by Code if DB uses Code?
-        // Actually DB uses COD. PRODUTO which is the internal code.
-        // We need to map code to ID.
-      }
+    carToClientData?.forEach((row) => {
+      if (row.produto_id)
+        carToClientMap.set(
+          row.produto_id,
+          (carToClientMap.get(row.produto_id) || 0) +
+            (row.SAIDAS_carro_cliente || 0),
+        )
     })
 
-    // Helper map: Code -> ID
-    const codeToIdMap = new Map<number, number>()
-    products.forEach((p) => {
-      if (p.CODIGO) codeToIdMap.set(p.CODIGO, p.ID)
-    })
-
-    dbData?.forEach((row: any) => {
-      const prodCode = row['COD. PRODUTO']
-      const prodId = codeToIdMap.get(prodCode)
-      if (!prodId) return
-
-      const recolhido = parseCurrency(row['RECOLHIDO'])
-      const novas = parseCurrency(row['NOVAS CONSIGNAÇÕES'])
-
-      clientToCarMap.set(prodId, (clientToCarMap.get(prodId) || 0) + recolhido)
-      carToClientMap.set(prodId, (carToClientMap.get(prodId) || 0) + novas)
-    })
-
-    // 3c. Stock -> Car (ESTOQUE GERAL ESTOQUE PARA CARRO)
+    // Stock -> Car -> 'ESTOQUE CARRO: ESTOQUE PARA O CARRO'
     const { data: stockToCarData } = await supabase
-      .from('ESTOQUE GERAL ESTOQUE PARA CARRO')
-      .select('produto_id, quantidade')
-      .eq('funcionario_id', funcionarioId)
-      .gte('created_at', startDate)
-      .lte('created_at', endDate)
+      .from('ESTOQUE CARRO: ESTOQUE PARA O CARRO')
+      .select('produto_id, ENTRADAS_estoque_carro')
+      .eq('id_estoque_carro', sessionId)
 
     const stockToCarMap = new Map<number, number>()
     stockToCarData?.forEach((row) => {
       if (row.produto_id)
         stockToCarMap.set(
           row.produto_id,
-          (stockToCarMap.get(row.produto_id) || 0) + (row.quantidade || 0),
+          (stockToCarMap.get(row.produto_id) || 0) +
+            (row.ENTRADAS_estoque_carro || 0),
         )
     })
 
-    // 3d. Car -> Stock (ESTOQUE GERAL CARRO PARA ESTOQUE)
+    // Car -> Stock -> 'ESTOQUE CARRO: CARRO PARA O ESTOQUE'
     const { data: carToStockData } = await supabase
-      .from('ESTOQUE GERAL CARRO PARA ESTOQUE')
-      .select('produto_id, quantidade')
-      .eq('funcionario_id', funcionarioId)
-      .gte('created_at', startDate)
-      .lte('created_at', endDate)
+      .from('ESTOQUE CARRO: CARRO PARA O ESTOQUE')
+      .select('produto_id, SAIDAS_carro_estoque')
+      .eq('id_estoque_carro', sessionId)
 
     const carToStockMap = new Map<number, number>()
     carToStockData?.forEach((row) => {
       if (row.produto_id)
         carToStockMap.set(
           row.produto_id,
-          (carToStockMap.get(row.produto_id) || 0) + (row.quantidade || 0),
+          (carToStockMap.get(row.produto_id) || 0) +
+            (row.SAIDAS_carro_estoque || 0),
         )
     })
 
@@ -217,9 +207,6 @@ export const estoqueCarroService = {
       const saldoFinal = initial + inClient + inStock - outClient - outStock
       const contagem = countMap.get(p.ID) || 0
 
-      const diffQtd = saldoFinal - contagem // Or Contagem - Saldo Final? Usually Diff = Physical - System.
-      // Acceptance Criteria says: "DIFERENÇA DE ESTOQUE (quantidade): (SALDO FINAL - CONTAGEM)"
-      // Okay, following criteria exactly.
       const diffQtdCrit = saldoFinal - contagem
       const diffVal = diffQtdCrit * parseCurrency(p.PREÇO)
 
@@ -245,6 +232,205 @@ export const estoqueCarroService = {
         novo_saldo: novoSaldo,
       }
     })
+  },
+
+  async updateStockMovements(sessionId: number, employeeId: number) {
+    const session = await this.getActiveSession(employeeId)
+    if (!session || session.id !== sessionId) {
+      throw new Error('Invalid or closed session.')
+    }
+
+    const startDate = parseISO(session.data_inicio)
+    // If open, end date is effectively "now" for filtering logic
+    const endDate = session.data_fim ? parseISO(session.data_fim) : new Date()
+
+    // 0. Fetch Employee Name
+    const { data: employeeData } = await supabase
+      .from('FUNCIONARIOS')
+      .select('nome_completo')
+      .eq('id', employeeId)
+      .single()
+    const employeeName = employeeData?.nome_completo || 'Unknown'
+
+    // 1. Clear existing data for this session in the 4 tables
+    await Promise.all([
+      supabase
+        .from('ESTOQUE CARRO: CLIENTE PARA O CARRO')
+        .delete()
+        .eq('id_estoque_carro', sessionId),
+      supabase
+        .from('ESTOQUE CARRO: CARRO PARA O CLIENTE')
+        .delete()
+        .eq('id_estoque_carro', sessionId),
+      supabase
+        .from('ESTOQUE CARRO: ESTOQUE PARA O CARRO')
+        .delete()
+        .eq('id_estoque_carro', sessionId),
+      supabase
+        .from('ESTOQUE CARRO: CARRO PARA O ESTOQUE')
+        .delete()
+        .eq('id_estoque_carro', sessionId),
+    ])
+
+    // 2. Fetch all products to map codes and details
+    const { data: products } = await productsService.getProducts(1, 10000)
+    const productsMap = new Map(products?.map((p) => [p.ID, p]) || [])
+    const codeToProductMap = new Map(
+      products?.map((p) => [p.CODIGO, p]).filter((e) => e[0]) || [],
+    )
+
+    // Helper to create insert payload
+    const createPayload = (
+      prodId: number | null,
+      qty: number,
+      extra: any = {},
+    ) => {
+      const prod =
+        (prodId ? productsMap.get(prodId) : null) ||
+        (extra.code ? codeToProductMap.get(extra.code) : null)
+      return {
+        id_estoque_carro: sessionId,
+        produto_id: prod?.ID ?? prodId, // Fallback if not found
+        quantidade: qty, // Original column
+        pedido: extra.pedido,
+        data_horario: extra.data_horario,
+        funcionario: employeeName,
+        codigo_produto: prod?.CODIGO ?? null,
+        barcode: prod?.['CÓDIGO BARRAS'] ? String(prod['CÓDIGO BARRAS']) : null,
+        produto: prod?.PRODUTO ?? 'Desconhecido',
+        preco: prod?.PREÇO ? parseCurrency(prod.PREÇO) : 0,
+        // Specific columns
+        ENTRADAS_cliente_carro: extra.ENTRADAS_cliente_carro,
+        SAIDAS_carro_cliente: extra.SAIDAS_carro_cliente,
+        ENTRADAS_estoque_carro: extra.ENTRADAS_estoque_carro,
+        SAIDAS_carro_estoque: extra.SAIDAS_carro_estoque,
+      } as EstoqueCarroMovementInsert
+    }
+
+    // 3. Process BANCO_DE_DADOS (Client <-> Car)
+    // Fetch records for employee within timeframe
+    // We use a broader date string filter then precise date check in JS
+    const dateStartStr = session.data_inicio.split('T')[0]
+    const dateEndStr = session.data_fim
+      ? session.data_fim.split('T')[0]
+      : new Date().toISOString().split('T')[0]
+
+    const { data: bdData } = await supabase
+      .from('BANCO_DE_DADOS')
+      .select('*')
+      .eq('CODIGO FUNCIONARIO', employeeId)
+      .gte('"DATA DO ACERTO"', dateStartStr)
+      .lte('"DATA DO ACERTO"', dateEndStr)
+
+    const clientToCarInserts: any[] = []
+    const carToClientInserts: any[] = []
+
+    bdData?.forEach((row: any) => {
+      const dateStr = row['DATA DO ACERTO']
+      const timeStr = row['HORA DO ACERTO'] || '00:00:00'
+      if (!dateStr) return
+      const rowDate = parseISO(`${dateStr}T${timeStr}`)
+
+      // Check if within session window
+      if (isBefore(rowDate, startDate)) return
+      if (session.data_fim && isAfter(rowDate, endDate)) return
+
+      const recolhido = parseCurrency(row['RECOLHIDO'])
+      const novas = parseCurrency(row['NOVAS CONSIGNAÇÕES'])
+      const prodCode = row['COD. PRODUTO']
+      const orderId = row['NÚMERO DO PEDIDO']
+
+      if (recolhido > 0) {
+        clientToCarInserts.push(
+          createPayload(null, recolhido, {
+            code: prodCode,
+            pedido: orderId,
+            data_horario: rowDate.toISOString(),
+            ENTRADAS_cliente_carro: recolhido,
+          }),
+        )
+      }
+
+      if (novas > 0) {
+        carToClientInserts.push(
+          createPayload(null, novas, {
+            code: prodCode,
+            pedido: orderId,
+            data_horario: rowDate.toISOString(),
+            SAIDAS_carro_cliente: novas,
+          }),
+        )
+      }
+    })
+
+    // 4. Process ESTOQUE GERAL (Stock <-> Car)
+    // ESTOQUE GERAL ESTOQUE PARA CARRO (Stock -> Car)
+    const { data: stockToCarRows } = await supabase
+      .from('ESTOQUE GERAL ESTOQUE PARA CARRO')
+      .select('*')
+      .eq('funcionario_id', employeeId)
+      .gte('created_at', session.data_inicio)
+
+    const stockToCarInserts: any[] = []
+    stockToCarRows?.forEach((row) => {
+      const rowDate = parseISO(row.created_at || '')
+      if (isBefore(rowDate, startDate)) return
+      if (session.data_fim && isAfter(rowDate, endDate)) return
+
+      const qty = row.quantidade || 0
+      if (qty > 0) {
+        stockToCarInserts.push(
+          createPayload(row.produto_id, qty, {
+            data_horario: row.created_at,
+            ENTRADAS_estoque_carro: qty,
+          }),
+        )
+      }
+    })
+
+    // ESTOQUE GERAL CARRO PARA ESTOQUE (Car -> Stock)
+    const { data: carToStockRows } = await supabase
+      .from('ESTOQUE GERAL CARRO PARA ESTOQUE')
+      .select('*')
+      .eq('funcionario_id', employeeId)
+      .gte('created_at', session.data_inicio)
+
+    const carToStockInserts: any[] = []
+    carToStockRows?.forEach((row) => {
+      const rowDate = parseISO(row.created_at || '')
+      if (isBefore(rowDate, startDate)) return
+      if (session.data_fim && isAfter(rowDate, endDate)) return
+
+      const qty = row.quantidade || 0
+      if (qty > 0) {
+        carToStockInserts.push(
+          createPayload(row.produto_id, qty, {
+            data_horario: row.created_at,
+            SAIDAS_carro_estoque: qty,
+          }),
+        )
+      }
+    })
+
+    // 5. Insert Data
+    // Using simple loops for bulk inserts to handle potential large arrays
+    const insertBatch = async (table: string, items: any[]) => {
+      if (items.length === 0) return
+      const batchSize = 1000
+      for (let i = 0; i < items.length; i += batchSize) {
+        const { error } = await supabase
+          .from(table)
+          .insert(items.slice(i, i + batchSize))
+        if (error) throw error
+      }
+    }
+
+    await Promise.all([
+      insertBatch('ESTOQUE CARRO: CLIENTE PARA O CARRO', clientToCarInserts),
+      insertBatch('ESTOQUE CARRO: CARRO PARA O CLIENTE', carToClientInserts),
+      insertBatch('ESTOQUE CARRO: ESTOQUE PARA O CARRO', stockToCarInserts),
+      insertBatch('ESTOQUE CARRO: CARRO PARA O ESTOQUE', carToStockInserts),
+    ])
   },
 
   async resetInitialBalance(sessionId: number) {
