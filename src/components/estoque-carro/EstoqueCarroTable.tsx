@@ -23,13 +23,13 @@ export function EstoqueCarroTable({ items }: Props) {
             <TableHead className="min-w-[200px]">Produto</TableHead>
             <TableHead>Tipo</TableHead>
             <TableHead className="text-right">Saldo Inicial</TableHead>
-            <TableHead className="text-right text-green-600">
+            <TableHead className="text-right text-green-600 font-semibold bg-green-50/50">
               Ent. Cliente
             </TableHead>
             <TableHead className="text-right text-green-600">
               Ent. Estoque
             </TableHead>
-            <TableHead className="text-right text-red-600">
+            <TableHead className="text-right text-red-600 font-semibold bg-red-50/50">
               Saída Cliente
             </TableHead>
             <TableHead className="text-right text-red-600">
@@ -66,13 +66,13 @@ export function EstoqueCarroTable({ items }: Props) {
               <TableCell className="text-right font-mono">
                 {item.saldo_inicial}
               </TableCell>
-              <TableCell className="text-right font-mono text-green-600">
+              <TableCell className="text-right font-mono text-green-700 font-medium bg-green-50/20">
                 {item.entradas_cliente}
               </TableCell>
               <TableCell className="text-right font-mono text-green-600">
                 {item.entradas_estoque}
               </TableCell>
-              <TableCell className="text-right font-mono text-red-600">
+              <TableCell className="text-right font-mono text-red-700 font-medium bg-red-50/20">
                 {item.saidas_cliente}
               </TableCell>
               <TableCell className="text-right font-mono text-red-600">

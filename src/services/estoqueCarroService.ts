@@ -42,6 +42,7 @@ export const estoqueCarroService = {
       .from('ID ESTOQUE CARRO')
       .insert({
         funcionario_id: funcionarioId,
+        data_inicio: new Date().toISOString(),
       })
       .select()
       .single()
@@ -106,7 +107,7 @@ export const estoqueCarroService = {
     )
 
     // 3. Fetch Movements from the DETAIL TABLES
-    // Client -> Car (RECOLHIDO) -> 'ESTOQUE CARRO: CLIENTE PARA O CARRO'
+    // Client -> Car (RECOLHIDO) -> 'ESTOQUE CARRO: CLIENTE PARA O CARRO' -> ENTRADAS_cliente_carro
     const { data: clientToCarData } = await supabase
       .from('ESTOQUE CARRO: CLIENTE PARA O CARRO')
       .select('produto_id, ENTRADAS_cliente_carro')
@@ -122,7 +123,7 @@ export const estoqueCarroService = {
         )
     })
 
-    // Car -> Client (NOVAS CONSIGNAÇÕES) -> 'ESTOQUE CARRO: CARRO PARA O CLIENTE'
+    // Car -> Client (NOVAS CONSIGNAÇÕES) -> 'ESTOQUE CARRO: CARRO PARA O CLIENTE' -> SAIDAS_carro_cliente
     const { data: carToClientData } = await supabase
       .from('ESTOQUE CARRO: CARRO PARA O CLIENTE')
       .select('produto_id, SAIDAS_carro_cliente')
@@ -293,6 +294,7 @@ export const estoqueCarroService = {
     // Filter optimization: pre-fetch by date string range using just the date part for inclusivity
     const dateStartStr = targetSession.data_inicio.split('T')[0]
 
+    // Fetch using basic filtering to limit payload
     const { data: bdData } = await supabase
       .from('BANCO_DE_DADOS')
       .select('*')
@@ -321,24 +323,29 @@ export const estoqueCarroService = {
         const dateStr = row['DATA DO ACERTO']
         const timeStr = row['HORA DO ACERTO'] || '00:00:00'
         if (!dateStr) return
-        // Assuming local time for simplicity as DB stores plain strings usually
         const rowDateTimeStr = `${dateStr}T${timeStr}`
         rowDate = parseISO(rowDateTimeStr)
       }
 
-      // Filter 1 & 2: Strict Time Filtering
-      // "Strictly less than Data Início" -> Assumed to mean "Strictly Greater Than" for session validity
+      // Filter 1: Start Date (Session Start < Transaction Date)
+      // isAfter(rowDate, startDate) checks if rowDate > startDate.
+      // If rowDate is NOT after startDate (i.e. <=), we ignore it.
       if (!isAfter(rowDate, startDate)) return
 
-      // "Strictly less than Data Final"
+      // Filter 2: End Date (Session End > Transaction Date)
+      // isBefore(rowDate, endDate) checks if rowDate < endDate.
+      // If rowDate is NOT before endDate (i.e. >=), we ignore it.
       if (endDate && !isBefore(rowDate, endDate)) return
 
+      // Data Type Handling: Convert strings to numbers
       const recolhido = parseCurrency(row['RECOLHIDO'])
       const novas = parseCurrency(row['NOVAS CONSIGNAÇÕES'])
       const prodCode = row['COD. PRODUTO']
       const orderId = row['NÚMERO DO PEDIDO']
+
       const details = getProductDetails(null, prodCode)
 
+      // Automated 'Ent. Cliente' Calculation: Sums "RECOLHIDO"
       // Source: BANCO_DE_DADOS RECOLHIDO -> Destination: ESTOQUE CARRO: CLIENTE PARA O CARRO (ENTRADAS_cliente_carro)
       if (recolhido > 0) {
         clientToCarInserts.push({
@@ -356,6 +363,7 @@ export const estoqueCarroService = {
         })
       }
 
+      // Automated 'Saída Cliente' Calculation: Sums "NOVAS CONSIGNAÇÕES"
       // Source: BANCO_DE_DADOS NOVAS CONSIGNAÇÕES -> Destination: ESTOQUE CARRO: CARRO PARA O CLIENTE (SAIDAS_carro_cliente)
       if (novas > 0) {
         carToClientInserts.push({
@@ -385,7 +393,6 @@ export const estoqueCarroService = {
     const stockToCarInserts: any[] = []
     stockToCarRows?.forEach((row) => {
       const rowDate = parseISO(row.created_at || '')
-      // Apply same strict strict logic to ensure consistency
       if (!isAfter(rowDate, startDate)) return
       if (endDate && !isBefore(rowDate, endDate)) return
 

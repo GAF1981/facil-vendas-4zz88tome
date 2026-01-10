@@ -48,6 +48,7 @@ export default function EstoqueCarroPage() {
 
       if (session) {
         // Automatically sync stock movements when employee is selected
+        // This ensures "Ent. Cliente" and "Saída Cliente" are up to date
         try {
           await estoqueCarroService.updateStockMovements(session.id, empId)
         } catch (syncError) {
