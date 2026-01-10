@@ -1,4 +1,3 @@
-import { useState, useEffect, useRef } from 'react'
 import {
   Table,
   TableBody,
@@ -7,407 +6,206 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Input } from '@/components/ui/input'
-import { Checkbox } from '@/components/ui/checkbox'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { RotaRow, SortConfig } from '@/types/rota'
-import { Employee } from '@/types/employee'
-import { cn } from '@/lib/utils'
-import { formatCurrency } from '@/lib/formatters'
-import { format, parseISO } from 'date-fns'
-import { AlertCircle, ArrowUpDown } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { RotaRow } from '@/types/rota'
+import { formatCurrency, safeFormatDate } from '@/lib/formatters'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import {
+  CheckCircle2,
+  AlertTriangle,
+  Clock,
+  XCircle,
+  MapPin,
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 interface RotaTableProps {
-  rows: RotaRow[]
-  sellers: Employee[]
-  onUpdateRow: (clientId: number, field: string, value: any) => void
-  disabled: boolean
-  onSort: (key: string) => void
-  sortConfig: SortConfig
+  data: RotaRow[]
 }
 
-const getRowColorClass = (row: RotaRow) => {
-  if (row.debito > 10) return 'bg-red-50/50 hover:bg-red-50'
-  if (row.x_na_rota > 3) return 'bg-purple-50/50 hover:bg-purple-50'
-  if (row.has_pendency) return 'bg-orange-50/50 hover:bg-orange-50'
-  if (row.client['OBSERVAÇÃO FIXA']) return 'bg-yellow-50/50 hover:bg-yellow-50'
-  if (row.is_completed) return 'bg-green-50/50 hover:bg-green-50'
-  return ''
-}
-
-export function RotaTable({
-  rows,
-  sellers,
-  onUpdateRow,
-  disabled,
-  onSort,
-  sortConfig,
-}: RotaTableProps) {
-  const [visibleCount, setVisibleCount] = useState(50)
-  const loadMoreRef = useRef<HTMLTableRowElement>(null)
-
-  useEffect(() => {
-    setVisibleCount(50)
-  }, [rows])
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          setVisibleCount((prev) => Math.min(prev + 50, rows.length))
-        }
-      },
-      { threshold: 0.1, rootMargin: '400px' },
-    )
-
-    if (loadMoreRef.current) {
-      observer.observe(loadMoreRef.current)
+export function RotaTable({ data }: RotaTableProps) {
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'VENCIDO':
+        return 'bg-red-100 text-red-700 border-red-200 hover:bg-red-100'
+      case 'A VENCER':
+        return 'bg-yellow-100 text-yellow-700 border-yellow-200 hover:bg-yellow-100'
+      case 'PAGO':
+        return 'bg-green-100 text-green-700 border-green-200 hover:bg-green-100'
+      default:
+        return 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-100'
     }
+  }
 
-    return () => observer.disconnect()
-  }, [rows.length])
-
-  const visibleRows = rows.slice(0, visibleCount)
-
-  const SortableHeader = ({
-    label,
-    sortKey,
-    align = 'left',
-  }: {
-    label: string
-    sortKey: string
-    align?: string
-  }) => (
-    <TableHead
-      className={cn(
-        'cursor-pointer hover:bg-muted whitespace-nowrap',
-        align === 'right'
-          ? 'text-right'
-          : align === 'center'
-            ? 'text-center'
-            : 'text-left',
-      )}
-      onClick={() => onSort(sortKey)}
-    >
-      <div
-        className={cn(
-          'flex items-center gap-1',
-          align === 'right' && 'justify-end',
-          align === 'center' && 'justify-center',
-        )}
-      >
-        {label}
-        <ArrowUpDown
-          className={cn(
-            'h-3 w-3',
-            sortConfig.key === sortKey ? 'opacity-100' : 'opacity-30',
-          )}
-        />
-      </div>
-    </TableHead>
-  )
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'VENCIDO':
+        return <XCircle className="w-3 h-3 mr-1" />
+      case 'A VENCER':
+        return <AlertTriangle className="w-3 h-3 mr-1" />
+      case 'PAGO':
+        return <CheckCircle2 className="w-3 h-3 mr-1" />
+      default:
+        return <Clock className="w-3 h-3 mr-1" />
+    }
+  }
 
   return (
-    <div className="relative w-full h-full overflow-auto bg-background rounded-md border shadow-sm">
+    <div className="rounded-md border bg-card overflow-hidden shadow-sm">
       <Table>
-        <TableHeader className="sticky top-0 z-20 bg-background shadow-sm ring-1 ring-border">
+        <TableHeader className="bg-muted/50">
           <TableRow>
-            <TableHead className="w-[80px]">Código</TableHead>
+            <TableHead className="w-[50px] text-center">#</TableHead>
+            <TableHead className="w-[100px]">Status</TableHead>
             <TableHead className="min-w-[200px]">Cliente</TableHead>
-
-            {/* Combined Stock & Projection Header */}
-            <TableHead className="text-right min-w-[120px]">
-              <div className="flex flex-col items-end gap-1 py-1">
-                {/* Projection Sort */}
-                <div
-                  className="flex items-center gap-1 cursor-pointer hover:text-primary group/proj"
-                  onClick={() => onSort('projecao')}
-                  title="Ordenar por Projeção"
-                >
-                  <span
-                    className={cn(
-                      'text-[10px] uppercase font-bold tracking-wider',
-                      sortConfig.key === 'projecao'
-                        ? 'text-blue-700'
-                        : 'text-muted-foreground group-hover/proj:text-blue-600',
-                    )}
-                  >
-                    Projeção
-                  </span>
-                  <ArrowUpDown
-                    className={cn(
-                      'h-3 w-3',
-                      sortConfig.key === 'projecao'
-                        ? 'opacity-100 text-blue-700'
-                        : 'opacity-30',
-                    )}
-                  />
-                </div>
-
-                {/* Stock Sort */}
-                <div
-                  className="flex items-center gap-1 cursor-pointer hover:text-primary group/stock"
-                  onClick={() => onSort('estoque')}
-                  title="Ordenar por Estoque"
-                >
-                  <span
-                    className={cn(
-                      'text-xs font-semibold',
-                      sortConfig.key === 'estoque'
-                        ? 'text-foreground'
-                        : 'text-muted-foreground group-hover/stock:text-foreground',
-                    )}
-                  >
-                    Estoque
-                  </span>
-                  <ArrowUpDown
-                    className={cn(
-                      'h-3 w-3',
-                      sortConfig.key === 'estoque'
-                        ? 'opacity-100'
-                        : 'opacity-30',
-                    )}
-                  />
-                </div>
-              </div>
+            <TableHead className="text-center w-[80px]">Pedido</TableHead>
+            <TableHead className="text-right w-[120px]">Estoque (R$)</TableHead>
+            <TableHead className="text-right w-[120px]">
+              Projeção (R$)
             </TableHead>
-
-            <SortableHeader label="Débito" sortKey="debito" align="right" />
-            <TableHead className="w-[140px] text-center">Vencimento</TableHead>
-            <SortableHeader
-              label="Data Acerto"
-              sortKey="data_acerto"
-              align="center"
-            />
-            {/* Reordered Columns */}
-            <TableHead className="w-[160px]">Vendedor</TableHead>
-            <TableHead className="w-[80px] text-center">Boleto</TableHead>
-            <TableHead className="w-[80px] text-center">Agreg.</TableHead>
-            <SortableHeader label="x Rota" sortKey="x_na_rota" align="center" />
-            <TableHead className="w-[50px]"></TableHead>
+            <TableHead className="text-center w-[80px]">X Rota</TableHead>
+            <TableHead className="w-[100px] text-center">Extras</TableHead>
+            <TableHead className="text-right w-[120px]">Débito Total</TableHead>
+            <TableHead className="w-[120px] text-right">
+              Último Acerto
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {visibleRows.length === 0 ? (
+          {data.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={11} className="h-24 text-center">
-                Nenhum cliente encontrado.
+              <TableCell
+                colSpan={10}
+                className="h-32 text-center text-muted-foreground"
+              >
+                <div className="flex flex-col items-center justify-center gap-2">
+                  <MapPin className="h-8 w-8 text-muted-foreground/50" />
+                  <p className="font-medium">Nenhum cliente na rota</p>
+                  <p className="text-xs">
+                    Inicie uma rota ou altere os filtros para ver os clientes.
+                  </p>
+                </div>
               </TableCell>
             </TableRow>
           ) : (
-            visibleRows.map((row) => (
+            data.map((row) => (
               <TableRow
                 key={row.client.CODIGO}
-                className={cn('group', getRowColorClass(row))}
+                className={cn(
+                  'hover:bg-muted/30 transition-colors',
+                  row.is_completed && 'bg-green-50/40 hover:bg-green-50/60',
+                )}
               >
-                <TableCell className="font-mono text-xs font-medium">
-                  {row.client.CODIGO}
-                  {row.is_completed && (
-                    <Badge className="ml-2 bg-green-600 h-4 px-1 py-0 text-[10px]">
-                      OK
-                    </Badge>
-                  )}
+                <TableCell className="text-center font-mono text-xs text-muted-foreground">
+                  {row.rowNumber}
+                </TableCell>
+                <TableCell>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      'font-normal text-[10px] whitespace-nowrap px-2 py-0.5 h-6',
+                      getStatusColor(row.vencimento_status),
+                    )}
+                  >
+                    {getStatusIcon(row.vencimento_status)}
+                    {row.vencimento_status}
+                  </Badge>
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-col">
-                    <span
-                      className="font-medium text-xs truncate max-w-[250px] block"
-                      title={row.client['NOME CLIENTE'] || ''}
-                    >
+                    <span className="font-medium text-sm">
                       {row.client['NOME CLIENTE']}
                     </span>
-                    <div className="flex gap-2 text-[10px] text-muted-foreground">
-                      {row.client.MUNICÍPIO && (
-                        <span>{row.client.MUNICÍPIO}</span>
-                      )}
-                      {row.client['GRUPO ROTA'] && (
-                        <span>| Rota: {row.client['GRUPO ROTA']}</span>
-                      )}
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span className="font-mono">#{row.client.CODIGO}</span>
+                      <span>•</span>
+                      <span>{row.client.MUNICÍPIO}</span>
                     </div>
                   </div>
                 </TableCell>
-
-                {/* Combined Stock & Projection Cell */}
-                <TableCell className="text-right text-xs font-mono">
-                  <div className="flex flex-col items-end gap-1">
-                    {/* Order Number */}
-                    {row.numero_pedido && (
-                      <div className="flex items-center justify-end mb-0.5">
-                        <span
-                          className="text-[9px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-[3px] font-bold"
-                          title="Último Pedido"
-                        >
-                          #{row.numero_pedido}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Projection */}
-                    <div
-                      className="flex items-center gap-1 text-[10px] text-blue-700 font-semibold whitespace-nowrap"
-                      title="Projeção Calculada"
-                    >
-                      <span>Proj:</span>
-                      <span>
-                        {row.projecao !== null
-                          ? formatCurrency(row.projecao)
-                          : '-'}
-                      </span>
-                    </div>
-
-                    {/* Stock */}
-                    <span className="font-bold text-sm">
-                      {formatCurrency(row.estoque)}
+                <TableCell className="text-center">
+                  {row.numero_pedido ? (
+                    <span className="font-mono text-sm font-medium text-blue-600">
+                      #{row.numero_pedido}
                     </span>
-                  </div>
-                </TableCell>
-
-                <TableCell
-                  className={cn(
-                    'text-right text-xs font-mono',
-                    row.debito > 0
-                      ? 'text-red-600 font-medium'
-                      : 'text-muted-foreground',
-                  )}
-                >
-                  {row.debito > 0 ? formatCurrency(row.debito) : '-'}
-                </TableCell>
-                {/* Vencimento Column */}
-                <TableCell className="text-center text-xs">
-                  {row.earliest_unpaid_date ? (
-                    <div className="flex flex-col items-center gap-1">
-                      <span>
-                        {format(
-                          parseISO(row.earliest_unpaid_date),
-                          'dd/MM/yyyy',
-                        )}
-                      </span>
-                      {row.vencimento_status === 'VENCIDO' && (
-                        <Badge
-                          variant="destructive"
-                          className="h-4 px-1 py-0 text-[10px]"
-                        >
-                          VENCIDO
-                        </Badge>
-                      )}
-                      {row.vencimento_status === 'A VENCER' && (
-                        <Badge className="h-4 px-1 py-0 text-[10px] bg-green-600 hover:bg-green-700">
-                          A VENCER
-                        </Badge>
-                      )}
-                    </div>
                   ) : (
-                    '-'
+                    <span className="text-muted-foreground">-</span>
                   )}
                 </TableCell>
-                <TableCell className="text-center text-xs">
-                  {row.data_acerto
-                    ? format(parseISO(row.data_acerto), 'dd/MM/yy')
-                    : '-'}
+                <TableCell className="text-right">
+                  <span className="font-medium">
+                    {formatCurrency(row.estoque)}
+                  </span>
                 </TableCell>
-                <TableCell className="p-2">
-                  <Select
-                    value={row.vendedor_id?.toString() || 'none'}
-                    disabled={disabled}
-                    onValueChange={(v) =>
-                      onUpdateRow(
-                        row.client.CODIGO,
-                        'vendedor_id',
-                        v === 'none' ? null : parseInt(v),
-                      )
-                    }
-                  >
-                    <SelectTrigger className="h-7 text-xs w-full">
-                      <SelectValue placeholder="-" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">-</SelectItem>
-                      {sellers.map((s) => (
-                        <SelectItem key={s.id} value={s.id.toString()}>
-                          {s.nome_completo}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <TableCell className="text-right">
+                  {row.projecao !== null ? (
+                    <span className="font-medium text-orange-600">
+                      {formatCurrency(row.projecao)}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground text-xs">-</span>
+                  )}
                 </TableCell>
-                <TableCell className="text-center p-2">
-                  <div className="flex justify-center" title="Boleto">
-                    <Checkbox
-                      id={`boleto-${row.client.CODIGO}`}
-                      checked={row.boleto}
-                      disabled={disabled}
-                      onCheckedChange={(c) =>
-                        onUpdateRow(row.client.CODIGO, 'boleto', c as boolean)
-                      }
-                      className="h-4 w-4"
-                    />
+                <TableCell className="text-center">
+                  <span className="font-mono font-medium">
+                    {row.x_na_rota ?? 0}
+                  </span>
+                </TableCell>
+                <TableCell className="text-center">
+                  <div className="flex justify-center gap-1">
+                    {row.boleto && (
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] px-1 h-5 bg-blue-50 text-blue-700 border-blue-200"
+                      >
+                        BOL
+                      </Badge>
+                    )}
+                    {row.agregado && (
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] px-1 h-5 bg-purple-50 text-purple-700 border-purple-200"
+                      >
+                        AGR
+                      </Badge>
+                    )}
+                    {!row.boleto && !row.agregado && (
+                      <span className="text-muted-foreground text-xs">-</span>
+                    )}
                   </div>
                 </TableCell>
-                <TableCell className="text-center p-2">
-                  <div className="flex justify-center" title="Agregado">
-                    <Checkbox
-                      id={`agregado-${row.client.CODIGO}`}
-                      checked={row.agregado}
-                      disabled={disabled}
-                      onCheckedChange={(c) =>
-                        onUpdateRow(row.client.CODIGO, 'agregado', c as boolean)
-                      }
-                      className="h-4 w-4"
-                    />
-                  </div>
-                </TableCell>
-                <TableCell className="p-2">
-                  <Input
-                    type="number"
-                    min={0}
-                    className="h-7 w-16 mx-auto text-center text-xs px-1"
-                    value={row.x_na_rota || 0}
-                    disabled={disabled}
-                    onChange={(e) =>
-                      onUpdateRow(
-                        row.client.CODIGO,
-                        'x_na_rota',
-                        parseInt(e.target.value) || 0,
-                      )
-                    }
-                  />
-                </TableCell>
-                <TableCell className="text-center p-2">
-                  {row.has_pendency && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 text-orange-600 hover:text-orange-700"
-                      asChild
-                      title="Ver Pendências"
+                <TableCell className="text-right">
+                  <div className="flex flex-col items-end">
+                    <span
+                      className={cn(
+                        'font-medium',
+                        row.debito > 0.05 ? 'text-red-600' : 'text-slate-600',
+                      )}
                     >
-                      <Link to={`/pendencias?search=${row.client.CODIGO}`}>
-                        <AlertCircle className="h-4 w-4" />
-                      </Link>
-                    </Button>
-                  )}
+                      {formatCurrency(row.debito)}
+                    </span>
+                    {row.quant_debito > 0 && (
+                      <span className="text-[10px] text-muted-foreground">
+                        ({row.quant_debito}{' '}
+                        {row.quant_debito === 1 ? 'pedido' : 'pedidos'})
+                      </span>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex flex-col items-end">
+                    <span className="text-sm">
+                      {safeFormatDate(row.data_acerto, 'dd/MM/yy')}
+                    </span>
+                    {row.earliest_unpaid_date && (
+                      <span className="text-[10px] text-red-500 font-medium">
+                        Venc:{' '}
+                        {safeFormatDate(row.earliest_unpaid_date, 'dd/MM')}
+                      </span>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             ))
-          )}
-          {visibleCount < rows.length && (
-            <TableRow ref={loadMoreRef}>
-              <TableCell
-                colSpan={11}
-                className="h-12 text-center text-muted-foreground text-xs"
-              >
-                Carregando mais clientes...
-              </TableCell>
-            </TableRow>
           )}
         </TableBody>
       </Table>
