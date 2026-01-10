@@ -6,7 +6,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { RotaRow } from '@/types/rota'
+import { RotaRow, SortConfig } from '@/types/rota'
+import { Employee } from '@/types/employee'
 import { formatCurrency, safeFormatDate } from '@/lib/formatters'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -15,14 +16,40 @@ import {
   Clock,
   XCircle,
   MapPin,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Loader2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Button } from '@/components/ui/button'
 
 interface RotaTableProps {
-  data: RotaRow[]
+  rows: RotaRow[]
+  sellers?: Employee[]
+  onUpdateRow?: (clientId: number, field: string, value: any) => void
+  disabled?: boolean
+  onSort?: (key: string) => void
+  sortConfig?: SortConfig
+  loading?: boolean
 }
 
-export function RotaTable({ data }: RotaTableProps) {
+export function RotaTable({
+  rows = [],
+  sellers = [],
+  onUpdateRow,
+  disabled = false,
+  onSort,
+  sortConfig,
+  loading = false,
+}: RotaTableProps) {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'VENCIDO':
@@ -49,6 +76,29 @@ export function RotaTable({ data }: RotaTableProps) {
     }
   }
 
+  const renderSortIcon = (key: string) => {
+    if (sortConfig?.key !== key) return <ArrowUpDown className="ml-2 h-4 w-4" />
+    if (sortConfig.direction === 'asc')
+      return <ArrowUp className="ml-2 h-4 w-4" />
+    return <ArrowDown className="ml-2 h-4 w-4" />
+  }
+
+  const handleSortClick = (key: string) => {
+    if (onSort) onSort(key)
+  }
+
+  if (loading) {
+    return (
+      <div className="rounded-md border bg-card p-8 flex flex-col items-center justify-center text-muted-foreground h-96">
+        <Loader2 className="h-10 w-10 animate-spin mb-4 text-primary" />
+        <p>Carregando dados da rota...</p>
+      </div>
+    )
+  }
+
+  // Safe access to rows length
+  const hasRows = Array.isArray(rows) && rows.length > 0
+
   return (
     <div className="rounded-md border bg-card overflow-hidden shadow-sm">
       <Table>
@@ -58,23 +108,70 @@ export function RotaTable({ data }: RotaTableProps) {
             <TableHead className="w-[100px]">Status</TableHead>
             <TableHead className="min-w-[200px]">Cliente</TableHead>
             <TableHead className="text-center w-[80px]">Pedido</TableHead>
-            <TableHead className="text-right w-[120px]">Estoque (R$)</TableHead>
             <TableHead className="text-right w-[120px]">
-              Projeção (R$)
+              <Button
+                variant="ghost"
+                size="sm"
+                className="-ml-3 h-8 data-[state=open]:bg-accent"
+                onClick={() => handleSortClick('estoque')}
+              >
+                Estoque (R$)
+                {renderSortIcon('estoque')}
+              </Button>
             </TableHead>
-            <TableHead className="text-center w-[80px]">X Rota</TableHead>
+            <TableHead className="text-right w-[120px]">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="-ml-3 h-8 data-[state=open]:bg-accent"
+                onClick={() => handleSortClick('projecao')}
+              >
+                Projeção (R$)
+                {renderSortIcon('projecao')}
+              </Button>
+            </TableHead>
+            <TableHead className="text-center w-[80px]">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="-ml-3 h-8 data-[state=open]:bg-accent"
+                onClick={() => handleSortClick('x_na_rota')}
+              >
+                X Rota
+                {renderSortIcon('x_na_rota')}
+              </Button>
+            </TableHead>
             <TableHead className="w-[100px] text-center">Extras</TableHead>
-            <TableHead className="text-right w-[120px]">Débito Total</TableHead>
-            <TableHead className="w-[120px] text-right">
-              Último Acerto
+            <TableHead className="text-right w-[120px]">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="-ml-3 h-8 data-[state=open]:bg-accent"
+                onClick={() => handleSortClick('debito')}
+              >
+                Débito Total
+                {renderSortIcon('debito')}
+              </Button>
             </TableHead>
+            <TableHead className="w-[120px] text-right">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="-ml-3 h-8 data-[state=open]:bg-accent"
+                onClick={() => handleSortClick('data_acerto')}
+              >
+                Último Acerto
+                {renderSortIcon('data_acerto')}
+              </Button>
+            </TableHead>
+            <TableHead className="w-[150px]">Vendedor</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {data.length === 0 ? (
+          {!hasRows ? (
             <TableRow>
               <TableCell
-                colSpan={10}
+                colSpan={11}
                 className="h-32 text-center text-muted-foreground"
               >
                 <div className="flex flex-col items-center justify-center gap-2">
@@ -87,7 +184,7 @@ export function RotaTable({ data }: RotaTableProps) {
               </TableCell>
             </TableRow>
           ) : (
-            data.map((row) => (
+            rows.map((row) => (
               <TableRow
                 key={row.client.CODIGO}
                 className={cn(
@@ -111,14 +208,22 @@ export function RotaTable({ data }: RotaTableProps) {
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  <div className="flex flex-col">
-                    <span className="font-medium text-sm">
+                  <div className="flex flex-col max-w-[200px]">
+                    <span
+                      className="font-medium text-sm truncate"
+                      title={row.client['NOME CLIENTE'] || ''}
+                    >
                       {row.client['NOME CLIENTE']}
                     </span>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <span className="font-mono">#{row.client.CODIGO}</span>
                       <span>•</span>
-                      <span>{row.client.MUNICÍPIO}</span>
+                      <span
+                        className="truncate"
+                        title={row.client.MUNICÍPIO || ''}
+                      >
+                        {row.client.MUNICÍPIO}
+                      </span>
                     </div>
                   </div>
                 </TableCell>
@@ -133,11 +238,11 @@ export function RotaTable({ data }: RotaTableProps) {
                 </TableCell>
                 <TableCell className="text-right">
                   <span className="font-medium">
-                    {formatCurrency(row.estoque)}
+                    {formatCurrency(row.estoque ?? 0)}
                   </span>
                 </TableCell>
                 <TableCell className="text-right">
-                  {row.projecao !== null ? (
+                  {row.projecao !== null && row.projecao !== undefined ? (
                     <span className="font-medium text-orange-600">
                       {formatCurrency(row.projecao)}
                     </span>
@@ -181,7 +286,7 @@ export function RotaTable({ data }: RotaTableProps) {
                         row.debito > 0.05 ? 'text-red-600' : 'text-slate-600',
                       )}
                     >
-                      {formatCurrency(row.debito)}
+                      {formatCurrency(row.debito ?? 0)}
                     </span>
                     {row.quant_debito > 0 && (
                       <span className="text-[10px] text-muted-foreground">
@@ -197,12 +302,45 @@ export function RotaTable({ data }: RotaTableProps) {
                       {safeFormatDate(row.data_acerto, 'dd/MM/yy')}
                     </span>
                     {row.earliest_unpaid_date && (
-                      <span className="text-[10px] text-red-500 font-medium">
+                      <span className="text-[10px] text-red-500 font-medium whitespace-nowrap">
                         Venc:{' '}
                         {safeFormatDate(row.earliest_unpaid_date, 'dd/MM')}
                       </span>
                     )}
                   </div>
+                </TableCell>
+                <TableCell>
+                  <Select
+                    disabled={disabled}
+                    value={
+                      row.vendedor_id ? row.vendedor_id.toString() : 'none'
+                    }
+                    onValueChange={(value) => {
+                      if (onUpdateRow) {
+                        // If 'none' is selected, send null, otherwise send number ID
+                        onUpdateRow(
+                          row.client.CODIGO,
+                          'vendedor_id',
+                          value === 'none' ? null : Number(value),
+                        )
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="h-7 text-xs w-full bg-transparent border-transparent hover:border-input hover:bg-background focus:bg-background focus:border-input">
+                      <SelectValue placeholder="-" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">-</SelectItem>
+                      {sellers.map((seller) => (
+                        <SelectItem
+                          key={seller.id}
+                          value={seller.id.toString()}
+                        >
+                          {seller.nome_completo.split(' ')[0]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </TableCell>
               </TableRow>
             ))

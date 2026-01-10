@@ -55,8 +55,13 @@ export default function RotaPage() {
         setSellers(allEmployees)
 
         // Fetch data (auto-filtered by ATIVO in service)
-        const data = await rotaService.getFullRotaData(active)
-        setRows(data)
+        // Ensure we pass active route if exists, otherwise last route (for viewing history)
+        // Or null if neither (will show all clients as per service logic)
+        const rotaToFetch = active || last
+        const data = await rotaService.getFullRotaData(rotaToFetch)
+
+        // Ensure data is array to prevent crashes
+        setRows(Array.isArray(data) ? data : [])
       } catch (error) {
         console.error(error)
         toast({
@@ -77,7 +82,7 @@ export default function RotaPage() {
       const newRota = await rotaService.startRota()
       setActiveRota(newRota)
       const data = await rotaService.getFullRotaData(newRota)
-      setRows(data)
+      setRows(Array.isArray(data) ? data : [])
       toast({ title: 'Rota Iniciada', className: 'bg-green-600 text-white' })
     } catch (error) {
       toast({
@@ -105,7 +110,7 @@ export default function RotaPage() {
       setLastRota({ ...activeRota, data_fim: new Date().toISOString() })
       setActiveRota(newRota)
       const data = await rotaService.getFullRotaData(newRota)
-      setRows(data)
+      setRows(Array.isArray(data) ? data : [])
 
       toast({
         title: 'Rota Finalizada e Nova Iniciada',
@@ -183,6 +188,7 @@ export default function RotaPage() {
   }
 
   const filteredRows = useMemo(() => {
+    if (!rows) return [] // Safety check
     return rows.filter((row) => {
       if (filters.search) {
         const searchLower = filters.search.toLowerCase()
@@ -259,8 +265,8 @@ export default function RotaPage() {
           valB = b.projecao ?? -1
           break
         case 'estoque':
-          valA = a.estoque
-          valB = b.estoque
+          valA = a.estoque ?? 0
+          valB = b.estoque ?? 0
           break
         case 'x_na_rota':
           valA = a.x_na_rota
@@ -392,6 +398,7 @@ export default function RotaPage() {
           disabled={!activeRota}
           onSort={handleSort}
           sortConfig={sortConfig}
+          loading={loading}
         />
       </div>
     </div>
