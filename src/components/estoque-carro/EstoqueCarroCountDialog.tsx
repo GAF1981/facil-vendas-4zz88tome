@@ -80,9 +80,6 @@ export function EstoqueCarroCountDialog({
       setStep(1)
       setQuantity('')
       setSelectedProduct(null)
-      // Keep dialog open for rapid entry? Or close? User story implies standard modal flow.
-      // "Allow editing/deleting individual lines via icons" -> implies this modal is for adding/editing.
-      // I'll close it to follow standard dialog pattern, user can reopen or use "Save & Next" if implemented.
       onOpenChange(false)
     } catch (e) {
       toast({ title: 'Erro ao salvar', variant: 'destructive' })
@@ -109,7 +106,6 @@ export function EstoqueCarroCountDialog({
                   value={searchTerm}
                   onChange={(e) => {
                     setSearchTerm(e.target.value)
-                    // Simple debounce
                     if (e.target.value.length > 2) handleSearch(e.target.value)
                   }}
                   autoFocus

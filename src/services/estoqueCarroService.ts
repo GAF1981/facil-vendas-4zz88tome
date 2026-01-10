@@ -328,13 +328,11 @@ export const estoqueCarroService = {
       }
 
       // Filter 1: Start Date (Session Start < Transaction Date)
-      // isAfter(rowDate, startDate) checks if rowDate > startDate.
-      // If rowDate is NOT after startDate (i.e. <=), we ignore it.
+      // The record's DATA E HORA must be GREATER THAN data_inicio (Strict >)
       if (!isAfter(rowDate, startDate)) return
 
       // Filter 2: End Date (Session End > Transaction Date)
-      // isBefore(rowDate, endDate) checks if rowDate < endDate.
-      // If rowDate is NOT before endDate (i.e. >=), we ignore it.
+      // The record's DATA E HORA must be LESS THAN data_fim (Strict <)
       if (endDate && !isBefore(rowDate, endDate)) return
 
       // Data Type Handling: Convert strings to numbers
