@@ -231,7 +231,10 @@ export default function RotaPage() {
       if (filters.debito_max && row.debito > Number(filters.debito_max))
         return false
 
-      if (filters.projecao_min && row.projecao < Number(filters.projecao_min))
+      if (
+        filters.projecao_min &&
+        (row.projecao || 0) < Number(filters.projecao_min)
+      )
         return false
 
       if (filters.estoque_min && row.estoque < Number(filters.estoque_min))
@@ -252,8 +255,8 @@ export default function RotaPage() {
 
       switch (sortConfig.key) {
         case 'projecao':
-          valA = a.projecao
-          valB = b.projecao
+          valA = a.projecao ?? -1
+          valB = b.projecao ?? -1
           break
         case 'estoque':
           valA = a.estoque
@@ -318,7 +321,7 @@ export default function RotaPage() {
         return [
           row.client.CODIGO,
           `"${(row.client['NOME CLIENTE'] || '').replace(/"/g, '""')}"`,
-          row.projecao.toFixed(2).replace('.', ','),
+          (row.projecao || 0).toFixed(2).replace('.', ','),
           `"${sellerName}"`,
           row.debito.toFixed(2).replace('.', ','),
           row.data_acerto || '',

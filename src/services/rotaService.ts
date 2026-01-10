@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase/client'
 import { Rota, RotaItem } from '@/types/rota'
 import { pendenciasService } from './pendenciasService'
+import { reportsService } from './reportsService'
 import { parseISO, isBefore, startOfDay, subDays } from 'date-fns'
 
 export const rotaService = {
@@ -151,21 +152,6 @@ export const rotaService = {
     }
   },
 
-  async getClientProjections() {
-    const { data, error } = await supabase.rpc('get_client_projections')
-    if (error) {
-      console.error('Error calculating projections:', error)
-      return new Map<number, number>()
-    }
-    const map = new Map<number, number>()
-    if (data) {
-      ;(data as any[]).forEach((d) => {
-        map.set(d.client_id, d.projecao)
-      })
-    }
-    return map
-  },
-
   async getFullRotaData(rota: Rota | null) {
     // 1. Fetch all Clients (FILTERED BY 'ATIVO' OR 'INATIVO - ROTA')
     const { data: clients, error: clientsError } = await supabase
@@ -179,11 +165,9 @@ export const rotaService = {
     if (!clients) return []
 
     // 2. Optimized Debt Fetching using debitos_historico (Source of Truth)
-    // Removed .gt('debito', 0) to ensure we include all records as per user story requirements
     const { data: debtData, error: debtError } = await supabase
       .from('debitos_historico')
       .select('cliente_codigo, debito, data_acerto')
-    // .gt('debito', 0) // REMOVED to allow summing all debts, even 0.00
 
     if (debtError) {
       console.error('Error fetching debitos_historico:', debtError)
@@ -209,12 +193,8 @@ export const rotaService = {
         const entry = debtMap.get(cid)!
         const val = row.debito || 0
 
-        // Always sum the debt, even if 0, to satisfy requirement:
-        // "Orders with a debt of R$ 0,00 must be included in the sum"
         entry.totalDebt += val
 
-        // Only count as an "active" debt order if > 0.01 for status calculation purposes
-        // This ensures 'quant_debito' reflects number of pending bills, not all history
         if (val > 0.01) {
           entry.orderCount += 1
 
@@ -238,8 +218,14 @@ export const rotaService = {
       items.forEach((i) => rotaItemsMap.set(i.cliente_id, i))
     }
 
-    // 5. Fetch Projections
-    const projectionMap = await this.getClientProjections()
+    // 5. Fetch Projections via Reports Service (Linked by Order Number)
+    const projectionsReport = await reportsService.getProjectionsReport()
+    const orderProjectionMap = new Map<number, number>()
+    projectionsReport.forEach((p) => {
+      if (p.projection !== null) {
+        orderProjectionMap.set(p.orderId, p.projection)
+      }
+    })
 
     // 6. Fetch Accurate Stock Values via RPC
     const { data: stockData, error: stockError } = await supabase.rpc(
@@ -257,8 +243,6 @@ export const rotaService = {
     }
 
     // 7. Fetch basic Summary Stats (Last Visit Date from debitos_historico or BANCO_DE_DADOS lightweight)
-    // We use debitos_historico for last acerto if possible, else simplified DB query
-    // Actually, let's fetch simplified BANCO_DE_DADOS stats for lastDate/orderId to keep "Recency"
     const { data: dbStats } = await supabase
       .from('BANCO_DE_DADOS')
       .select('"CÓDIGO DO CLIENTE", "DATA DO ACERTO", "NÚMERO DO PEDIDO"')
@@ -321,7 +305,16 @@ export const rotaService = {
       const debtEntry = debtMap.get(cid)
       const rotaItem = rotaItemsMap.get(cid)
       const stats = statsMap.get(cid)
-      const projection = projectionMap.get(cid) || 0
+
+      // Projection linked by Order ID
+      let projection: number | null = null
+      if (stats?.lastOrderId) {
+        const p = orderProjectionMap.get(stats.lastOrderId)
+        if (p !== undefined) {
+          projection = p
+        }
+      }
+
       const stockValue = stockMap.get(cid) || 0
 
       // Calculate Status & Earliest Unpaid Date
@@ -333,14 +326,6 @@ export const rotaService = {
         earliestUnpaid = debtEntry.oldestDate
         if (debtEntry.oldestDate) {
           const date = parseISO(debtEntry.oldestDate)
-          // Logic: If debt is older than 30 days (example rule) or just "Active"
-          // User Story doesn't specify rule, but standard is: if old debt exists -> VENCIDO.
-          // Let's check if debt is strictly older than today (implying due date passed)
-          // Since debitos_historico doesn't have due date, we assume 'data_acerto' + buffer?
-          // Using strict 'isBefore' comparison with today for now to simulate past due.
-          // Better yet: If any debt exists in history, it likely implies it wasn't fully paid.
-          // We mark VENCIDO if older than 1 day to be safe, or just A VENCER if recent.
-          // Let's use 30 days threshold as 'VENCIDO', otherwise 'A VENCER'.
           if (isBefore(date, subDays(today, 30))) {
             vencimentoStatus = 'VENCIDO'
           } else {

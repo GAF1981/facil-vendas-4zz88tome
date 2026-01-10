@@ -29,7 +29,7 @@ export interface RotaRow {
   debito: number
   quant_debito: number
   data_acerto: string | null
-  projecao: number
+  projecao: number | null
   numero_pedido: number | null
   estoque: number
   // Pendencies

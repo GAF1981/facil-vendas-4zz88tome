@@ -257,7 +257,11 @@ export function RotaTable({
                       title="Projeção Calculada"
                     >
                       <span>Proj:</span>
-                      <span>{formatCurrency(row.projecao)}</span>
+                      <span>
+                        {row.projecao !== null
+                          ? formatCurrency(row.projecao)
+                          : '-'}
+                      </span>
                     </div>
 
                     {/* Stock */}
