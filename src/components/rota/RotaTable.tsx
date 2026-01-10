@@ -123,19 +123,52 @@ export function RotaTable({
           <TableRow>
             <TableHead className="w-[80px]">Código</TableHead>
             <TableHead className="min-w-[200px]">Cliente</TableHead>
-            <SortableHeader label="Projeção" sortKey="projecao" align="right" />
 
-            {/* Combined Stock & Order # */}
-            <TableHead className="text-right min-w-[100px]">
-              <div className="flex flex-col items-end">
-                <span className="text-[10px] text-muted-foreground uppercase font-semibold">
-                  Pedido Recente
-                </span>
+            {/* Combined Stock & Projection Header */}
+            <TableHead className="text-right min-w-[120px]">
+              <div className="flex flex-col items-end gap-1 py-1">
+                {/* Projection Sort */}
                 <div
-                  className="flex items-center gap-1 cursor-pointer hover:text-primary"
-                  onClick={() => onSort('estoque')}
+                  className="flex items-center gap-1 cursor-pointer hover:text-primary group/proj"
+                  onClick={() => onSort('projecao')}
+                  title="Ordenar por Projeção"
                 >
-                  Estoque
+                  <span
+                    className={cn(
+                      'text-[10px] uppercase font-bold tracking-wider',
+                      sortConfig.key === 'projecao'
+                        ? 'text-blue-700'
+                        : 'text-muted-foreground group-hover/proj:text-blue-600',
+                    )}
+                  >
+                    Projeção
+                  </span>
+                  <ArrowUpDown
+                    className={cn(
+                      'h-3 w-3',
+                      sortConfig.key === 'projecao'
+                        ? 'opacity-100 text-blue-700'
+                        : 'opacity-30',
+                    )}
+                  />
+                </div>
+
+                {/* Stock Sort */}
+                <div
+                  className="flex items-center gap-1 cursor-pointer hover:text-primary group/stock"
+                  onClick={() => onSort('estoque')}
+                  title="Ordenar por Estoque"
+                >
+                  <span
+                    className={cn(
+                      'text-xs font-semibold',
+                      sortConfig.key === 'estoque'
+                        ? 'text-foreground'
+                        : 'text-muted-foreground group-hover/stock:text-foreground',
+                    )}
+                  >
+                    Estoque
+                  </span>
                   <ArrowUpDown
                     className={cn(
                       'h-3 w-3',
@@ -166,7 +199,7 @@ export function RotaTable({
         <TableBody>
           {visibleRows.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={12} className="h-24 text-center">
+              <TableCell colSpan={11} className="h-24 text-center">
                 Nenhum cliente encontrado.
               </TableCell>
             </TableRow>
@@ -202,19 +235,35 @@ export function RotaTable({
                     </div>
                   </div>
                 </TableCell>
-                <TableCell className="text-right text-xs font-medium text-blue-700">
-                  {formatCurrency(row.projecao)}
-                </TableCell>
 
-                {/* Stock Cell with Order Number Above */}
+                {/* Combined Stock & Projection Cell */}
                 <TableCell className="text-right text-xs font-mono">
-                  <div className="flex flex-col items-end gap-0.5">
+                  <div className="flex flex-col items-end gap-1">
+                    {/* Order Number */}
                     {row.numero_pedido && (
-                      <span className="text-[10px] text-muted-foreground font-bold bg-muted px-1 rounded">
-                        #{row.numero_pedido}
-                      </span>
+                      <div className="flex items-center justify-end mb-0.5">
+                        <span
+                          className="text-[9px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-[3px] font-bold"
+                          title="Último Pedido"
+                        >
+                          #{row.numero_pedido}
+                        </span>
+                      </div>
                     )}
-                    <span>{formatCurrency(row.estoque)}</span>
+
+                    {/* Projection */}
+                    <div
+                      className="flex items-center gap-1 text-[10px] text-blue-700 font-semibold whitespace-nowrap"
+                      title="Projeção Calculada"
+                    >
+                      <span>Proj:</span>
+                      <span>{formatCurrency(row.projecao)}</span>
+                    </div>
+
+                    {/* Stock */}
+                    <span className="font-bold text-sm">
+                      {formatCurrency(row.estoque)}
+                    </span>
                   </div>
                 </TableCell>
 
@@ -349,7 +398,7 @@ export function RotaTable({
           {visibleCount < rows.length && (
             <TableRow ref={loadMoreRef}>
               <TableCell
-                colSpan={12}
+                colSpan={11}
                 className="h-12 text-center text-muted-foreground text-xs"
               >
                 Carregando mais clientes...
