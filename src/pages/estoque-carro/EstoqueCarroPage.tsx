@@ -108,33 +108,6 @@ export default function EstoqueCarroPage() {
     }
   }
 
-  const handleUpdateStock = async () => {
-    if (!currentSession || !selectedEmployeeId) return
-
-    setLoading(true)
-    try {
-      await estoqueCarroService.updateStockMovements(
-        currentSession.id,
-        parseInt(selectedEmployeeId),
-      )
-      toast({
-        title: 'Estoque Atualizado',
-        description: 'Movimentações sincronizadas com sucesso.',
-        className: 'bg-green-600 text-white',
-      })
-      await loadData() // Refresh table to fetch new values from the populated tables
-    } catch (e: any) {
-      console.error(e)
-      toast({
-        title: 'Erro na atualização',
-        description: e.message || 'Falha ao sincronizar movimentações.',
-        variant: 'destructive',
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const handleFinalize = async () => {
     if (!currentSession) return
     if (!confirm('Finalizar sessão atual e abrir uma nova?')) return
@@ -214,7 +187,6 @@ export default function EstoqueCarroPage() {
             onReset={handleReset}
             onCount={() => setCountDialogOpen(true)}
             onFinalize={handleFinalize}
-            onUpdateStock={handleUpdateStock}
             loading={loading}
           />
 
