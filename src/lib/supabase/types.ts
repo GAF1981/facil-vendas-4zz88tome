@@ -827,25 +827,49 @@ export type Database = {
       }
       'ESTOQUE CARRO: CARRO PARA O CLIENTE': {
         Row: {
+          barcode: string | null
+          codigo_produto: number | null
           created_at: string | null
+          data_horario: string | null
+          funcionario: string | null
           id: number
           id_estoque_carro: number
+          pedido: number | null
+          preco: number | null
+          produto: string | null
           produto_id: number | null
           quantidade: number | null
+          SAIDAS_carro_cliente: number | null
         }
         Insert: {
+          barcode?: string | null
+          codigo_produto?: number | null
           created_at?: string | null
+          data_horario?: string | null
+          funcionario?: string | null
           id?: number
           id_estoque_carro: number
+          pedido?: number | null
+          preco?: number | null
+          produto?: string | null
           produto_id?: number | null
           quantidade?: number | null
+          SAIDAS_carro_cliente?: number | null
         }
         Update: {
+          barcode?: string | null
+          codigo_produto?: number | null
           created_at?: string | null
+          data_horario?: string | null
+          funcionario?: string | null
           id?: number
           id_estoque_carro?: number
+          pedido?: number | null
+          preco?: number | null
+          produto?: string | null
           produto_id?: number | null
           quantidade?: number | null
+          SAIDAS_carro_cliente?: number | null
         }
         Relationships: [
           {
@@ -866,25 +890,49 @@ export type Database = {
       }
       'ESTOQUE CARRO: CARRO PARA O ESTOQUE': {
         Row: {
+          barcode: string | null
+          codigo_produto: number | null
           created_at: string | null
+          data_horario: string | null
+          funcionario: string | null
           id: number
           id_estoque_carro: number
+          pedido: number | null
+          preco: number | null
+          produto: string | null
           produto_id: number | null
           quantidade: number | null
+          SAIDAS_carro_estoque: number | null
         }
         Insert: {
+          barcode?: string | null
+          codigo_produto?: number | null
           created_at?: string | null
+          data_horario?: string | null
+          funcionario?: string | null
           id?: number
           id_estoque_carro: number
+          pedido?: number | null
+          preco?: number | null
+          produto?: string | null
           produto_id?: number | null
           quantidade?: number | null
+          SAIDAS_carro_estoque?: number | null
         }
         Update: {
+          barcode?: string | null
+          codigo_produto?: number | null
           created_at?: string | null
+          data_horario?: string | null
+          funcionario?: string | null
           id?: number
           id_estoque_carro?: number
+          pedido?: number | null
+          preco?: number | null
+          produto?: string | null
           produto_id?: number | null
           quantidade?: number | null
+          SAIDAS_carro_estoque?: number | null
         }
         Relationships: [
           {
@@ -905,23 +953,47 @@ export type Database = {
       }
       'ESTOQUE CARRO: CLIENTE PARA O CARRO': {
         Row: {
+          barcode: string | null
+          codigo_produto: number | null
           created_at: string | null
+          data_horario: string | null
+          ENTRADAS_cliente_carro: number | null
+          funcionario: string | null
           id: number
           id_estoque_carro: number
+          pedido: number | null
+          preco: number | null
+          produto: string | null
           produto_id: number | null
           quantidade: number | null
         }
         Insert: {
+          barcode?: string | null
+          codigo_produto?: number | null
           created_at?: string | null
+          data_horario?: string | null
+          ENTRADAS_cliente_carro?: number | null
+          funcionario?: string | null
           id?: number
           id_estoque_carro: number
+          pedido?: number | null
+          preco?: number | null
+          produto?: string | null
           produto_id?: number | null
           quantidade?: number | null
         }
         Update: {
+          barcode?: string | null
+          codigo_produto?: number | null
           created_at?: string | null
+          data_horario?: string | null
+          ENTRADAS_cliente_carro?: number | null
+          funcionario?: string | null
           id?: number
           id_estoque_carro?: number
+          pedido?: number | null
+          preco?: number | null
+          produto?: string | null
           produto_id?: number | null
           quantidade?: number | null
         }
@@ -944,23 +1016,47 @@ export type Database = {
       }
       'ESTOQUE CARRO: ESTOQUE PARA O CARRO': {
         Row: {
+          barcode: string | null
+          codigo_produto: number | null
           created_at: string | null
+          data_horario: string | null
+          ENTRADAS_estoque_carro: number | null
+          funcionario: string | null
           id: number
           id_estoque_carro: number
+          pedido: number | null
+          preco: number | null
+          produto: string | null
           produto_id: number | null
           quantidade: number | null
         }
         Insert: {
+          barcode?: string | null
+          codigo_produto?: number | null
           created_at?: string | null
+          data_horario?: string | null
+          ENTRADAS_estoque_carro?: number | null
+          funcionario?: string | null
           id?: number
           id_estoque_carro: number
+          pedido?: number | null
+          preco?: number | null
+          produto?: string | null
           produto_id?: number | null
           quantidade?: number | null
         }
         Update: {
+          barcode?: string | null
+          codigo_produto?: number | null
           created_at?: string | null
+          data_horario?: string | null
+          ENTRADAS_estoque_carro?: number | null
+          funcionario?: string | null
           id?: number
           id_estoque_carro?: number
+          pedido?: number | null
+          preco?: number | null
+          produto?: string | null
           produto_id?: number | null
           quantidade?: number | null
         }

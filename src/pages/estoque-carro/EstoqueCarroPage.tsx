@@ -43,14 +43,23 @@ export default function EstoqueCarroPage() {
     try {
       const empId = parseInt(selectedEmployeeId)
       let session = await estoqueCarroService.getActiveSession(empId)
-      if (!session) {
-        // Try getting last closed session if no active one, just to show history?
-        // Requirement implies controlling flow.
-        // We'll leave session null if none active, ControlBar will show Start.
-      }
+
       setCurrentSession(session)
 
       if (session) {
+        // Automatically sync stock movements when employee is selected
+        try {
+          await estoqueCarroService.updateStockMovements(session.id, empId)
+        } catch (syncError) {
+          console.error('Auto-sync failed', syncError)
+          toast({
+            title: 'Aviso',
+            description:
+              'Não foi possível sincronizar automaticamente as movimentações.',
+            variant: 'destructive',
+          })
+        }
+
         const data = await estoqueCarroService.getSessionData(session)
         setItems(data)
       } else {
@@ -100,7 +109,6 @@ export default function EstoqueCarroPage() {
   const handleUpdateStock = async () => {
     if (!currentSession || !selectedEmployeeId) return
 
-    // Optimistic UI or separate loading state could be better, but sharing 'loading' is safe enough
     setLoading(true)
     try {
       await estoqueCarroService.updateStockMovements(

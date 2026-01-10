@@ -1,12 +1,8 @@
 import { supabase } from '@/lib/supabase/client'
-import {
-  EstoqueCarroItem,
-  EstoqueCarroSession,
-  EstoqueCarroMovementInsert,
-} from '@/types/estoque_carro'
+import { EstoqueCarroItem, EstoqueCarroSession } from '@/types/estoque_carro'
 import { productsService } from './productsService'
 import { parseCurrency } from '@/lib/formatters'
-import { parseISO, isAfter, isBefore, isEqual } from 'date-fns'
+import { parseISO, isAfter, isBefore } from 'date-fns'
 
 export const estoqueCarroService = {
   async getActiveSession(funcionarioId: number) {
@@ -93,9 +89,6 @@ export const estoqueCarroService = {
     session: EstoqueCarroSession,
   ): Promise<EstoqueCarroItem[]> {
     const sessionId = session.id
-    const funcionarioId = session.funcionario_id
-    const startDate = session.data_inicio
-    const endDate = session.data_fim || new Date().toISOString()
 
     // 1. Fetch Products
     const { data: products } = await productsService.getProducts(1, 10000)
@@ -112,7 +105,7 @@ export const estoqueCarroService = {
       initialMap.set(i.produto_id, i.saldo_inicial),
     )
 
-    // 3. Fetch Movements from the DETAIL TABLES now (as they are the source of truth for the session)
+    // 3. Fetch Movements from the DETAIL TABLES
     // Client -> Car (RECOLHIDO) -> 'ESTOQUE CARRO: CLIENTE PARA O CARRO'
     const { data: clientToCarData } = await supabase
       .from('ESTOQUE CARRO: CLIENTE PARA O CARRO')
@@ -235,16 +228,20 @@ export const estoqueCarroService = {
   },
 
   async updateStockMovements(sessionId: number, employeeId: number) {
-    const session = await this.getActiveSession(employeeId)
-    if (!session || session.id !== sessionId) {
-      throw new Error('Invalid or closed session.')
-    }
+    // 0. Fetch Session and Employee info
+    const { data: targetSession, error: sessError } = await supabase
+      .from('ID ESTOQUE CARRO')
+      .select('*')
+      .eq('id', sessionId)
+      .single()
 
-    const startDate = parseISO(session.data_inicio)
-    // If open, end date is effectively "now" for filtering logic
-    const endDate = session.data_fim ? parseISO(session.data_fim) : new Date()
+    if (sessError || !targetSession) throw new Error('Session not found')
 
-    // 0. Fetch Employee Name
+    const startDate = parseISO(targetSession.data_inicio)
+    const endDate = targetSession.data_fim
+      ? parseISO(targetSession.data_fim)
+      : new Date()
+
     const { data: employeeData } = await supabase
       .from('FUNCIONARIOS')
       .select('nome_completo')
@@ -252,7 +249,7 @@ export const estoqueCarroService = {
       .single()
     const employeeName = employeeData?.nome_completo || 'Unknown'
 
-    // 1. Clear existing data for this session in the 4 tables
+    // 1. Clear existing data for this session to avoid duplicates
     await Promise.all([
       supabase
         .from('ESTOQUE CARRO: CLIENTE PARA O CARRO')
@@ -272,55 +269,36 @@ export const estoqueCarroService = {
         .eq('id_estoque_carro', sessionId),
     ])
 
-    // 2. Fetch all products to map codes and details
+    // 2. Prepare Product Maps for enrichment
     const { data: products } = await productsService.getProducts(1, 10000)
     const productsMap = new Map(products?.map((p) => [p.ID, p]) || [])
     const codeToProductMap = new Map(
       products?.map((p) => [p.CODIGO, p]).filter((e) => e[0]) || [],
     )
 
-    // Helper to create insert payload
-    const createPayload = (
-      prodId: number | null,
-      qty: number,
-      extra: any = {},
-    ) => {
+    const getProductDetails = (prodId: number | null, code: number | null) => {
       const prod =
         (prodId ? productsMap.get(prodId) : null) ||
-        (extra.code ? codeToProductMap.get(extra.code) : null)
+        (code ? codeToProductMap.get(code) : null)
       return {
-        id_estoque_carro: sessionId,
-        produto_id: prod?.ID ?? prodId, // Fallback if not found
-        quantidade: qty, // Original column
-        pedido: extra.pedido,
-        data_horario: extra.data_horario,
-        funcionario: employeeName,
+        produto_id: prod?.ID ?? prodId,
         codigo_produto: prod?.CODIGO ?? null,
         barcode: prod?.['CÓDIGO BARRAS'] ? String(prod['CÓDIGO BARRAS']) : null,
         produto: prod?.PRODUTO ?? 'Desconhecido',
         preco: prod?.PREÇO ? parseCurrency(prod.PREÇO) : 0,
-        // Specific columns
-        ENTRADAS_cliente_carro: extra.ENTRADAS_cliente_carro,
-        SAIDAS_carro_cliente: extra.SAIDAS_carro_cliente,
-        ENTRADAS_estoque_carro: extra.ENTRADAS_estoque_carro,
-        SAIDAS_carro_estoque: extra.SAIDAS_carro_estoque,
-      } as EstoqueCarroMovementInsert
+      }
     }
 
-    // 3. Process BANCO_DE_DADOS (Client <-> Car)
-    // Fetch records for employee within timeframe
-    // We use a broader date string filter then precise date check in JS
-    const dateStartStr = session.data_inicio.split('T')[0]
-    const dateEndStr = session.data_fim
-      ? session.data_fim.split('T')[0]
-      : new Date().toISOString().split('T')[0]
-
+    // 3. Process BANCO_DE_DADOS (Transactions)
+    // Filter optimization: pre-fetch by date string range, then refine by timestamp
+    const dateStartStr = targetSession.data_inicio.split('T')[0]
+    // Fetch a bit more future if needed or just don't bound the upper string strictly to avoid timezone edge cases
+    // We will strict filter in JS loop
     const { data: bdData } = await supabase
       .from('BANCO_DE_DADOS')
       .select('*')
       .eq('CODIGO FUNCIONARIO', employeeId)
       .gte('"DATA DO ACERTO"', dateStartStr)
-      .lte('"DATA DO ACERTO"', dateEndStr)
 
     const clientToCarInserts: any[] = []
     const carToClientInserts: any[] = []
@@ -329,91 +307,121 @@ export const estoqueCarroService = {
       const dateStr = row['DATA DO ACERTO']
       const timeStr = row['HORA DO ACERTO'] || '00:00:00'
       if (!dateStr) return
-      const rowDate = parseISO(`${dateStr}T${timeStr}`)
 
-      // Check if within session window
+      // Construct ISO string for parsing: YYYY-MM-DDTHH:mm:ss
+      // Assuming local time for simplicity as DB stores plain strings usually
+      const rowDateTimeStr = `${dateStr}T${timeStr}`
+      const rowDate = parseISO(rowDateTimeStr)
+
+      // Strict Time Filtering
       if (isBefore(rowDate, startDate)) return
-      if (session.data_fim && isAfter(rowDate, endDate)) return
+      if (targetSession.data_fim && isAfter(rowDate, endDate)) return
 
       const recolhido = parseCurrency(row['RECOLHIDO'])
       const novas = parseCurrency(row['NOVAS CONSIGNAÇÕES'])
       const prodCode = row['COD. PRODUTO']
       const orderId = row['NÚMERO DO PEDIDO']
+      const details = getProductDetails(null, prodCode)
 
+      // Source: BANCO_DE_DADOS RECOLHIDO -> Destination: ESTOQUE CARRO: CLIENTE PARA O CARRO (ENTRADAS_cliente_carro)
       if (recolhido > 0) {
-        clientToCarInserts.push(
-          createPayload(null, recolhido, {
-            code: prodCode,
-            pedido: orderId,
-            data_horario: rowDate.toISOString(),
-            ENTRADAS_cliente_carro: recolhido,
-          }),
-        )
+        clientToCarInserts.push({
+          id_estoque_carro: sessionId,
+          produto_id: details.produto_id,
+          quantidade: recolhido,
+          pedido: orderId,
+          data_horario: rowDate.toISOString(),
+          funcionario: employeeName,
+          codigo_produto: details.codigo_produto,
+          barcode: details.barcode,
+          produto: details.produto,
+          preco: details.preco,
+          ENTRADAS_cliente_carro: recolhido,
+        })
       }
 
+      // Source: BANCO_DE_DADOS NOVAS CONSIGNAÇÕES -> Destination: ESTOQUE CARRO: CARRO PARA O CLIENTE (SAIDAS_carro_cliente)
       if (novas > 0) {
-        carToClientInserts.push(
-          createPayload(null, novas, {
-            code: prodCode,
-            pedido: orderId,
-            data_horario: rowDate.toISOString(),
-            SAIDAS_carro_cliente: novas,
-          }),
-        )
+        carToClientInserts.push({
+          id_estoque_carro: sessionId,
+          produto_id: details.produto_id,
+          quantidade: novas,
+          pedido: orderId,
+          data_horario: rowDate.toISOString(),
+          funcionario: employeeName,
+          codigo_produto: details.codigo_produto,
+          barcode: details.barcode,
+          produto: details.produto,
+          preco: details.preco,
+          SAIDAS_carro_cliente: novas,
+        })
       }
     })
 
-    // 4. Process ESTOQUE GERAL (Stock <-> Car)
-    // ESTOQUE GERAL ESTOQUE PARA CARRO (Stock -> Car)
+    // 4. Process ESTOQUE GERAL (Stock Transfers)
+    // Source: ESTOQUE GERAL ESTOQUE PARA CARRO -> Destination: ESTOQUE CARRO: ESTOQUE PARA O CARRO (ENTRADAS_estoque_carro)
     const { data: stockToCarRows } = await supabase
       .from('ESTOQUE GERAL ESTOQUE PARA CARRO')
       .select('*')
       .eq('funcionario_id', employeeId)
-      .gte('created_at', session.data_inicio)
+      .gte('created_at', targetSession.data_inicio)
 
     const stockToCarInserts: any[] = []
     stockToCarRows?.forEach((row) => {
       const rowDate = parseISO(row.created_at || '')
       if (isBefore(rowDate, startDate)) return
-      if (session.data_fim && isAfter(rowDate, endDate)) return
+      if (targetSession.data_fim && isAfter(rowDate, endDate)) return
 
       const qty = row.quantidade || 0
       if (qty > 0) {
-        stockToCarInserts.push(
-          createPayload(row.produto_id, qty, {
-            data_horario: row.created_at,
-            ENTRADAS_estoque_carro: qty,
-          }),
-        )
+        const details = getProductDetails(row.produto_id, null)
+        stockToCarInserts.push({
+          id_estoque_carro: sessionId,
+          produto_id: details.produto_id,
+          quantidade: qty,
+          data_horario: row.created_at,
+          funcionario: employeeName,
+          codigo_produto: details.codigo_produto,
+          barcode: details.barcode,
+          produto: details.produto,
+          preco: details.preco,
+          ENTRADAS_estoque_carro: qty,
+        })
       }
     })
 
-    // ESTOQUE GERAL CARRO PARA ESTOQUE (Car -> Stock)
+    // Source: ESTOQUE GERAL CARRO PARA ESTOQUE -> Destination: ESTOQUE CARRO: CARRO PARA O ESTOQUE (SAIDAS_carro_estoque)
     const { data: carToStockRows } = await supabase
       .from('ESTOQUE GERAL CARRO PARA ESTOQUE')
       .select('*')
       .eq('funcionario_id', employeeId)
-      .gte('created_at', session.data_inicio)
+      .gte('created_at', targetSession.data_inicio)
 
     const carToStockInserts: any[] = []
     carToStockRows?.forEach((row) => {
       const rowDate = parseISO(row.created_at || '')
       if (isBefore(rowDate, startDate)) return
-      if (session.data_fim && isAfter(rowDate, endDate)) return
+      if (targetSession.data_fim && isAfter(rowDate, endDate)) return
 
       const qty = row.quantidade || 0
       if (qty > 0) {
-        carToStockInserts.push(
-          createPayload(row.produto_id, qty, {
-            data_horario: row.created_at,
-            SAIDAS_carro_estoque: qty,
-          }),
-        )
+        const details = getProductDetails(row.produto_id, null)
+        carToStockInserts.push({
+          id_estoque_carro: sessionId,
+          produto_id: details.produto_id,
+          quantidade: qty,
+          data_horario: row.created_at,
+          funcionario: employeeName,
+          codigo_produto: details.codigo_produto,
+          barcode: details.barcode,
+          produto: details.produto,
+          preco: details.preco,
+          SAIDAS_carro_estoque: qty,
+        })
       }
     })
 
-    // 5. Insert Data
-    // Using simple loops for bulk inserts to handle potential large arrays
+    // 5. Batch Insert
     const insertBatch = async (table: string, items: any[]) => {
       if (items.length === 0) return
       const batchSize = 1000
@@ -451,9 +459,8 @@ export const estoqueCarroService = {
         quantidade: quantity,
       },
       { onConflict: 'id_estoque_carro, produto_id' },
-    ) // Assuming unique constraint or logic allows upsert
+    )
 
-    // If constraint missing, delete then insert
     if (error) {
       await supabase
         .from('ESTOQUE CARRO CONTAGEM')
@@ -469,7 +476,6 @@ export const estoqueCarroService = {
   },
 
   async saveAdjustment(sessionId: number, productId: number, ajuste: number) {
-    // Simplified logic, similar to count
     await supabase
       .from('ESTOQUE CARRO AJUSTES')
       .delete()
@@ -487,7 +493,7 @@ export const estoqueCarroService = {
     const finalBalances = items.map((item) => ({
       id_estoque_carro: session.id,
       produto_id: item.produto_id,
-      saldo_final: item.novo_saldo, // Is "Novo Saldo" the final one for history? Yes.
+      saldo_final: item.novo_saldo,
       funcionario_id: session.funcionario_id,
       codigo_produto: item.codigo,
       produto: item.produto,
