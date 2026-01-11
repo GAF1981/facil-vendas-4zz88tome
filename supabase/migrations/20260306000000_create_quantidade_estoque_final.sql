@@ -38,8 +38,8 @@ WITH raw_data AS (
   SELECT
     "NÚMERO DO PEDIDO" as pedido,
     CASE
-      WHEN NULLIF("DATA E HORA", '') IS NOT NULL THEN NULLIF("DATA E HORA", '')::timestamp with time zone
-      ELSE (NULLIF("DATA DO ACERTO", '') || ' ' || COALESCE(NULLIF("HORA DO ACERTO", ''), '00:00:00'))::timestamp with time zone
+      WHEN NULLIF("DATA E HORA"::text, '') IS NOT NULL THEN NULLIF("DATA E HORA"::text, '')::timestamp with time zone
+      ELSE (NULLIF("DATA DO ACERTO"::text, '') || ' ' || COALESCE(NULLIF("HORA DO ACERTO"::text, ''), '00:00:00'))::timestamp with time zone
     END as data_hora,
     "CÓDIGO DO CLIENTE" as cod_cliente,
     "CLIENTE" as nome_cliente,
