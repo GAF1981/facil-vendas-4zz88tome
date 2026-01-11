@@ -227,22 +227,7 @@ export const rotaService = {
       }
     })
 
-    // 6. Fetch Accurate Stock Values via RPC
-    const { data: stockData, error: stockError } = await supabase.rpc(
-      'get_clients_last_stock_value',
-    )
-    if (stockError) {
-      console.error('Error fetching stock values:', stockError)
-    }
-
-    const stockMap = new Map<number, number>()
-    if (stockData) {
-      ;(stockData as any[]).forEach((row) => {
-        stockMap.set(row.client_id, row.stock_value)
-      })
-    }
-
-    // 7. Fetch basic Summary Stats (Last Visit Date from debitos_historico or BANCO_DE_DADOS lightweight)
+    // 6. Fetch basic Summary Stats (Last Visit Date from debitos_historico or BANCO_DE_DADOS lightweight)
     const { data: dbStats } = await supabase
       .from('BANCO_DE_DADOS')
       .select('"CÓDIGO DO CLIENTE", "DATA DO ACERTO", "NÚMERO DO PEDIDO"')
@@ -257,6 +242,9 @@ export const rotaService = {
         lastOrderId: number | null
       }
     >()
+
+    // Collect Order IDs to fetch stock values later
+    const orderIdsForStock = new Set<number>()
 
     dbStats?.forEach((row: any) => {
       const cid = row['CÓDIGO DO CLIENTE']
@@ -279,9 +267,43 @@ export const rotaService = {
         entry.lastDate = row['DATA DO ACERTO']
         if (row['NÚMERO DO PEDIDO']) {
           entry.lastOrderId = row['NÚMERO DO PEDIDO']
+          orderIdsForStock.add(row['NÚMERO DO PEDIDO'])
         }
       }
     })
+
+    // 7. Fetch Stock Values from QUANTIDADE DE ESTOQUE FINAL based on collected Orders
+    const stockMapByOrder = new Map<number, number>()
+    const orderIdsArray = Array.from(orderIdsForStock)
+
+    if (orderIdsArray.length > 0) {
+      const chunkSize = 1000
+      for (let i = 0; i < orderIdsArray.length; i += chunkSize) {
+        const chunk = orderIdsArray.slice(i, i + chunkSize)
+
+        // Explicitly casting table name to avoid type errors with spaces if definitions are outdated
+        const { data: stockRows, error: stockError } = await supabase
+          .from('QUANTIDADE DE ESTOQUE FINAL' as any)
+          .select('"NUMERO DO PEDIDO", "VALOR ESTOQUE POR PRODUTO"')
+          .in('NUMERO DO PEDIDO', chunk)
+
+        if (stockError) {
+          console.error('Error fetching stock final:', stockError)
+          continue
+        }
+
+        stockRows?.forEach((row: any) => {
+          const orderId = row['NUMERO DO PEDIDO']
+          const val = row['VALOR ESTOQUE POR PRODUTO'] || 0
+          if (orderId) {
+            stockMapByOrder.set(
+              orderId,
+              (stockMapByOrder.get(orderId) || 0) + val,
+            )
+          }
+        })
+      }
+    }
 
     // 8. Check for Completed Status
     const completedSet = new Set<number>()
@@ -315,7 +337,11 @@ export const rotaService = {
         }
       }
 
-      const stockValue = stockMap.get(cid) || 0
+      // Stock Value linked by Order ID (NEW)
+      let stockValue = 0
+      if (stats?.lastOrderId) {
+        stockValue = stockMapByOrder.get(stats.lastOrderId) || 0
+      }
 
       // Calculate Status & Earliest Unpaid Date
       let vencimentoStatus: 'VENCIDO' | 'A VENCER' | 'PAGO' | 'SEM DÉBITO' =
@@ -348,7 +374,7 @@ export const rotaService = {
         data_acerto: stats?.lastDate || null,
         projecao: projection,
         numero_pedido: stats?.lastOrderId || null,
-        estoque: stockValue,
+        estoque: stockValue, // Populated from aggregated stock data
         has_pendency: pendencyMap.has(cid),
         is_completed: completedSet.has(cid),
         earliest_unpaid_date: earliestUnpaid,
