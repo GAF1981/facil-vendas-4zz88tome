@@ -14,6 +14,20 @@ export interface StockReportRow {
   created_at: string
 }
 
+export interface StockFinalReportRow {
+  id: number
+  'NUMERO DO PEDIDO': number | null
+  'DATA E HORA DO ACERTO': string | null
+  'CÓDIGO DO CLIENTE': number | null
+  CLIENTE: string | null
+  'CÓDIGO DO PRODUTO': number | null
+  MERCADORIA: string | null
+  'SALDO FINAL': number | null
+  'PREÇO VENDIDO': number | null
+  'VALOR ESTOQUE POR PRODUTO': number | null
+  'VALOR ESTOQUE SALDO FINAL': number | null
+}
+
 export interface StockReportFilters {
   numero_pedido?: string
   codigo_cliente?: string

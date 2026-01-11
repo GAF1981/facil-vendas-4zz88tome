@@ -1,5 +1,9 @@
 import { supabase } from '@/lib/supabase/client'
-import { StockReportRow, StockReportFilters } from '@/types/stockReport'
+import {
+  StockReportRow,
+  StockReportFilters,
+  StockFinalReportRow,
+} from '@/types/stockReport'
 import { format, endOfDay, startOfDay, subDays } from 'date-fns'
 
 export const stockReportService = {
@@ -67,5 +71,22 @@ export const stockReportService = {
 
     if (error) throw error
     return data as StockReportRow[]
+  },
+
+  /**
+   * Fetches data from QUANTIDADE DE ESTOQUE FINAL table.
+   * This table contains detailed stock calculations per product and per order.
+   */
+  async getStockFinalReport(): Promise<StockFinalReportRow[]> {
+    // We use 'as any' casting for table name here because it's a new table
+    // and might not be in the generated types yet for this session context.
+    const { data, error } = await supabase
+      .from('QUANTIDADE DE ESTOQUE FINAL' as any)
+      .select('*')
+      .order('DATA E HORA DO ACERTO', { ascending: false })
+      .limit(1000)
+
+    if (error) throw error
+    return data as StockFinalReportRow[]
   },
 }
