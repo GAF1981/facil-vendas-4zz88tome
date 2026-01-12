@@ -265,6 +265,7 @@ export const rotaService = {
 
     // 7. Fetch Stock Values from QUANTIDADE DE ESTOQUE FINAL based on collected Orders (MAX Orders)
     // Updated Logic: Use 'VALOR ESTOQUE SALDO FINAL' directly, filtering by Order ID and Client ID
+    // We use column aliasing to avoid issues with spaces in column names in the returned object
     const stockMapByOrder = new Map<
       number,
       { value: number; clientId: number }
@@ -279,7 +280,7 @@ export const rotaService = {
         const { data: stockRows, error: stockError } = await supabase
           .from('QUANTIDADE DE ESTOQUE FINAL')
           .select(
-            '"NUMERO DO PEDIDO", "CÓDIGO DO CLIENTE", "VALOR ESTOQUE SALDO FINAL"',
+            'pedido_id:"NUMERO DO PEDIDO", client_id:"CÓDIGO DO CLIENTE", valor_total:"VALOR ESTOQUE SALDO FINAL"',
           )
           .in('"NUMERO DO PEDIDO"', chunk)
 
@@ -292,15 +293,14 @@ export const rotaService = {
         }
 
         stockRows?.forEach((row: any) => {
-          // Robust ID Matching (Ensure Numbers)
-          const orderId = Number(row['NUMERO DO PEDIDO'])
-          const clientId = Number(row['CÓDIGO DO CLIENTE'])
+          // Robust ID Matching (Ensure Numbers) using aliases
+          const orderId = Number(row.pedido_id)
+          const clientId = Number(row.client_id)
 
           if (!orderId || !clientId) return
 
           // Directly use the pre-calculated final value (sourced from database trigger/view)
-          // No manual summation here to ensure consistency with DB state
-          const totalValue = Number(row['VALOR ESTOQUE SALDO FINAL']) || 0
+          const totalValue = Number(row.valor_total) || 0
 
           // Store in map. Since all rows for the same order should have the same total,
           // overwriting is fine. We store Client ID to ensure correct matching later.

@@ -7,129 +7,382 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { RotaRow } from '@/types/rota'
+import { RotaRow, SortConfig } from '@/types/rota'
+import { Employee } from '@/types/employee'
 import { formatCurrency, safeFormatDate } from '@/lib/formatters'
 import { cn } from '@/lib/utils'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Loader2,
+  AlertCircle,
+} from 'lucide-react'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import { Button } from '@/components/ui/button'
 
 interface RotaTableProps {
-  data: RotaRow[]
+  rows: RotaRow[]
+  sellers: Employee[]
+  onUpdateRow: (clientId: number, field: string, value: any) => void
+  disabled?: boolean
+  onSort: (key: string) => void
+  sortConfig: SortConfig
+  loading?: boolean
 }
 
-export function RotaTable({ data }: RotaTableProps) {
+export function RotaTable({
+  rows,
+  sellers,
+  onUpdateRow,
+  disabled = false,
+  onSort,
+  sortConfig,
+  loading = false,
+}: RotaTableProps) {
+  const getSortIcon = (columnKey: string) => {
+    if (sortConfig.key !== columnKey)
+      return <ArrowUpDown className="h-3 w-3 ml-1 text-muted-foreground/50" />
+    if (sortConfig.direction === 'asc')
+      return <ArrowUp className="h-3 w-3 ml-1 text-primary" />
+    return <ArrowDown className="h-3 w-3 ml-1 text-primary" />
+  }
+
+  const SortableHeader = ({
+    column,
+    label,
+    align = 'left',
+  }: {
+    column: string
+    label: string
+    align?: 'left' | 'right' | 'center'
+  }) => (
+    <TableHead
+      className={cn('cursor-pointer hover:bg-muted/50 transition-colors', {
+        'text-right': align === 'right',
+        'text-center': align === 'center',
+      })}
+      onClick={() => onSort(column)}
+    >
+      <div
+        className={cn('flex items-center gap-1', {
+          'justify-end': align === 'right',
+          'justify-center': align === 'center',
+        })}
+      >
+        {label}
+        {getSortIcon(column)}
+      </div>
+    </TableHead>
+  )
+
+  if (loading && rows.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-4 border rounded-md bg-card">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-muted-foreground text-sm">Carregando rota...</p>
+      </div>
+    )
+  }
+
   return (
-    <div className="rounded-md border bg-card overflow-hidden shadow-sm">
-      <Table>
-        <TableHeader className="bg-muted/50">
-          <TableRow>
-            <TableHead className="w-[60px] text-center">#</TableHead>
-            <TableHead className="w-[300px]">Cliente</TableHead>
-            <TableHead className="w-[80px] text-center">Rota</TableHead>
-            <TableHead className="text-right">Débito</TableHead>
-            <TableHead className="text-right">Estoque (R$)</TableHead>
-            <TableHead className="text-center">Último Pedido</TableHead>
-            <TableHead className="text-center">Última Data</TableHead>
-            <TableHead className="w-[120px] text-center">Status</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {data.length === 0 ? (
+    <div className="rounded-md border bg-card overflow-hidden shadow-sm flex flex-col h-full">
+      <div className="flex-1 overflow-auto">
+        <Table>
+          <TableHeader className="bg-muted/50 sticky top-0 z-10 shadow-sm">
             <TableRow>
-              <TableCell
-                colSpan={8}
-                className="h-32 text-center text-muted-foreground"
-              >
-                <div className="flex flex-col items-center justify-center gap-2">
-                  <p className="font-medium">Nenhum cliente na rota</p>
-                  <p className="text-xs">
-                    Não há registros correspondentes aos filtros atuais.
-                  </p>
-                </div>
-              </TableCell>
+              <TableHead className="w-[50px] text-center font-bold text-xs">
+                #
+              </TableHead>
+              <TableHead className="w-[250px] font-bold text-xs">
+                Cliente
+              </TableHead>
+              <SortableHeader column="x_na_rota" label="xRota" align="center" />
+              <TableHead className="w-[100px] text-center font-bold text-xs">
+                Boleto
+              </TableHead>
+              <TableHead className="w-[100px] text-center font-bold text-xs">
+                Agregado
+              </TableHead>
+              <TableHead className="w-[160px] font-bold text-xs">
+                Vendedor
+              </TableHead>
+              <SortableHeader column="debito" label="Débito" align="right" />
+              <SortableHeader
+                column="estoque"
+                label="Estoque (R$)"
+                align="right"
+              />
+              <SortableHeader
+                column="projecao"
+                label="Projeção"
+                align="right"
+              />
+              <TableHead className="text-center font-bold text-xs">
+                Pedido
+              </TableHead>
+              <SortableHeader
+                column="data_acerto"
+                label="Data"
+                align="center"
+              />
+              <TableHead className="w-[100px] text-center font-bold text-xs">
+                Status
+              </TableHead>
             </TableRow>
-          ) : (
-            data.map((row) => (
-              <TableRow
-                key={row.client.CODIGO}
-                className={cn('hover:bg-muted/30', {
-                  'bg-green-50/50 hover:bg-green-100/50': row.is_completed,
-                  'bg-yellow-50/50 hover:bg-yellow-100/50': row.has_pendency,
-                })}
-              >
-                <TableCell className="text-center text-muted-foreground font-mono text-xs">
-                  {row.rowNumber}
-                </TableCell>
-                <TableCell>
-                  <div className="flex flex-col">
-                    <span className="font-medium">
-                      {row.client['NOME CLIENTE']}
-                    </span>
-                    <span className="text-xs text-muted-foreground flex gap-2">
-                      <span>Cod: {row.client.CODIGO}</span>
-                      {row.client.MUNICÍPIO && (
-                        <span>• {row.client.MUNICÍPIO}</span>
-                      )}
-                    </span>
+          </TableHeader>
+          <TableBody>
+            {rows.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={12}
+                  className="h-32 text-center text-muted-foreground"
+                >
+                  <div className="flex flex-col items-center justify-center gap-2">
+                    <p className="font-medium">Nenhum cliente encontrado</p>
+                    <p className="text-xs">
+                      Tente ajustar os filtros de busca.
+                    </p>
                   </div>
                 </TableCell>
-                <TableCell className="text-center font-medium">
-                  {row.x_na_rota > 0 ? (
-                    <Badge variant="secondary" className="font-mono">
-                      {row.x_na_rota}
-                    </Badge>
-                  ) : (
-                    <span className="text-muted-foreground">-</span>
-                  )}
-                </TableCell>
-                <TableCell className="text-right font-medium text-red-600">
-                  {row.debito > 0 ? `R$ ${formatCurrency(row.debito)}` : '-'}
-                </TableCell>
-                <TableCell className="text-right font-medium text-blue-600">
-                  {/* Graceful display: Show '-' if null, 'R$ 0,00' if 0, otherwise value */}
-                  {row.estoque !== null ? (
-                    `R$ ${formatCurrency(row.estoque)}`
-                  ) : (
-                    <span className="text-muted-foreground">-</span>
-                  )}
-                </TableCell>
-                <TableCell className="text-center font-mono text-xs">
-                  {row.numero_pedido || '-'}
-                </TableCell>
-                <TableCell className="text-center text-xs">
-                  {row.data_acerto
-                    ? safeFormatDate(row.data_acerto, 'dd/MM/yy')
-                    : '-'}
-                </TableCell>
-                <TableCell className="text-center">
-                  {row.vencimento_status === 'VENCIDO' && (
-                    <Badge variant="destructive" className="text-[10px]">
-                      VENCIDO
-                    </Badge>
-                  )}
-                  {row.vencimento_status === 'A VENCER' && (
-                    <Badge
-                      variant="outline"
-                      className="text-yellow-600 border-yellow-200 bg-yellow-50 text-[10px]"
-                    >
-                      A VENCER
-                    </Badge>
-                  )}
-                  {row.vencimento_status === 'PAGO' && (
-                    <Badge
-                      variant="outline"
-                      className="text-green-600 border-green-200 bg-green-50 text-[10px]"
-                    >
-                      PAGO
-                    </Badge>
-                  )}
-                  {row.vencimento_status === 'SEM DÉBITO' && (
-                    <span className="text-xs text-muted-foreground">-</span>
-                  )}
-                </TableCell>
               </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
+            ) : (
+              rows.map((row) => (
+                <TableRow
+                  key={row.client.CODIGO}
+                  className={cn(
+                    'hover:bg-muted/30 transition-colors border-b text-xs',
+                    {
+                      'bg-green-50/50 hover:bg-green-100/50 dark:bg-green-950/10 dark:hover:bg-green-950/20':
+                        row.is_completed,
+                      'bg-orange-50/50 hover:bg-orange-100/50 dark:bg-orange-950/10 dark:hover:bg-orange-950/20':
+                        row.has_pendency && !row.is_completed,
+                    },
+                  )}
+                >
+                  <TableCell className="text-center text-muted-foreground font-mono">
+                    {row.rowNumber}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col gap-0.5">
+                      <span
+                        className="font-semibold text-sm truncate max-w-[230px] block"
+                        title={row.client['NOME CLIENTE'] || ''}
+                      >
+                        {row.client['NOME CLIENTE']}
+                      </span>
+                      <div className="flex flex-wrap gap-1.5 text-[10px] text-muted-foreground">
+                        <span className="font-mono bg-muted px-1 rounded">
+                          {row.client.CODIGO}
+                        </span>
+                        {row.client.MUNICÍPIO && (
+                          <span className="flex items-center gap-0.5 truncate max-w-[120px]">
+                            • {row.client.MUNICÍPIO}
+                          </span>
+                        )}
+                        {row.client['OBSERVAÇÃO FIXA'] && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="bg-yellow-100 text-yellow-800 px-1 rounded cursor-help font-bold text-[10px]">
+                                  OBS
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-[300px]">
+                                <p>{row.client['OBSERVAÇÃO FIXA']}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <div className="flex justify-center">
+                      <Select
+                        disabled={disabled}
+                        value={row.x_na_rota.toString()}
+                        onValueChange={(val) =>
+                          onUpdateRow(
+                            row.client.CODIGO,
+                            'x_na_rota',
+                            parseInt(val),
+                          )
+                        }
+                      >
+                        <SelectTrigger
+                          className={cn(
+                            'h-7 w-[50px] text-xs px-1 justify-center',
+                            row.x_na_rota > 3
+                              ? 'bg-purple-100 text-purple-700 border-purple-200 font-bold'
+                              : row.x_na_rota > 0
+                                ? 'bg-secondary/50 font-medium'
+                                : 'text-muted-foreground',
+                          )}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="0">-</SelectItem>
+                          <SelectItem value="1">1</SelectItem>
+                          <SelectItem value="2">2</SelectItem>
+                          <SelectItem value="3">3</SelectItem>
+                          <SelectItem value="4">4</SelectItem>
+                          <SelectItem value="5">5</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Checkbox
+                      checked={row.boleto}
+                      disabled={disabled}
+                      onCheckedChange={(checked) =>
+                        onUpdateRow(row.client.CODIGO, 'boleto', checked)
+                      }
+                      className="h-4 w-4"
+                    />
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Checkbox
+                      checked={row.agregado}
+                      disabled={disabled}
+                      onCheckedChange={(checked) =>
+                        onUpdateRow(row.client.CODIGO, 'agregado', checked)
+                      }
+                      className="h-4 w-4"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Select
+                      disabled={disabled}
+                      value={row.vendedor_id?.toString() || 'none'}
+                      onValueChange={(val) =>
+                        onUpdateRow(
+                          row.client.CODIGO,
+                          'vendedor_id',
+                          val === 'none' ? null : parseInt(val),
+                        )
+                      }
+                    >
+                      <SelectTrigger
+                        className={cn(
+                          'h-7 w-full text-xs truncate',
+                          row.vendedor_id
+                            ? 'text-foreground font-medium'
+                            : 'text-muted-foreground',
+                        )}
+                      >
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem
+                          value="none"
+                          className="text-muted-foreground"
+                        >
+                          Nenhum
+                        </SelectItem>
+                        {sellers.map((s) => (
+                          <SelectItem key={s.id} value={s.id.toString()}>
+                            {s.nome_completo}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                  <TableCell className="text-right font-medium">
+                    <div className="flex flex-col items-end">
+                      <span
+                        className={cn({
+                          'text-red-600 font-bold': row.debito > 10,
+                          'text-muted-foreground': row.debito <= 0,
+                        })}
+                      >
+                        {row.debito > 0
+                          ? `R$ ${formatCurrency(row.debito)}`
+                          : '-'}
+                      </span>
+                      {row.quant_debito > 1 && (
+                        <span className="text-[9px] text-muted-foreground bg-muted px-1 rounded-full">
+                          {row.quant_debito} compras
+                        </span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right font-medium text-blue-600">
+                    {/* Correctly display currency or dash for null. 0 displays as R$ 0,00 */}
+                    {row.estoque !== null ? (
+                      `R$ ${formatCurrency(row.estoque)}`
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right text-muted-foreground">
+                    {row.projecao ? `R$ ${formatCurrency(row.projecao)}` : '-'}
+                  </TableCell>
+                  <TableCell className="text-center font-mono text-[10px]">
+                    {row.numero_pedido || '-'}
+                  </TableCell>
+                  <TableCell className="text-center text-[10px]">
+                    {row.data_acerto
+                      ? safeFormatDate(row.data_acerto, 'dd/MM/yy')
+                      : '-'}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <div className="flex flex-col items-center gap-1">
+                      {row.vencimento_status === 'VENCIDO' && (
+                        <Badge
+                          variant="destructive"
+                          className="text-[9px] px-1 h-4 flex items-center gap-1"
+                        >
+                          <AlertCircle className="w-2 h-2" /> VENCIDO
+                        </Badge>
+                      )}
+                      {row.vencimento_status === 'A VENCER' && (
+                        <Badge
+                          variant="outline"
+                          className="text-yellow-600 border-yellow-200 bg-yellow-50 text-[9px] px-1 h-4"
+                        >
+                          A VENCER
+                        </Badge>
+                      )}
+                      {row.vencimento_status === 'PAGO' && (
+                        <Badge
+                          variant="outline"
+                          className="text-green-600 border-green-200 bg-green-50 text-[9px] px-1 h-4"
+                        >
+                          PAGO
+                        </Badge>
+                      )}
+                      {row.has_pendency && (
+                        <Badge
+                          variant="secondary"
+                          className="bg-orange-100 text-orange-700 hover:bg-orange-200 text-[9px] px-1 h-4 border-orange-200 border"
+                        >
+                          PENDÊNCIA
+                        </Badge>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   )
 }
