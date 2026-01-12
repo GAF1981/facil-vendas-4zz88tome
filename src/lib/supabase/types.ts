@@ -2151,6 +2151,14 @@ export type Database = {
       }
     }
     Views: {
+      client_stats_view: {
+        Row: {
+          client_id: number | null
+          max_data_acerto: string | null
+          max_pedido: number | null
+        }
+        Relationships: []
+      }
       debitos_com_total_view: {
         Row: {
           cliente_codigo: number | null
