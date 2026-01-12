@@ -53,6 +53,7 @@ export default function AcertoPage() {
   const [signature, setSignature] = useState<string | null>(null)
   const [signatureOpen, setSignatureOpen] = useState(false)
   const [zeroStockDialogOpen, setZeroStockDialogOpen] = useState(false)
+  const [isCaptacao, setIsCaptacao] = useState(false)
 
   // Default to 80mm as per user story requirement for thermal printer optimization
   const [pdfFormat, setPdfFormat] = useState<'A4' | '80mm'>('80mm')
@@ -97,6 +98,15 @@ export default function AcertoPage() {
   useEffect(() => {
     if (client) {
       setLoadingAcerto(true)
+
+      // 0. Check for History (Captação Logic)
+      bancoDeDadosService
+        .checkClientHasOrders(client.CODIGO)
+        .then((hasOrders) => {
+          setIsCaptacao(!hasOrders)
+        })
+        .catch((e) => console.error('History check error', e))
+
       // 1. Get Last Acerto Info
       bancoDeDadosService
         .getLastAcerto(client.CODIGO)
@@ -153,6 +163,7 @@ export default function AcertoPage() {
       setSignature(null)
       setNotaFiscal('')
       setPendingAdjustments([])
+      setIsCaptacao(false)
     }
   }, [client])
 
@@ -262,7 +273,7 @@ export default function AcertoPage() {
           employee: emp,
           items,
           date: new Date().toISOString(),
-          acertoTipo: 'Acerto',
+          acertoTipo: isCaptacao ? 'Captação' : 'Acerto',
           totalVendido: totalSalesValue,
           valorDesconto: discountAmount,
           valorAcerto: amountToPay,
@@ -389,7 +400,7 @@ export default function AcertoPage() {
         emp,
         items,
         now,
-        'Acerto',
+        isCaptacao ? 'Captação' : 'Acerto',
         payments,
         notaFiscal,
       )
@@ -435,7 +446,7 @@ export default function AcertoPage() {
           employee: emp,
           items,
           date: now.toISOString(),
-          acertoTipo: 'Acerto',
+          acertoTipo: isCaptacao ? 'Captação' : 'Acerto',
           totalVendido: totalSalesValue,
           valorDesconto: discountAmount,
           valorAcerto: amountToPay,
@@ -467,7 +478,7 @@ export default function AcertoPage() {
       }, 100)
 
       toast({
-        title: 'Acerto Realizado',
+        title: isCaptacao ? 'Captação Realizada' : 'Acerto Realizado',
         description: 'Pedido salvo e PDF gerado com sucesso.',
         className: 'bg-green-600 text-white',
       })
@@ -550,11 +561,12 @@ export default function AcertoPage() {
             onUpdateSaldoInicial={handleUpdateSaldoInicial}
             onQueueAdjustment={handleQueueAdjustment}
             loading={loadingAcerto}
-            mode="ACERTO"
-            acertoTipo="Acerto"
+            mode={isCaptacao ? 'CAPTACAO' : 'ACERTO'}
+            acertoTipo={isCaptacao ? 'Captação' : 'Acerto'}
             clientId={client.CODIGO}
             clientName={client['NOME CLIENTE'] || 'Desconhecido'}
             orderNumber={nextOrderNumber}
+            isCaptacao={isCaptacao}
           />
 
           <div className="space-y-6">
@@ -623,7 +635,7 @@ export default function AcertoPage() {
               ) : (
                 <>
                   <Save className="mr-2 h-4 w-4" />
-                  Finalizar Acerto
+                  {isCaptacao ? 'Finalizar Captação' : 'Finalizar Acerto'}
                 </>
               )}
             </Button>

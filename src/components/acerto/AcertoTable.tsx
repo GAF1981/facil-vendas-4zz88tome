@@ -41,6 +41,7 @@ interface AcertoTableProps {
   clientId?: number
   clientName?: string
   orderNumber?: number | null
+  isCaptacao?: boolean
 }
 
 const VerticalHeader = ({
@@ -125,6 +126,7 @@ export function AcertoTable({
   loading = false,
   clientId,
   clientName,
+  isCaptacao = false,
 }: AcertoTableProps) {
   const { employee } = useUserStore()
   const { toast } = useToast()
@@ -134,8 +136,9 @@ export function AcertoTable({
   const [newSaldoInicial, setNewSaldoInicial] = useState<number>(0)
 
   // Determine if Contagem is editable based on acertoTipo
+  // If isCaptacao is true, force disable contagem
   const isContagemDisabled =
-    acertoTipo === 'CAPTAÇÃO' || acertoTipo === 'COMPLEMENTO'
+    isCaptacao || acertoTipo === 'CAPTAÇÃO' || acertoTipo === 'COMPLEMENTO'
 
   // Safety wrappers for callbacks
   const safeUpdateContagem = (uid: string, val: number) => {

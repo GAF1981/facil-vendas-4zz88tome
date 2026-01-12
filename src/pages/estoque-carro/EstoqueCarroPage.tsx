@@ -8,7 +8,6 @@ import {
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { employeesService } from '@/services/employeesService'
 import { estoqueCarroService } from '@/services/estoqueCarroService'
 import { Employee } from '@/types/employee'
@@ -20,7 +19,6 @@ import { EstoqueCarroHeader } from '@/components/estoque-carro/EstoqueCarroHeade
 import { EstoqueCarroControlBar } from '@/components/estoque-carro/EstoqueCarroControlBar'
 import { EstoqueCarroTable } from '@/components/estoque-carro/EstoqueCarroTable'
 import { EstoqueCarroCountDialog } from '@/components/estoque-carro/EstoqueCarroCountDialog'
-import { EstoqueCarroAcertoTab } from '@/components/estoque-carro/EstoqueCarroAcertoTab'
 
 export default function EstoqueCarroPage() {
   const [employees, setEmployees] = useState<Employee[]>([])
@@ -136,10 +134,6 @@ export default function EstoqueCarroPage() {
     employees.find((e) => e.id.toString() === selectedEmployeeId)
       ?.nome_completo || 'N/D'
 
-  const selectedEmployee = employees.find(
-    (e) => e.id.toString() === selectedEmployeeId,
-  )
-
   return (
     <div className="space-y-6 animate-fade-in pb-20">
       <div className="flex items-center gap-4">
@@ -178,69 +172,56 @@ export default function EstoqueCarroPage() {
       </div>
 
       {selectedEmployeeId && (
-        <Tabs defaultValue="estoque" className="w-full">
-          <TabsList>
-            <TabsTrigger value="estoque">Estoque Carro</TabsTrigger>
-            <TabsTrigger value="acerto">Acerto com Cliente</TabsTrigger>
-          </TabsList>
+        <div className="space-y-6">
+          <EstoqueCarroHeader
+            session={currentSession}
+            employeeName={selectedEmployeeName}
+          />
 
-          <TabsContent value="estoque" className="space-y-6">
-            <EstoqueCarroHeader
-              session={currentSession}
-              employeeName={selectedEmployeeName}
-            />
+          <EstoqueCarroControlBar
+            hasActiveSession={!!currentSession}
+            onStart={handleStart}
+            onReset={handleReset}
+            onCount={() => setCountDialogOpen(true)}
+            onFinalize={handleFinalize}
+            loading={loading}
+          />
 
-            <EstoqueCarroControlBar
-              hasActiveSession={!!currentSession}
-              onStart={handleStart}
-              onReset={handleReset}
-              onCount={() => setCountDialogOpen(true)}
-              onFinalize={handleFinalize}
-              loading={loading}
-            />
-
-            <Card>
-              <CardHeader className="pb-2">
-                <div className="flex justify-between items-center">
-                  <CardTitle>Produtos Carro</CardTitle>
-                  <div className="flex items-center gap-2">
-                    <Filter className="h-4 w-4 text-muted-foreground" />
-                    <Select value={saldoFilter} onValueChange={setSaldoFilter}>
-                      <SelectTrigger className="w-[180px] h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="todos">Todos</SelectItem>
-                        <SelectItem value="igual a 0">
-                          Saldo Final = 0
-                        </SelectItem>
-                        <SelectItem value="maior que 0">
-                          Saldo Final &gt; 0
-                        </SelectItem>
-                        <SelectItem value="menor que 0">
-                          Saldo Final &lt; 0
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex justify-between items-center">
+                <CardTitle>Produtos Carro</CardTitle>
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 text-muted-foreground" />
+                  <Select value={saldoFilter} onValueChange={setSaldoFilter}>
+                    <SelectTrigger className="w-[180px] h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      <SelectItem value="igual a 0">Saldo Final = 0</SelectItem>
+                      <SelectItem value="maior que 0">
+                        Saldo Final &gt; 0
+                      </SelectItem>
+                      <SelectItem value="menor que 0">
+                        Saldo Final &lt; 0
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-              </CardHeader>
-              <CardContent>
-                {loading ? (
-                  <div className="flex justify-center py-12">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  </div>
-                ) : (
-                  <EstoqueCarroTable items={filteredItems} />
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="acerto">
-            <EstoqueCarroAcertoTab employee={selectedEmployee} />
-          </TabsContent>
-        </Tabs>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              ) : (
+                <EstoqueCarroTable items={filteredItems} />
+              )}
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {currentSession && (
