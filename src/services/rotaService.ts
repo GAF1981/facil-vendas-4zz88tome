@@ -264,7 +264,11 @@ export const rotaService = {
     })
 
     // 7. Fetch Stock Values from QUANTIDADE DE ESTOQUE FINAL based on collected Orders (MAX Orders)
-    const stockMapByOrder = new Map<number, number>()
+    // Updated Logic: Use 'VALOR ESTOQUE SALDO FINAL' directly, filtering by Order ID and Client ID
+    const stockMapByOrder = new Map<
+      number,
+      { value: number; clientId: number }
+    >()
     const orderIdsArray = Array.from(orderIdsForStock)
 
     if (orderIdsArray.length > 0) {
@@ -272,13 +276,10 @@ export const rotaService = {
       for (let i = 0; i < orderIdsArray.length; i += chunkSize) {
         const chunk = orderIdsArray.slice(i, i + chunkSize)
 
-        // Query QUANTIDADE DE ESTOQUE FINAL directly for accurate numeric values
-        // We select "VALOR ESTOQUE POR PRODUTO" to calculate summation manually if needed,
-        // ensuring robustness against missing pre-calculations (Acceptance Criteria)
         const { data: stockRows, error: stockError } = await supabase
           .from('QUANTIDADE DE ESTOQUE FINAL')
           .select(
-            '"NUMERO DO PEDIDO", "VALOR ESTOQUE SALDO FINAL", "VALOR ESTOQUE POR PRODUTO"',
+            '"NUMERO DO PEDIDO", "CÓDIGO DO CLIENTE", "VALOR ESTOQUE SALDO FINAL"',
           )
           .in('"NUMERO DO PEDIDO"', chunk)
 
@@ -290,22 +291,23 @@ export const rotaService = {
           continue
         }
 
-        // Aggregate locally to ensure correctness (Summation Verification)
-        const calculatedTotals = new Map<number, number>()
-
         stockRows?.forEach((row: any) => {
+          // Robust ID Matching (Ensure Numbers)
           const orderId = Number(row['NUMERO DO PEDIDO'])
-          if (!orderId) return
+          const clientId = Number(row['CÓDIGO DO CLIENTE'])
 
-          // We sum VALOR ESTOQUE POR PRODUTO to be sure we have the correct total
-          // regardless of the trigger state for the aggregate column
-          const productValue = Number(row['VALOR ESTOQUE POR PRODUTO']) || 0
-          const currentTotal = calculatedTotals.get(orderId) || 0
-          calculatedTotals.set(orderId, currentTotal + productValue)
-        })
+          if (!orderId || !clientId) return
 
-        calculatedTotals.forEach((total, orderId) => {
-          stockMapByOrder.set(orderId, total)
+          // Directly use the pre-calculated final value (sourced from database trigger/view)
+          // No manual summation here to ensure consistency with DB state
+          const totalValue = Number(row['VALOR ESTOQUE SALDO FINAL']) || 0
+
+          // Store in map. Since all rows for the same order should have the same total,
+          // overwriting is fine. We store Client ID to ensure correct matching later.
+          stockMapByOrder.set(orderId, {
+            value: totalValue,
+            clientId: clientId,
+          })
         })
       }
     }
@@ -356,10 +358,14 @@ export const rotaService = {
         }
       }
 
-      // Stock Value linked by Order ID
-      let stockValue = 0
+      // Stock Value linked by Order ID (with Client ID verification)
+      let stockValue: number | null = null
       if (stats?.lastOrderId) {
-        stockValue = stockMapByOrder.get(stats.lastOrderId) || 0
+        const stockInfo = stockMapByOrder.get(stats.lastOrderId)
+        // Ensure the stock record found actually belongs to this client
+        if (stockInfo && stockInfo.clientId === cid) {
+          stockValue = stockInfo.value
+        }
       }
 
       // Calculate Status & Earliest Unpaid Date
@@ -393,7 +399,7 @@ export const rotaService = {
         data_acerto: stats?.lastDate || null,
         projecao: projection,
         numero_pedido: stats?.lastOrderId || null,
-        estoque: stockValue,
+        estoque: stockValue, // Now nullable
         has_pendency: pendencyMap.has(cid),
         is_completed: completedSet.has(cid),
         earliest_unpaid_date: earliestUnpaid,

@@ -31,7 +31,7 @@ export interface RotaRow {
   data_acerto: string | null
   projecao: number | null
   numero_pedido: number | null
-  estoque: number
+  estoque: number | null // Updated to allow null for missing data
   // Pendencies
   has_pendency: boolean
   // Meta

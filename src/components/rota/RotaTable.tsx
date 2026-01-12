@@ -84,8 +84,8 @@ export function RotaTable({ data }: RotaTableProps) {
                   {row.debito > 0 ? `R$ ${formatCurrency(row.debito)}` : '-'}
                 </TableCell>
                 <TableCell className="text-right font-medium text-blue-600">
-                  {/* Display calculated Stock Value based on Order ID matching */}
-                  {row.numero_pedido ? (
+                  {/* Graceful display: Show '-' if null, 'R$ 0,00' if 0, otherwise value */}
+                  {row.estoque !== null ? (
                     `R$ ${formatCurrency(row.estoque)}`
                   ) : (
                     <span className="text-muted-foreground">-</span>
