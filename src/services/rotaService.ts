@@ -4,12 +4,6 @@ import { pendenciasService } from './pendenciasService'
 import { reportsService } from './reportsService'
 import { parseISO, isBefore, startOfDay, subDays, format } from 'date-fns'
 
-// Define explicit type for the stock query result
-interface StockQueryResult {
-  'NUMERO DO PEDIDO': number
-  'VALOR ESTOQUE SALDO FINAL': number
-}
-
 export const rotaService = {
   async getActiveRota() {
     const { data, error } = await supabase
@@ -270,7 +264,6 @@ export const rotaService = {
     })
 
     // 7. Fetch Stock Values from QUANTIDADE DE ESTOQUE FINAL based on collected Orders (MAX Orders)
-    // We fetch the total stock value from VALOR ESTOQUE SALDO FINAL for the specific order
     const stockMapByOrder = new Map<number, number>()
     const orderIdsArray = Array.from(orderIdsForStock)
 
@@ -280,12 +273,14 @@ export const rotaService = {
         const chunk = orderIdsArray.slice(i, i + chunkSize)
 
         // Query QUANTIDADE DE ESTOQUE FINAL directly for accurate numeric values
-        // We use "VALOR ESTOQUE SALDO FINAL" which contains the total for the order (partitioned sum)
+        // We select "VALOR ESTOQUE POR PRODUTO" to calculate summation manually if needed,
+        // ensuring robustness against missing pre-calculations (Acceptance Criteria)
         const { data: stockRows, error: stockError } = await supabase
           .from('QUANTIDADE DE ESTOQUE FINAL')
-          .select('"NUMERO DO PEDIDO", "VALOR ESTOQUE SALDO FINAL"')
+          .select(
+            '"NUMERO DO PEDIDO", "VALOR ESTOQUE SALDO FINAL", "VALOR ESTOQUE POR PRODUTO"',
+          )
           .in('"NUMERO DO PEDIDO"', chunk)
-          .returns<StockQueryResult[]>()
 
         if (stockError) {
           console.error(
@@ -295,16 +290,22 @@ export const rotaService = {
           continue
         }
 
-        stockRows?.forEach((row) => {
-          const orderId = row['NUMERO DO PEDIDO']
+        // Aggregate locally to ensure correctness (Summation Verification)
+        const calculatedTotals = new Map<number, number>()
+
+        stockRows?.forEach((row: any) => {
+          const orderId = Number(row['NUMERO DO PEDIDO'])
           if (!orderId) return
 
-          // VALOR ESTOQUE SALDO FINAL is already the total for the order (partitioned sum)
-          // So we can just set it directly. Even if repeated rows exist, value is consistent
-          // because the database trigger ensures all rows for the same order have the same total.
-          const totalValue = row['VALOR ESTOQUE SALDO FINAL'] || 0
+          // We sum VALOR ESTOQUE POR PRODUTO to be sure we have the correct total
+          // regardless of the trigger state for the aggregate column
+          const productValue = Number(row['VALOR ESTOQUE POR PRODUTO']) || 0
+          const currentTotal = calculatedTotals.get(orderId) || 0
+          calculatedTotals.set(orderId, currentTotal + productValue)
+        })
 
-          stockMapByOrder.set(orderId, totalValue)
+        calculatedTotals.forEach((total, orderId) => {
+          stockMapByOrder.set(orderId, total)
         })
       }
     }
@@ -392,7 +393,7 @@ export const rotaService = {
         data_acerto: stats?.lastDate || null,
         projecao: projection,
         numero_pedido: stats?.lastOrderId || null,
-        estoque: stockValue, // Populated from QUANTIDADE DE ESTOQUE FINAL via Map
+        estoque: stockValue,
         has_pendency: pendencyMap.has(cid),
         is_completed: completedSet.has(cid),
         earliest_unpaid_date: earliestUnpaid,
