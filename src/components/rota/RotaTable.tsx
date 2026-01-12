@@ -32,7 +32,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { Button } from '@/components/ui/button'
 
 interface RotaTableProps {
   rows: RotaRow[]
@@ -53,6 +52,12 @@ export function RotaTable({
   sortConfig,
   loading = false,
 }: RotaTableProps) {
+  // Use Intl.NumberFormat specifically for Stock column as requested
+  const currencyFormatter = new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  })
+
   const getSortIcon = (columnKey: string) => {
     if (sortConfig.key !== columnKey)
       return <ArrowUpDown className="h-3 w-3 ml-1 text-muted-foreground/50" />
@@ -323,9 +328,9 @@ export function RotaTable({
                     </div>
                   </TableCell>
                   <TableCell className="text-right font-medium text-blue-600">
-                    {/* Correctly display currency or dash for null. 0 displays as R$ 0,00 */}
+                    {/* Display exact currency value or dash if null */}
                     {row.estoque !== null ? (
-                      `R$ ${formatCurrency(row.estoque)}`
+                      currencyFormatter.format(row.estoque)
                     ) : (
                       <span className="text-muted-foreground">-</span>
                     )}
