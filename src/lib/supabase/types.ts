@@ -2181,6 +2181,13 @@ export type Database = {
         }
         Relationships: []
       }
+      view_client_latest_consigned_value: {
+        Row: {
+          client_id: number | null
+          total_consigned_value: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       auto_finalize_overdue_routes: { Args: never; Returns: Json }

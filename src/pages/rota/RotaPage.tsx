@@ -145,7 +145,7 @@ export default function RotaPage() {
 
     let newXNaRota: number | undefined = undefined
 
-    // Automatic logic: Increment x_na_rota if seller is assigned (not removed)
+    // Automatic logic: Increment x_na_rota if seller is assigned or changed
     if (field === 'vendedor_id' && value !== null) {
       const currentRow = rows.find((r) => r.client.CODIGO === clientId)
       if (currentRow) {
@@ -292,6 +292,14 @@ export default function RotaPage() {
           valA = a.debito
           valB = b.debito
           break
+        case 'grupo_rota':
+          valA = a.client['GRUPO ROTA'] || ''
+          valB = b.client['GRUPO ROTA'] || ''
+          break
+        case 'municipio':
+          valA = a.client.MUNICÍPIO || ''
+          valB = b.client.MUNICÍPIO || ''
+          break
         default:
           return 0
       }
@@ -320,16 +328,24 @@ export default function RotaPage() {
 
   const handleExportExcel = () => {
     const headers = [
-      'Código',
-      'Nome',
+      'Débito',
       'Projeção',
       'Vendedor',
-      'Débito',
-      'Data Acerto',
-      'Saldo Final de Estoques',
-      'Valor Consignado Total',
+      'Rota/Grupo Rota',
+      'Consignado',
+      '#',
+      'Cliente',
       'Município',
-      'Rota',
+      'Endereço',
+      'Tipo de Cliente',
+      'Telefone 1',
+      'Contato 1',
+      'xRota',
+      'Pedido',
+      'Data',
+      'Status',
+      'Boleto',
+      'Agregado',
     ]
 
     const csvContent = [
@@ -338,16 +354,24 @@ export default function RotaPage() {
         const sellerName =
           sellers.find((s) => s.id === row.vendedor_id)?.nome_completo || ''
         return [
-          row.client.CODIGO,
-          `"${(row.client['NOME CLIENTE'] || '').replace(/"/g, '""')}"`,
+          row.debito.toFixed(2).replace('.', ','),
           (row.projecao || 0).toFixed(2).replace('.', ','),
           `"${sellerName}"`,
-          row.debito.toFixed(2).replace('.', ','),
-          row.data_acerto || '',
-          (row.estoque || 0).toFixed(2).replace('.', ','),
-          (row.valor_consignado || 0).toFixed(2).replace('.', ','),
-          `"${(row.client.MUNICÍPIO || '').replace(/"/g, '""')}"`,
           `"${(row.client['GRUPO ROTA'] || '').replace(/"/g, '""')}"`,
+          (row.valor_consignado || 0).toFixed(2).replace('.', ','),
+          row.rowNumber,
+          `"${(row.client['NOME CLIENTE'] || '').replace(/"/g, '""')}"`,
+          `"${(row.client.MUNICÍPIO || '').replace(/"/g, '""')}"`,
+          `"${(row.client.ENDEREÇO || '').replace(/"/g, '""')}"`,
+          `"${(row.client['TIPO DE CLIENTE'] || '').replace(/"/g, '""')}"`,
+          `"${(row.client['FONE 1'] || '').replace(/"/g, '""')}"`,
+          `"${(row.client['CONTATO 1'] || '').replace(/"/g, '""')}"`,
+          row.x_na_rota,
+          row.numero_pedido || '',
+          row.data_acerto || '',
+          row.vencimento_status,
+          row.boleto ? 'SIM' : 'NÃO',
+          row.agregado ? 'SIM' : 'NÃO',
         ].join(';')
       }),
     ].join('\n')
