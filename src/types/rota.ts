@@ -32,6 +32,7 @@ export interface RotaRow {
   projecao: number | null
   numero_pedido: number | null
   estoque: number | null // Updated to allow null for missing data
+  valor_consignado: number | null // New field for Total Consigned Value
   // Pendencies
   has_pendency: boolean
   // Meta

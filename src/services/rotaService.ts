@@ -264,9 +264,6 @@ export const rotaService = {
     })
 
     // 7. Fetch Stock Values from QUANTIDADE DE ESTOQUE FINAL based on collected Orders (MAX Orders)
-    // Updated Logic: We now rely on the pre-calculated total from the database trigger
-    // We fetch one row per product but the VALOR ESTOQUE SALDO FINAL is already the total for the order.
-    // So we just need to take the value once per order.
     const stockMapByOrder = new Map<
       number,
       { value: number; clientId: number }
@@ -300,9 +297,6 @@ export const rotaService = {
 
           if (!orderId || !clientId) return
 
-          // Logic Change: The value 'val' is already the Total Stock Value for the Order (Synced by DB Trigger).
-          // We do NOT sum it. We just assign it.
-          // Since we get multiple rows (one per product) for the same order, we check if we already have it.
           if (!stockMapByOrder.has(orderId)) {
             stockMapByOrder.set(orderId, {
               value: val,
@@ -313,7 +307,23 @@ export const rotaService = {
       }
     }
 
-    // 8. Check for Completed Status (Visits within active route range)
+    // 8. Fetch Consigned Values (New Requirement)
+    const { data: consignedData, error: consignedError } = await supabase
+      .from('view_client_latest_consigned_value' as any)
+      .select('*')
+
+    if (consignedError) {
+      console.error('Error fetching consigned values:', consignedError)
+    }
+
+    const consignedMap = new Map<number, number>()
+    if (consignedData) {
+      consignedData.forEach((row: any) => {
+        consignedMap.set(row.client_id, row.total_consigned_value)
+      })
+    }
+
+    // 9. Check for Completed Status (Visits within active route range)
     const completedSet = new Set<number>()
     if (rota) {
       const startDate = format(parseISO(rota.data_inicio), 'yyyy-MM-dd')
@@ -401,6 +411,7 @@ export const rotaService = {
         projecao: projection,
         numero_pedido: stats?.lastOrderId || null,
         estoque: stockValue, // Now nullable
+        valor_consignado: consignedMap.get(cid) || null, // Map from view
         has_pendency: pendencyMap.has(cid),
         is_completed: completedSet.has(cid),
         earliest_unpaid_date: earliestUnpaid,

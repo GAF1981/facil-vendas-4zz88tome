@@ -132,6 +132,11 @@ export function RotaTable({
                 align="right"
               />
               <SortableHeader
+                column="valor_consignado"
+                label="Consignado"
+                align="right"
+              />
+              <SortableHeader
                 column="projecao"
                 label="Projeção"
                 align="right"
@@ -153,7 +158,7 @@ export function RotaTable({
             {rows.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={12}
+                  colSpan={13}
                   className="h-32 text-center text-muted-foreground"
                 >
                   <div className="flex flex-col items-center justify-center gap-2">
@@ -334,6 +339,12 @@ export function RotaTable({
                     ) : (
                       <span className="text-muted-foreground">-</span>
                     )}
+                  </TableCell>
+                  <TableCell className="text-right text-muted-foreground">
+                    {row.valor_consignado !== null &&
+                    row.valor_consignado !== undefined
+                      ? `R$ ${formatCurrency(row.valor_consignado)}`
+                      : '-'}
                   </TableCell>
                   <TableCell className="text-right text-muted-foreground">
                     {row.projecao ? `R$ ${formatCurrency(row.projecao)}` : '-'}

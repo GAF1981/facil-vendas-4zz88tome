@@ -276,6 +276,10 @@ export default function RotaPage() {
           valA = a.estoque ?? 0
           valB = b.estoque ?? 0
           break
+        case 'valor_consignado':
+          valA = a.valor_consignado ?? 0
+          valB = b.valor_consignado ?? 0
+          break
         case 'x_na_rota':
           valA = a.x_na_rota
           valB = b.x_na_rota
@@ -323,6 +327,7 @@ export default function RotaPage() {
       'Débito',
       'Data Acerto',
       'Saldo Final de Estoques',
+      'Valor Consignado Total',
       'Município',
       'Rota',
     ]
@@ -340,6 +345,7 @@ export default function RotaPage() {
           row.debito.toFixed(2).replace('.', ','),
           row.data_acerto || '',
           (row.estoque || 0).toFixed(2).replace('.', ','),
+          (row.valor_consignado || 0).toFixed(2).replace('.', ','),
           `"${(row.client.MUNICÍPIO || '').replace(/"/g, '""')}"`,
           `"${(row.client['GRUPO ROTA'] || '').replace(/"/g, '""')}"`,
         ].join(';')
