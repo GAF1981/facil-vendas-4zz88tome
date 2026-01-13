@@ -429,8 +429,8 @@ export default function RotaPage() {
   }
 
   return (
-    <div className="absolute inset-0 flex flex-col gap-4 animate-fade-in p-4 pb-20 md:pb-4 overflow-hidden">
-      <div className="flex-none flex flex-col gap-3">
+    <div className="absolute inset-0 flex flex-col gap-2 animate-fade-in p-2 pb-20 md:pb-2 overflow-hidden">
+      <div className="flex-none flex flex-col gap-2">
         <div className="w-full">
           <RotaHeader
             activeRota={activeRota}

@@ -14,6 +14,7 @@ export interface RotaItem {
   boleto: boolean
   agregado: boolean
   vendedor_id: number | null
+  tarefas?: string | null
 }
 
 export interface RotaRow {
@@ -25,6 +26,7 @@ export interface RotaRow {
   boleto: boolean
   agregado: boolean
   vendedor_id: number | null
+  tarefas: string | null
   // Financial & Stats
   debito: number
   quant_debito: number
@@ -35,6 +37,7 @@ export interface RotaRow {
   valor_consignado: number | null
   // Pendencies
   has_pendency: boolean
+  pendency_details: string[] // Added for alerts
   // Meta
   is_completed: boolean // Green status
   // Status Logic

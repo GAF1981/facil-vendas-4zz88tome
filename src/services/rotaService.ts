@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase/client'
 import { Rota, RotaItem } from '@/types/rota'
 import { pendenciasService } from './pendenciasService'
 import { reportsService } from './reportsService'
-import { parseISO, isBefore, startOfDay, format } from 'date-fns'
+import { parseISO, isBefore, startOfDay } from 'date-fns'
 
 export const rotaService = {
   async getActiveRota() {
@@ -89,10 +89,6 @@ export const rotaService = {
 
     if (transferError) {
       console.error('Error transferring unattended items:', transferError)
-      // Even if transfer fails, we try to close the old route?
-      // Better to throw so UI knows something went wrong, but the new route is already created...
-      // Ideally we would wrap in a transaction, but via client SDK we can't easily.
-      // We will proceed to close old route but log error.
     }
 
     // 4. Close the Old Rota
@@ -220,7 +216,13 @@ export const rotaService = {
 
     // 3. Fetch Pendencies
     const allPendencies = await pendenciasService.getAll(false)
-    const pendencyMap = new Set(allPendencies.map((p) => p.cliente_id))
+    const pendencyMap = new Map<number, string[]>()
+
+    allPendencies.forEach((p) => {
+      const existing = pendencyMap.get(p.cliente_id) || []
+      existing.push(p.descricao_pendencia)
+      pendencyMap.set(p.cliente_id, existing)
+    })
 
     // 4. Fetch Rota Items
     let rotaItemsMap = new Map<number, RotaItem>()
@@ -408,14 +410,11 @@ export const rotaService = {
     if (rota) {
       const startDate = rota.data_inicio
       const endDate = rota.data_fim || new Date().toISOString()
-      // We removed the 'formattedStartDate' and the loose 'DATA DO ACERTO' comparison
-      // to ensure strictly only current route activities are counted (Client 67 Fix).
 
-      // Check BANCO_DE_DADOS (Acertos)
       const { data: visits } = await supabase
         .from('BANCO_DE_DADOS')
         .select('"CÓDIGO DO CLIENTE"')
-        .gte('"DATA E HORA"', startDate) // Strict timestamp comparison
+        .gte('"DATA E HORA"', startDate)
         .limit(20000)
 
       visits?.forEach((v) => {
@@ -423,7 +422,6 @@ export const rotaService = {
         if (cid) completedSet.add(cid)
       })
 
-      // Check RECEBIMENTOS (Payments)
       const { data: payments } = await supabase
         .from('RECEBIMENTOS')
         .select('cliente_id')
@@ -466,14 +464,12 @@ export const rotaService = {
       if (effectiveDebt > 0.05) {
         if (oldestDue) {
           const dueDate = parseISO(oldestDue)
-          // strict check: if date is BEFORE today -> Vencido
           if (isBefore(dueDate, today)) {
             vencimentoStatus = 'VENCIDO'
           } else {
             vencimentoStatus = 'A VENCER'
           }
         } else if (debtEntry?.oldestDate) {
-          // Fallback to debt entry old logic
           const date = parseISO(debtEntry.oldestDate)
           if (isBefore(date, today)) {
             vencimentoStatus = 'VENCIDO'
@@ -494,6 +490,7 @@ export const rotaService = {
         boleto: rotaItem?.boleto || false,
         agregado: rotaItem?.agregado || false,
         vendedor_id: rotaItem?.vendedor_id || null,
+        tarefas: rotaItem?.tarefas || null,
         debito: effectiveDebt,
         quant_debito: debtEntry?.orderCount || 0,
         data_acerto: stats?.lastDate || null,
@@ -502,6 +499,7 @@ export const rotaService = {
         estoque: stockValue,
         valor_consignado: consignedMap.get(cid) || null,
         has_pendency: pendencyMap.has(cid),
+        pendency_details: pendencyMap.get(cid) || [],
         is_completed: isCompleted,
         earliest_unpaid_date: oldestDue || debtEntry?.oldestDate || null,
         vencimento_status: vencimentoStatus,

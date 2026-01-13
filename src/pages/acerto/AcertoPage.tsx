@@ -148,8 +148,8 @@ export default function AcertoPage() {
         .then(setNextOrderNumber)
         .catch((e) => console.error('Next order error', e))
 
-      // 5. NF Logic: If 'Nota Fiscal Cadastro' is NO, set Venda to NO automatically
-      if (client['NOTA FISCAL'] === 'NÃO') {
+      // 5. NF Logic: If 'Nota Fiscal Cadastro' is NO or 0, set Venda to NO automatically
+      if (client['NOTA FISCAL'] === 'NÃO' || client['NOTA FISCAL'] === '0') {
         setNotaFiscal('NÃO')
       } else {
         setNotaFiscal('') // Reset if SIM or other
