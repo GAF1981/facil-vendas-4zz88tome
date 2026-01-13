@@ -43,63 +43,67 @@ export function AcertoPaymentSummary({
     count: number,
     method: PaymentMethodType,
     hasZeroDownPayment: boolean = false,
+    baseDate: string = format(new Date(), 'yyyy-MM-dd'),
   ): PaymentInstallment[] => {
-    // Logic for "Sem Entrada" on Pix/Dinheiro:
-    // If checked, the first installment is a dummy 0 value entry,
-    // and the total value is distributed among the remaining N-1 installments.
     let effectiveCount = count
     if (hasZeroDownPayment && (method === 'Pix' || method === 'Dinheiro')) {
       effectiveCount = count - 1
     }
-    // Safety check for 1x Sem Entrada (effectively 0 value total for 1x?)
-    // Requirements imply "Sem Entrada" sets Entry payment to 0.
-    // For 1x, this would mean the whole payment is 0.
-    // We assume effectiveCount min 1 to avoid division by zero, but logic below handles i=0 explicitly.
     if (effectiveCount < 1) effectiveCount = 1
 
     const installmentValue =
       effectiveCount > 0 ? Number((totalValue / effectiveCount).toFixed(2)) : 0
 
-    // Calculate remainder to add to last installment to match total exactly
     const totalDistributed = installmentValue * effectiveCount
     const remainder = Number((totalValue - totalDistributed).toFixed(2))
 
-    const today = new Date()
+    // Determine initial date logic
+    // For Boleto/Cheque, if 1x, we want to respect the selected date.
+    // BaseDate is passed from the main input or today.
+    const start = new Date(baseDate + 'T12:00:00')
+
     return Array.from({ length: count }, (_, i) => {
-      let dueDate = format(addDays(today, (i + 1) * 30), 'yyyy-MM-dd')
+      // Logic for Date Automation:
+      // If "Sem Entrada" is checked, Requirements say:
+      // "the expiration dates in both the method field and the detail field must be automatically filled with the same date."
+      // This implies all dates are the same? Or just the start?
+      // Assuming for 1x it's same. For >1x, normally spaced by 30 days.
+      // But if "Sem Entrada" means delayed payment, maybe the 1st installment (0 value) has date X, and 2nd (real) has date X?
+      // Let's stick to standard spacing unless forced.
+      // The requirement focuses on "synchronization".
+
+      let dueDateObj = i === 0 ? start : addDays(start, i * 30)
+
+      // If Boleto/Cheque 1x, date is explicitly synced.
+      // If Sem Entrada, date is explicitly synced.
+      // For >1x, we space out.
+
+      let dueDate = format(dueDateObj, 'yyyy-MM-dd')
       let value = installmentValue
       let paidValue = 0
 
-      // Logic for Entry Payment (First Installment)
       const isEntry = i === 0
 
       if (isEntry && (method === 'Pix' || method === 'Dinheiro')) {
-        dueDate = format(today, 'yyyy-MM-dd')
         if (hasZeroDownPayment) {
-          // Requirement 2: If "Sem ENTRADA", Valor Registrado and Valor Pago must be 0
           value = 0
           paidValue = 0
+          // If Sem Entrada, maybe first date is irrelevant, but we sync it anyway
         } else {
-          // Default behavior: Entry is paid immediately
           paidValue = value
         }
       } else {
-        // Future installments
         if (hasZeroDownPayment && (method === 'Pix' || method === 'Dinheiro')) {
-          // We skipped i=0, so distributing to i>0
           if (i === count - 1) value += remainder
         } else {
-          // Standard distribution
           if (i === count - 1) value += remainder
         }
       }
 
-      // Requirement 1: Boleto always 0 Paid Value
       if (method === 'Boleto') {
         paidValue = 0
       }
 
-      // Update Requirement: Cheque now populated with registered value (considered paid/collected)
       if (method === 'Cheque') {
         paidValue = value
       }
@@ -119,21 +123,18 @@ export function AcertoPaymentSummary({
     if (checked) {
       const defaultValue = Number(Math.max(0, remaining).toFixed(2))
       const today = new Date()
+      // Default dates
       const dueDateDate = method === 'Boleto' ? addDays(today, 10) : today
       const dueDate = format(dueDateDate, 'yyyy-MM-dd')
 
-      // Initial Paid Value calculation
-      let initialPaidValue = 0
-      if (method === 'Pix' || method === 'Dinheiro') {
-        initialPaidValue = defaultValue // Default to full payment for 1x
-      } else if (method === 'Cheque') {
-        initialPaidValue = defaultValue // Cheque populated with registered value
-      }
-
-      // Generate default 1x details to keep logic consistent
-      const details = generateInstallments(defaultValue, 1, method, false)
-      // Override paidValue based on generated detail (which handles rules)
-      initialPaidValue = details[0].paidValue
+      const details = generateInstallments(
+        defaultValue,
+        1,
+        method,
+        false,
+        dueDate,
+      )
+      const initialPaidValue = details.reduce((acc, d) => acc + d.paidValue, 0)
 
       const newEntry: PaymentEntry = {
         method,
@@ -142,7 +143,7 @@ export function AcertoPaymentSummary({
         installments: 1,
         dueDate: dueDate,
         hasZeroDownPayment: false,
-        details: details, // Store details even for 1x for consistency
+        details: details,
       }
       onPaymentsChange([...payments, newEntry])
     } else {
@@ -160,14 +161,38 @@ export function AcertoPaymentSummary({
     onPaymentsChange(
       payments.map((p) => {
         if (p.method !== method) return p
-
-        // Block updating paidValue manually on the main object (it's calculated)
         if (field === 'paidValue') return p
 
         const updated = { ...p, [field]: value }
 
-        // Recalculate details and derived values
-        if (
+        // Date Sync Logic: If modifying main date
+        if (field === 'dueDate') {
+          const newDate = value as string
+          // Req 6: Boleto/Cheque 1x or Sem Entrada -> Sync details
+          const shouldSyncDetails =
+            (method === 'Boleto' || method === 'Cheque') && p.installments === 1
+
+          const isSemEntrada = p.hasZeroDownPayment
+
+          if (shouldSyncDetails || isSemEntrada) {
+            // For Sem Entrada, req says "both method field and detail field... same date"
+            // If we change main date, sync all details start point
+            if (updated.details) {
+              // Regenerate to keep spacing correct relative to new start
+              const newDetails = generateInstallments(
+                updated.value,
+                updated.installments,
+                method,
+                updated.hasZeroDownPayment,
+                newDate,
+              )
+              updated.details = newDetails
+            }
+          } else if (p.installments === 1 && updated.details) {
+            // Standard 1x sync
+            updated.details[0].dueDate = newDate
+          }
+        } else if (
           field === 'value' ||
           field === 'installments' ||
           field === 'hasZeroDownPayment'
@@ -179,25 +204,24 @@ export function AcertoPaymentSummary({
             field === 'hasZeroDownPayment'
               ? (value as boolean)
               : p.hasZeroDownPayment
+          const baseDate = p.dueDate
 
-          const newDetails = generateInstallments(val, count, method, zeroDown)
+          const newDetails = generateInstallments(
+            val,
+            count,
+            method,
+            zeroDown,
+            baseDate,
+          )
           updated.details = newDetails
-
-          // Update main paidValue sum from details
           updated.paidValue = Number(
             newDetails.reduce((acc, d) => acc + d.paidValue, 0).toFixed(2),
           )
 
           if (count === 1) {
+            // Sync back if 1x
             updated.dueDate = newDetails[0].dueDate
           }
-        } else if (
-          field === 'dueDate' &&
-          p.installments === 1 &&
-          updated.details
-        ) {
-          // Sync 1x detail due date
-          updated.details[0].dueDate = value as string
         }
 
         return updated
@@ -216,6 +240,27 @@ export function AcertoPaymentSummary({
     onPaymentsChange(
       payments.map((p) => {
         if (p.method !== method || !p.details) return p
+
+        // Date Sync Logic: If modifying detail date
+        // Req 6: If Boleto/Cheque 1x, sync main date
+        if (field === 'dueDate' && index === 0) {
+          const shouldSyncMain =
+            (method === 'Boleto' || method === 'Cheque') && p.installments === 1
+          const isSemEntrada = p.hasZeroDownPayment
+
+          if (shouldSyncMain || isSemEntrada) {
+            // If I change the detail date, update the main date too
+            // For Sem Entrada, if I change any detail date... well, usually just the first one matters for "base"
+            return {
+              ...p,
+              dueDate: value as string,
+              details: p.details.map((d, i) =>
+                i === index ? { ...d, [field]: value } : d,
+              ),
+            }
+          }
+        }
+
         const newDetails = [...p.details]
         newDetails[index] = { ...newDetails[index], [field]: value }
 
@@ -223,29 +268,15 @@ export function AcertoPaymentSummary({
         let newPaidValue = p.paidValue
 
         if (field === 'value') {
-          // If installment value changes, update total registered
           newValue = Number(
             newDetails.reduce((acc, curr) => acc + curr.value, 0).toFixed(2),
           )
-
-          // Also update paid value automatically if it's supposed to be synced (Cheque, Pix entry, etc)
-          // However, the `paidValue` update below handles recalculation from details.
-          // But if we only change 'value', we might need to sync 'paidValue' inside details too?
-          // If Cheque, paidValue should equal value.
           if (method === 'Cheque') {
             newDetails[index].paidValue = newDetails[index].value
           }
         }
 
-        if (field === 'paidValue') {
-          // If installment paid value changes, update total paid
-          newPaidValue = Number(
-            newDetails
-              .reduce((acc, curr) => acc + curr.paidValue, 0)
-              .toFixed(2),
-          )
-        } else if (field === 'value') {
-          // Recalculate total paid value sum after value updates (incase auto-updates happened)
+        if (field === 'paidValue' || field === 'value') {
           newPaidValue = Number(
             newDetails
               .reduce((acc, curr) => acc + curr.paidValue, 0)
@@ -359,12 +390,8 @@ export function AcertoPaymentSummary({
             <div className="grid gap-4">
               {payments.map((entry) => {
                 const isOverpaid = entry.paidValue > entry.value + 0.01
-
                 const isPixOrDinheiro =
                   entry.method === 'Pix' || entry.method === 'Dinheiro'
-
-                // Logic for disabling installments field
-                // Pix/Dinheiro: Disabled by default. Enabled ONLY if "Sem Entrada" is checked.
                 const isInstallmentsDisabled =
                   disabled || (isPixOrDinheiro && !entry.hasZeroDownPayment)
 
@@ -384,7 +411,6 @@ export function AcertoPaymentSummary({
                           </div>
                         </div>
 
-                        {/* Requirement 2: Checkbox "Sem ENTRADA" for Pix/Dinheiro */}
                         {isPixOrDinheiro && (
                           <div className="flex items-center gap-2 pt-1">
                             <Checkbox
@@ -451,7 +477,6 @@ export function AcertoPaymentSummary({
                           <span className="absolute left-3 top-2.5 text-muted-foreground text-sm">
                             R$
                           </span>
-                          {/* Requirement 1 (Boleto) Summary Paid Value must be disabled */}
                           <Input
                             type="number"
                             step="0.01"
@@ -524,7 +549,6 @@ export function AcertoPaymentSummary({
                       )}
                     </div>
 
-                    {/* Installments Breakdown - Show even for 1x to allow checking details or partial payment if enabled */}
                     {entry.installments >= 1 && entry.details && (
                       <div className="pl-4 border-l-2 border-muted space-y-3">
                         <div className="flex items-center justify-between">
@@ -536,20 +560,9 @@ export function AcertoPaymentSummary({
                         <div className="grid gap-3">
                           {entry.details.map((inst, idx) => {
                             const isEntrada = idx === 0 && isPixOrDinheiro
-                            // Requirement 1: Boleto Paid Value is 0 and Disabled
                             const isBoleto = entry.method === 'Boleto'
-                            // Cheque behavior is same as others for editability but defaults to full value.
-                            // We allow editing paid value for Cheque if needed, but it defaults to full.
-
-                            // Requirement 2: Pix/Dinheiro Paid Value rules
-                            // If Sem Entrada (hasZeroDownPayment), 1st installment is 0 and disabled
                             const isZeroEntry =
                               isEntrada && entry.hasZeroDownPayment
-                            // If NOT Sem Entrada, 1st installment (Entry) is editable
-                            // Future installments (idx > 0) usually 0 paid now
-                            // const isEditableEntry = isEntrada && !entry.hasZeroDownPayment
-
-                            // Logic for disabling paid value input
                             const isPaidDisabled =
                               disabled ||
                               isBoleto ||
@@ -587,9 +600,7 @@ export function AcertoPaymentSummary({
                                     step="0.01"
                                     className="h-8 pl-7 text-sm"
                                     value={inst.value}
-                                    disabled={
-                                      disabled || isZeroEntry // Value is also 0 and disabled if Sem Entrada
-                                    }
+                                    disabled={disabled || isZeroEntry}
                                     onChange={(e) =>
                                       handleUpdateInstallment(
                                         entry.method,
@@ -601,7 +612,6 @@ export function AcertoPaymentSummary({
                                   />
                                 </div>
 
-                                {/* Paid Value per Installment */}
                                 <div className="w-full sm:flex-1 relative">
                                   <span className="absolute left-2.5 top-2 text-muted-foreground text-xs">
                                     Pago: R$

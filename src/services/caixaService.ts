@@ -30,6 +30,18 @@ export interface ExpenseDetail {
   valor: number
   funcionarioNome?: string
   funcionarioId?: number
+  saiuDoCaixa: boolean
+  hodometro?: number | null
+}
+
+export interface FuelReportRow {
+  id: number
+  date: string
+  employeeName: string
+  gasolineValue: number
+  initialOdometer: number | null
+  finalOdometer: number
+  costPerKm: number | null
 }
 
 export const caixaService = {
@@ -44,6 +56,8 @@ export const caixaService = {
       Valor: despesa.Valor,
       funcionario_id: despesa.funcionario_id,
       Data: dataToSave,
+      saiu_do_caixa: despesa.saiu_do_caixa,
+      hodometro: despesa.hodometro,
     })
 
     if (error) throw error
@@ -75,20 +89,6 @@ export const caixaService = {
 
     const summaryMap = new Map<number, CaixaSummaryRow>()
     employees?.forEach((emp) => {
-      // Determine status: If closure record exists, use its status (Aberto/Fechado implies "In Process" or "Done").
-      // If no record, it's "Aberto" (Open for business).
-      // Requirement: "Display a Green badge 'Caixa Fechado' if the cashier is closed... Red badge 'Caixa Aberto' if the cashier is open."
-      // Closed = status 'Fechado'. Open = No record or 'Aberto'.
-      // Wait, if 'Aberto' (Closure started), is it "Closed" for operations? Yes per blocking logic.
-      // But purely for the badge, let's map DB status.
-      // If record exists, we might want to show "Em Fechamento" or "Fechado".
-      // But the requirement specifically says "Caixa Fechado" if closed.
-      // Let's assume:
-      // - No record: 'Aberto' (Red)
-      // - 'Aberto' record: 'Aberto' (Red) -- or maybe 'Em Fechamento'? Standardizing on 'Aberto'/'Fechado' as per acceptance criteria.
-      // - 'Fechado' record: 'Fechado' (Green)
-      // The logic `checkExistingClosing` implies blocking if *any* record exists.
-      // For display, let's use explicit status from table.
       const dbStatus = closureMap.get(emp.id)
       const statusCaixa = dbStatus === 'Fechado' ? 'Fechado' : 'Aberto'
 
@@ -133,13 +133,16 @@ export const caixaService = {
     // 4. Expenses
     const { data: expenses, error: expError } = await supabase
       .from('DESPESAS')
-      .select('funcionario_id, Valor, Data')
+      .select('funcionario_id, Valor, Data, saiu_do_caixa')
       .gte('Data', rota.data_inicio)
 
     if (expError) throw expError
 
     expenses?.forEach((exp) => {
       if (!exp.Data) return
+      // Only count expenses that explicitly came out of the cashier
+      if (exp.saiu_do_caixa === false) return
+
       const expDate = parseISO(exp.Data)
       const isAfterStart =
         isAfter(expDate, routeStart) || isEqual(expDate, routeStart)
@@ -164,7 +167,7 @@ export const caixaService = {
         (row) =>
           Math.abs(row.totalRecebido) > 0.01 ||
           Math.abs(row.totalDespesas) > 0.01 ||
-          row.statusCaixa === 'Fechado', // Keep closed employees visible even if 0
+          row.statusCaixa === 'Fechado',
       )
       .sort((a, b) => a.funcionarioNome.localeCompare(b.funcionarioNome))
 
@@ -250,6 +253,8 @@ export const caixaService = {
       valor: Number(exp.Valor),
       funcionarioNome: exp.FUNCIONARIOS?.nome_completo || 'N/D',
       funcionarioId: exp.funcionario_id,
+      saiuDoCaixa: exp.saiu_do_caixa,
+      hodometro: exp.hodometro,
     }))
   },
 
@@ -331,6 +336,75 @@ export const caixaService = {
       grupo: exp['Grupo de Despesas'],
       detalhamento: exp.Detalhamento,
       valor: Number(exp.Valor),
+      saiuDoCaixa: exp.saiu_do_caixa,
+      hodometro: exp.hodometro,
     }))
+  },
+
+  async getFuelReportData(): Promise<FuelReportRow[]> {
+    const { data, error } = await supabase
+      .from('DESPESAS')
+      .select(
+        `
+        id,
+        Data,
+        Valor,
+        hodometro,
+        funcionario_id,
+        FUNCIONARIOS ( nome_completo )
+      `,
+      )
+      .eq('Grupo de Despesas', 'Gasolina')
+      .order('Data', { ascending: true }) // Sorted by date to calculate distances
+
+    if (error) throw error
+
+    // Group by Employee to calculate odometer differences per car/person
+    const groupedByEmployee = new Map<number, any[]>()
+    data?.forEach((row: any) => {
+      const eid = row.funcionario_id
+      if (!groupedByEmployee.has(eid)) groupedByEmployee.set(eid, [])
+      groupedByEmployee.get(eid)?.push(row)
+    })
+
+    const reportRows: FuelReportRow[] = []
+
+    groupedByEmployee.forEach((entries) => {
+      // Sort each employee's entries by Date ascending (just to be safe)
+      entries.sort(
+        (a, b) => new Date(a.Data).getTime() - new Date(b.Data).getTime(),
+      )
+
+      for (let i = 0; i < entries.length; i++) {
+        const current = entries[i]
+        const previous = i > 0 ? entries[i - 1] : null
+
+        let initialOdo = null
+        let costPerKm = null
+
+        if (previous && previous.hodometro && current.hodometro) {
+          initialOdo = previous.hodometro
+          const distance = current.hodometro - initialOdo
+          if (distance > 0) {
+            costPerKm = current.Valor / distance
+          }
+        }
+
+        reportRows.push({
+          id: current.id,
+          date: current.Data,
+          employeeName: current.FUNCIONARIOS?.nome_completo || 'Unknown',
+          gasolineValue: Number(current.Valor),
+          initialOdometer: initialOdo,
+          finalOdometer: Number(current.hodometro),
+          costPerKm: costPerKm,
+        })
+      }
+    })
+
+    // Return sorted by date descending for report view
+    return reportRows.sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+    )
   },
 }

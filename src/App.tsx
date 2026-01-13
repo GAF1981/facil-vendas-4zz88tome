@@ -32,6 +32,7 @@ import TopSellingReportsPage from '@/pages/relatorio/TopSellingReportsPage'
 import AdjustmentReportsPage from '@/pages/relatorio/AdjustmentReportsPage'
 import DebitosReportPage from '@/pages/relatorio/DebitosReportPage'
 import GeneralInventoryReportPage from '@/pages/relatorio/GeneralInventoryReportPage'
+import FuelReportPage from '@/pages/relatorio/FuelReportPage'
 import CaixaPage from '@/pages/caixa/CaixaPage'
 import FechamentosPage from '@/pages/fechamento/FechamentosPage'
 import PagamentosPage from '@/pages/pagamentos/PagamentosPage'
@@ -41,7 +42,7 @@ import ContagemPage from '@/pages/inventario/ContagemPage'
 import ResumoAcertosPage from '@/pages/resumo-acertos/ResumoAcertosPage'
 import PermissionsPage from '@/pages/admin/PermissionsPage'
 import EstoqueCarroPage from '@/pages/estoque-carro/EstoqueCarroPage'
-import InativarClientesPage from '@/pages/inativar-clientes/InativarClientesPage' // New Page
+import InativarClientesPage from '@/pages/inativar-clientes/InativarClientesPage'
 import { AuthProvider } from '@/hooks/use-auth'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { PermissionsProvider } from '@/hooks/use-permissions'
@@ -184,7 +185,10 @@ const App = () => (
                     path="/relatorio/ajustes-saldo"
                     element={<AdjustmentReportsPage />}
                   />
-                  {/* New Report Route */}
+                  <Route
+                    path="/relatorio/combustivel"
+                    element={<FuelReportPage />}
+                  />
                   <Route
                     path="/relatorio/inativar-clientes"
                     element={<InativarClientesPage />}
@@ -204,7 +208,6 @@ const App = () => (
                   <Route path="/estoque-carro" element={<EstoqueCarroPage />} />
                 </Route>
 
-                {/* New Module Route */}
                 <Route element={<PermissionGuard module="Inativar Clientes" />}>
                   <Route
                     path="/inativar-clientes"

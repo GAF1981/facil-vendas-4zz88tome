@@ -24,6 +24,7 @@ export interface EstoqueCarroItem {
   diferenca_val: number
   ajustes: number
   novo_saldo: number
+  id_estoque_carro: number // Added for drill-down context
 }
 
 export interface CountUpdatePayload {

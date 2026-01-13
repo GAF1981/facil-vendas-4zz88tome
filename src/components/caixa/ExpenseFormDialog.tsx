@@ -17,6 +17,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import {
@@ -26,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/hooks/use-toast'
 import { caixaService } from '@/services/caixaService'
 import { employeesService } from '@/services/employeesService'
@@ -59,6 +61,8 @@ export function ExpenseFormDialog({
       detalhamento: '',
       valor: '',
       funcionario_id: '',
+      saiu_do_caixa: true,
+      hodometro: '',
     },
   })
 
@@ -66,49 +70,46 @@ export function ExpenseFormDialog({
 
   useEffect(() => {
     if (open) {
-      // Fetch employees list
       employeesService.getEmployees(1, 100).then(({ data }) => {
         setEmployees(data.filter((e) => e.situacao === 'ATIVO'))
       })
 
-      if (preselectedEmployee) {
-        form.reset({
-          data: new Date().toISOString().split('T')[0],
-          grupo: 'Alimentação',
-          detalhamento: 'Alimentação',
-          valor: '',
-          funcionario_id: preselectedEmployee.id.toString(),
-        })
-      } else {
-        // Requirement: Auto-select logged in employee if available
-        form.reset({
-          data: new Date().toISOString().split('T')[0],
-          grupo: 'Alimentação',
-          detalhamento: 'Alimentação',
-          valor: '',
-          funcionario_id: loggedInUser?.id.toString() || '',
-        })
+      const initialValues = {
+        data: new Date().toISOString().split('T')[0],
+        grupo: 'Alimentação' as const,
+        detalhamento: 'Alimentação',
+        valor: '',
+        funcionario_id:
+          preselectedEmployee?.id.toString() ||
+          loggedInUser?.id.toString() ||
+          '',
+        saiu_do_caixa: true,
+        hodometro: '',
       }
+      form.reset(initialValues)
     }
   }, [open, form, preselectedEmployee, loggedInUser])
 
-  // Auto-fill detalhamento effect
   useEffect(() => {
     if (selectedGrupo === 'Alimentação') {
       form.setValue('detalhamento', 'Alimentação')
     } else if (selectedGrupo === 'Combustível') {
       form.setValue('detalhamento', 'Combustível')
+    } else if (selectedGrupo === 'Gasolina') {
+      form.setValue('detalhamento', 'Gasolina')
     } else if (selectedGrupo === 'Outros') {
-      // Keep existing or clear if it was an auto-value
       const current = form.getValues('detalhamento')
-      if (current === 'Alimentação' || current === 'Combustível') {
+      if (
+        current === 'Alimentação' ||
+        current === 'Combustível' ||
+        current === 'Gasolina'
+      ) {
         form.setValue('detalhamento', '')
       }
     }
   }, [selectedGrupo, form])
 
   const onSubmit = async (data: DespesaFormData) => {
-    // Logic for detailing
     let detalhamentoToSave = data.detalhamento || ''
     if (data.grupo === 'Outros') {
       if (!detalhamentoToSave.trim()) {
@@ -118,17 +119,26 @@ export function ExpenseFormDialog({
         return
       }
     } else {
-      detalhamentoToSave = data.grupo // Enforce group name as detail for consistency if not others
+      detalhamentoToSave = data.grupo
+    }
+
+    if (data.grupo === 'Gasolina' && !data.hodometro) {
+      form.setError('hodometro', {
+        message: 'Hodômetro é obrigatório para Gasolina',
+      })
+      return
     }
 
     setLoading(true)
     try {
       await caixaService.saveDespesa({
-        Data: data.data, // Pass date from form
+        Data: data.data,
         'Grupo de Despesas': data.grupo,
         Detalhamento: detalhamentoToSave,
         Valor: parseFloat(data.valor.replace(',', '.')),
         funcionario_id: parseInt(data.funcionario_id),
+        saiu_do_caixa: data.saiu_do_caixa,
+        hodometro: data.hodometro ? parseFloat(data.hodometro) : null,
       })
 
       toast({
@@ -223,6 +233,7 @@ export function ExpenseFormDialog({
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="Alimentação">Alimentação</SelectItem>
+                      <SelectItem value="Gasolina">Gasolina</SelectItem>
                       <SelectItem value="Combustível">Combustível</SelectItem>
                       <SelectItem value="Outros">Outros</SelectItem>
                     </SelectContent>
@@ -248,6 +259,27 @@ export function ExpenseFormDialog({
               />
             )}
 
+            {selectedGrupo === 'Gasolina' && (
+              <FormField
+                control={form.control}
+                name="hodometro"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Hodômetro do carro *</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder="Km atual"
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
             <FormField
               control={form.control}
               name="valor"
@@ -263,6 +295,27 @@ export function ExpenseFormDialog({
                     />
                   </FormControl>
                   <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="saiu_do_caixa"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 shadow-sm">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>O valor saiu do Caixa?</FormLabel>
+                    <FormDescription>
+                      Se desmarcado, não descontará do saldo do acerto.
+                    </FormDescription>
+                  </div>
                 </FormItem>
               )}
             />

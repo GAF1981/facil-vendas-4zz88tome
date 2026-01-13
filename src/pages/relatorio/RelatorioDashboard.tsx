@@ -15,6 +15,7 @@ import {
   CreditCard,
   ClipboardList,
   UserX,
+  Fuel,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useUserStore } from '@/stores/useUserStore'
@@ -132,6 +133,14 @@ const RelatorioDashboard = () => {
       to: '/relatorio/itens-mais-vendidos',
       color: 'text-purple-600',
       bg: 'bg-purple-100',
+    },
+    {
+      title: 'Combustível',
+      description: 'Análise de consumo e custo por quilômetro.',
+      icon: Fuel,
+      to: '/relatorio/combustivel',
+      color: 'text-orange-600',
+      bg: 'bg-orange-100',
     },
     {
       title: 'Ajustes Saldo Inicial',

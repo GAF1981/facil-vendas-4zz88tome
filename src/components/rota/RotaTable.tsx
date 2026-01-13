@@ -268,13 +268,17 @@ export function RotaTable({
                       Agreg.
                     </TableHead>
                   )}
+
+                  <TableHead className="w-[100px] text-center font-bold text-xs">
+                    CEP
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {rows.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={isSelectionMode ? 14 : 20}
+                      colSpan={isSelectionMode ? 15 : 21}
                       className="h-32 text-center text-muted-foreground"
                     >
                       <div className="flex flex-col items-center justify-center gap-2">
@@ -293,23 +297,19 @@ export function RotaTable({
                     let textClass = ''
 
                     if (row.is_completed) {
-                      // 1. Green (Completed)
                       rowClass =
                         'bg-green-800 hover:bg-green-700 text-white dark:bg-green-900 dark:hover:bg-green-800 border-b text-xs'
                       textClass = 'text-green-100'
                     } else if (row.vencimento_status === 'VENCIDO') {
-                      // 2. Red (Overdue)
                       rowClass =
                         'bg-red-200 hover:bg-red-300 dark:bg-red-900/50 dark:hover:bg-red-900/70 border-b text-xs'
                       textClass = 'text-red-900 dark:text-red-100'
                     } else if (row.x_na_rota > 3) {
-                      // 3. Dark Purple (xRota > 3)
                       rowClass =
                         'bg-[#4c1d95] hover:bg-[#5b21b6] text-white border-b text-xs'
                       textClass = 'text-purple-100'
                     }
 
-                    // Alert Icon Status
                     const hasAlerts =
                       (row.pendency_details &&
                         row.pendency_details.length > 0) ||
@@ -378,7 +378,7 @@ export function RotaTable({
                                   'text-red-900':
                                     row.vencimento_status === 'VENCIDO' &&
                                     !row.is_completed &&
-                                    row.x_na_rota <= 3, // Conflict? handled by rowClass logic mainly
+                                    row.x_na_rota <= 3,
                                 })}
                               >
                                 {safeFormatDate(
@@ -618,7 +618,6 @@ export function RotaTable({
                               }
                               className={cn(
                                 'h-7 w-[60px] text-center text-xs p-1',
-                                // Condition for Cell Color: x_na_rota > 3 AND NOT Completed
                                 row.x_na_rota > 3 && !row.is_completed
                                   ? 'bg-[#4c1d95] text-white border-purple-900 font-bold'
                                   : row.x_na_rota > 0
@@ -732,6 +731,15 @@ export function RotaTable({
                             />
                           </TableCell>
                         )}
+
+                        <TableCell
+                          className={cn(
+                            'text-center font-mono text-[10px]',
+                            textClass || 'text-muted-foreground',
+                          )}
+                        >
+                          {row.client['CEP OFICIO'] || '-'}
+                        </TableCell>
                       </TableRow>
                     )
                   })

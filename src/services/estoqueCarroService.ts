@@ -208,6 +208,7 @@ export const estoqueCarroService = {
       const novoSaldo = contagem + ajuste
 
       return {
+        id_estoque_carro: sessionId, // Added for context
         produto_id: p.ID,
         codigo: p.CODIGO,
         produto: p.PRODUTO || 'Desconhecido',
@@ -226,6 +227,44 @@ export const estoqueCarroService = {
         novo_saldo: novoSaldo,
       }
     })
+  },
+
+  async getMovementDetails(sessionId: number, productId: number) {
+    // Helper to fetch and normalize
+    const fetchTable = async (table: string, type: string) => {
+      const { data } = await supabase
+        .from(table)
+        .select('*')
+        .eq('id_estoque_carro', sessionId)
+        .eq('produto_id', productId)
+      return (data || []).map((d) => ({ ...d, movement_type: type }))
+    }
+
+    const [clientToCar, carToClient, stockToCar, carToStock] =
+      await Promise.all([
+        fetchTable(
+          'ESTOQUE CARRO: CLIENTE PARA O CARRO',
+          'ENTRADAS_cliente_carro',
+        ),
+        fetchTable(
+          'ESTOQUE CARRO: CARRO PARA O CLIENTE',
+          'SAIDAS_carro_cliente',
+        ),
+        fetchTable(
+          'ESTOQUE CARRO: ESTOQUE PARA O CARRO',
+          'ENTRADAS_estoque_carro',
+        ),
+        fetchTable(
+          'ESTOQUE CARRO: CARRO PARA O ESTOQUE',
+          'SAIDAS_carro_estoque',
+        ),
+      ])
+
+    return [...clientToCar, ...carToClient, ...stockToCar, ...carToStock].sort(
+      (a, b) =>
+        new Date(b.created_at || b.data_horario).getTime() -
+        new Date(a.created_at || a.data_horario).getTime(),
+    )
   },
 
   async updateStockMovements(sessionId: number, employeeId: number) {

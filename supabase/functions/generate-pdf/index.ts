@@ -16,10 +16,13 @@ const formatCurrency = (value: number) => {
 const safeFormatDate = (dateString: string | null | undefined): string => {
   if (!dateString) return '-'
   try {
-    return new Date(dateString).toLocaleDateString('pt-BR', {
+    // Timezone Fix: Convert UTC string to America/Sao_Paulo time before formatting
+    const date = new Date(dateString)
+    return date.toLocaleDateString('pt-BR', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
+      timeZone: 'America/Sao_Paulo',
     })
   } catch {
     return dateString || '-'
@@ -29,9 +32,11 @@ const safeFormatDate = (dateString: string | null | undefined): string => {
 const safeFormatTime = (dateString: string | null | undefined): string => {
   if (!dateString) return ''
   try {
-    return new Date(dateString).toLocaleTimeString('pt-BR', {
+    const date = new Date(dateString)
+    return date.toLocaleTimeString('pt-BR', {
       hour: '2-digit',
       minute: '2-digit',
+      timeZone: 'America/Sao_Paulo',
     })
   } catch {
     return ''
