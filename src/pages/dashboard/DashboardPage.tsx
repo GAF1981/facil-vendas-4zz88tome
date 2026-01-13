@@ -31,9 +31,16 @@ const DashboardPage = () => {
   const fetchStats = async () => {
     try {
       const data = await clientsService.getMetrics()
-      setStats(data)
+      setStats({
+        totalClients: data.totalClients || 0,
+        recentClients: data.recentClients || [],
+      })
     } catch (error) {
-      console.error(error)
+      console.error('Error fetching dashboard stats:', error)
+      setStats({
+        totalClients: 0,
+        recentClients: [],
+      })
     } finally {
       setLoading(false)
     }
@@ -107,7 +114,9 @@ const DashboardPage = () => {
             />
             <MetricCard
               title="Novos Clientes"
-              value={`+${stats.recentClients.length}`} // Approximate for visual
+              value={
+                stats.recentClients ? `+${stats.recentClients.length}` : '+0'
+              }
               description="Recentes"
               icon={UserPlus}
               iconClassName="text-green-600"
@@ -128,41 +137,54 @@ const DashboardPage = () => {
               </div>
             ) : (
               <div className="space-y-6">
-                {stats.recentClients.map((client) => (
-                  <div
-                    key={client.CODIGO}
-                    className="flex items-center justify-between"
-                  >
-                    <div className="flex items-center space-x-4">
-                      <Avatar className="h-9 w-9">
-                        <AvatarImage
-                          src={`https://img.usecurling.com/ppl/thumbnail?gender=${Math.random() > 0.5 ? 'male' : 'female'}&seed=${client.CODIGO}`}
-                          alt={client['NOME CLIENTE'] || ''}
-                        />
-                        <AvatarFallback>
-                          {client['NOME CLIENTE']
-                            ?.substring(0, 2)
-                            .toUpperCase() || 'CL'}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium leading-none">
-                          {client['NOME CLIENTE']}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {client.EMAIL || 'Sem email'}
-                        </p>
+                {(stats.recentClients || []).map((client) => {
+                  // Safe handling for potentially null/undefined values
+                  const clientName =
+                    client['NOME CLIENTE'] || 'Cliente Sem Nome'
+                  const clientEmail = client.EMAIL || 'Sem email'
+                  const clientCode = client.CODIGO
+                    ? client.CODIGO.toString()
+                    : '0'
+
+                  return (
+                    <div
+                      key={client.CODIGO || Math.random()}
+                      className="flex items-center justify-between"
+                    >
+                      <div className="flex items-center space-x-4">
+                        <Avatar className="h-9 w-9">
+                          <AvatarImage
+                            src={`https://img.usecurling.com/ppl/thumbnail?gender=${Math.random() > 0.5 ? 'male' : 'female'}&seed=${clientCode}`}
+                            alt={clientName}
+                          />
+                          <AvatarFallback>
+                            {clientName.substring(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium leading-none">
+                            {clientName}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {clientEmail}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="icon" asChild>
+                          <Link to={`/clientes/${clientCode}`}>
+                            <ArrowRight className="h-4 w-4" />
+                          </Link>
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="icon" asChild>
-                        <Link to={`/clientes/${client.CODIGO}`}>
-                          <ArrowRight className="h-4 w-4" />
-                        </Link>
-                      </Button>
-                    </div>
+                  )
+                })}
+                {(!stats.recentClients || stats.recentClients.length === 0) && (
+                  <div className="text-center py-4 text-muted-foreground">
+                    Nenhum cliente recente encontrado.
                   </div>
-                ))}
+                )}
               </div>
             )}
             <div className="mt-6 flex justify-end">

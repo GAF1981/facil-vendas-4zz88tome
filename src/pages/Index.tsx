@@ -21,6 +21,7 @@ import {
   UserX,
 } from 'lucide-react'
 import { usePermissions } from '@/hooks/use-permissions'
+import { DashboardStats } from '@/components/dashboard/DashboardStats'
 
 export default function Index() {
   const { canAccess } = usePermissions()
@@ -104,7 +105,7 @@ export default function Index() {
       to: '/inativar-clientes',
       description: 'Gestão de clientes para inativação',
       color: 'text-red-700',
-      module: 'Inativar Clientes', // Using new permission
+      module: 'Inativar Clientes',
     },
     {
       title: 'Pendências',
@@ -187,9 +188,13 @@ export default function Index() {
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-bold tracking-tight">Menu Principal</h1>
         <p className="text-muted-foreground">
-          Bem-vindo ao sistema Fácil Vendas. Selecione um módulo para começar.
+          Bem-vindo ao sistema Fácil Vendas. Confira o resumo do dia e selecione
+          um módulo.
         </p>
       </div>
+
+      {/* Dashboard Stats Section - Robust Implementation */}
+      <DashboardStats />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {visibleModules.map((module) => (
