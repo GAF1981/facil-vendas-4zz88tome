@@ -188,7 +188,11 @@ export default function CaixaPage() {
 
   // Calculations (Ensuring correct subtractions)
   const totalRecebido = filteredReceipts.reduce((acc, r) => acc + r.valor, 0)
-  const totalDespesas = filteredExpenses.reduce((acc, e) => acc + e.valor, 0)
+  // Ensure we only sum expenses that came out of the cashier
+  const totalDespesas = filteredExpenses
+    .filter((e) => e.saiuDoCaixa)
+    .reduce((acc, e) => acc + e.valor, 0)
+
   const totalSaldo = totalRecebido - totalDespesas
 
   const totalPix = filteredReceipts

@@ -53,10 +53,19 @@ export function ExpenseFormDialog({
   const { toast } = useToast()
   const { employee: loggedInUser } = useUserStore()
 
+  // Helper to get local date string YYYY-MM-DD
+  const getLocalDateString = () => {
+    const date = new Date()
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
   const form = useForm<DespesaFormData>({
     resolver: zodResolver(despesaSchema),
     defaultValues: {
-      data: new Date().toISOString().split('T')[0],
+      data: getLocalDateString(),
       grupo: 'Alimentação',
       detalhamento: '',
       valor: '',
@@ -75,7 +84,7 @@ export function ExpenseFormDialog({
       })
 
       const initialValues = {
-        data: new Date().toISOString().split('T')[0],
+        data: getLocalDateString(),
         grupo: 'Alimentação' as const,
         detalhamento: 'Alimentação',
         valor: '',

@@ -1,7 +1,14 @@
 import { supabase } from '@/lib/supabase/client'
 import { DespesaInsert } from '@/types/despesa'
 import { Rota } from '@/types/rota'
-import { parseISO, isAfter, isBefore, isEqual, startOfDay } from 'date-fns'
+import {
+  parseISO,
+  isAfter,
+  isBefore,
+  isEqual,
+  startOfDay,
+  format,
+} from 'date-fns'
 
 export interface CaixaSummaryRow {
   funcionarioId: number
@@ -46,8 +53,10 @@ export interface FuelReportRow {
 
 export const caixaService = {
   async saveDespesa(despesa: DespesaInsert) {
+    // Fix: Ensure we use a safe time (Noon) for the selected date to prevent timezone shifts
+    // to previous day when converted to UTC (e.g. 00:00 Local -> 21:00 Prev Day UTC)
     const dataToSave = despesa.Data
-      ? new Date(despesa.Data).toISOString()
+      ? new Date(`${despesa.Data}T12:00:00`).toISOString()
       : new Date().toISOString()
 
     const { error } = await supabase.from('DESPESAS').insert({
@@ -137,8 +146,8 @@ export const caixaService = {
 
     // 4. Expenses
     // Using startOfDay logic for expenses to fix visibility issue
-    // We broaden the fetch to include the whole start day
-    const fetchStartDate = routeStartDay.toISOString()
+    // We broaden the fetch using local date string to catch UTC midnight cases if any
+    const fetchStartDate = format(routeStartDay, 'yyyy-MM-dd')
 
     const { data: expenses, error: expError } = await supabase
       .from('DESPESAS')
@@ -239,7 +248,7 @@ export const caixaService = {
     const routeEnd = rota.data_fim ? parseISO(rota.data_fim) : new Date()
     const routeEndDay = startOfDay(routeEnd)
 
-    const fetchStartDate = routeStartDay.toISOString()
+    const fetchStartDate = format(routeStartDay, 'yyyy-MM-dd')
 
     const { data, error } = await supabase
       .from('DESPESAS')
@@ -336,7 +345,7 @@ export const caixaService = {
     const routeEnd = rota.data_fim ? parseISO(rota.data_fim) : new Date()
     const routeEndDay = startOfDay(routeEnd)
 
-    const fetchStartDate = routeStartDay.toISOString()
+    const fetchStartDate = format(routeStartDay, 'yyyy-MM-dd')
 
     const { data, error } = await supabase
       .from('DESPESAS')

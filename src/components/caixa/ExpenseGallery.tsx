@@ -2,7 +2,7 @@ import { ExpenseDetail } from '@/services/caixaService'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { formatCurrency, safeFormatDate } from '@/lib/formatters'
-import { ArrowUpCircle } from 'lucide-react'
+import { ArrowUpCircle, CheckCircle2, XCircle } from 'lucide-react'
 import {
   Table,
   TableBody,
@@ -11,13 +11,17 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { cn } from '@/lib/utils'
 
 interface ExpenseGalleryProps {
   items: ExpenseDetail[]
 }
 
 export function ExpenseGallery({ items }: ExpenseGalleryProps) {
-  const total = items.reduce((acc, item) => acc + item.valor, 0)
+  const total = items.reduce(
+    (acc, item) => (item.saiuDoCaixa ? acc + item.valor : acc),
+    0,
+  )
 
   return (
     <Card className="h-full flex flex-col">
@@ -40,8 +44,7 @@ export function ExpenseGallery({ items }: ExpenseGalleryProps) {
                 <TableHead className="w-[100px]">Data</TableHead>
                 <TableHead>Detalhamento</TableHead>
                 <TableHead>Funcionário</TableHead>
-                {/* As requested: Caixa column (assuming status is irrelevant per row but context is) */}
-                <TableHead>Caixa</TableHead>
+                <TableHead className="text-center">Saiu do Caixa?</TableHead>
                 <TableHead className="text-right">Valor</TableHead>
               </TableRow>
             </TableHeader>
@@ -76,10 +79,23 @@ export function ExpenseGallery({ items }: ExpenseGalleryProps) {
                         ? item.funcionarioNome.split(' ')[0]
                         : 'N/D'}
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      -
+                    <TableCell className="text-center">
+                      <div className="flex justify-center">
+                        {item.saiuDoCaixa ? (
+                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <XCircle className="h-4 w-4 text-red-300" />
+                        )}
+                      </div>
                     </TableCell>
-                    <TableCell className="text-right font-bold text-red-700">
+                    <TableCell
+                      className={cn(
+                        'text-right font-bold',
+                        item.saiuDoCaixa
+                          ? 'text-red-700'
+                          : 'text-muted-foreground line-through decoration-red-700/30',
+                      )}
+                    >
                       R$ {formatCurrency(item.valor)}
                     </TableCell>
                   </TableRow>
@@ -92,7 +108,7 @@ export function ExpenseGallery({ items }: ExpenseGalleryProps) {
       <div className="p-4 bg-muted/20 border-t mt-auto">
         <div className="flex justify-between items-center">
           <span className="text-sm font-semibold text-muted-foreground">
-            Total Saídas
+            Total Saídas (Caixa)
           </span>
           <span className="text-lg font-bold text-red-700">
             R$ {formatCurrency(total)}
