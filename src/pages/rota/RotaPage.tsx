@@ -153,11 +153,16 @@ export default function RotaPage() {
 
     // Logic: If seller is assigned (changed to a value), increment x_na_rota by 1
     // This assumes the user is manually assigning, implying a new attempt/visit intention
-    if (field === 'vendedor_id' && value !== null) {
-      const currentRow = rows.find((r) => r.client.CODIGO === clientId)
-      if (currentRow) {
-        newXNaRota = (currentRow.x_na_rota || 0) + 1
-      }
+    // AND the client is NOT completed
+    const currentRow = rows.find((r) => r.client.CODIGO === clientId)
+
+    if (
+      field === 'vendedor_id' &&
+      value !== null &&
+      currentRow &&
+      !currentRow.is_completed
+    ) {
+      newXNaRota = (currentRow.x_na_rota || 0) + 1
     }
 
     setRows((prev) =>

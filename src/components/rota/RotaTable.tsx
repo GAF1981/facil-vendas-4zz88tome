@@ -296,8 +296,8 @@ export function RotaTable({
                     className={cn(
                       'hover:bg-muted/30 transition-colors border-b text-xs',
                       {
-                        // Dark Green for Completed (Activity during route)
-                        'bg-green-600 hover:bg-green-500 text-white dark:bg-green-800 dark:hover:bg-green-700':
+                        // Updated Dark Green for Completed (Activity during route) per User Story
+                        'bg-green-800 hover:bg-green-700 text-white dark:bg-green-900 dark:hover:bg-green-800':
                           row.is_completed,
                         'bg-orange-50/50 hover:bg-orange-100/50 dark:bg-orange-950/10 dark:hover:bg-orange-950/20':
                           row.has_pendency && !row.is_completed,
@@ -311,7 +311,7 @@ export function RotaTable({
                           className={cn({
                             'text-red-600 font-bold':
                               row.debito > 10 && !row.is_completed,
-                            'text-red-200 font-bold':
+                            'text-white font-bold':
                               row.debito > 10 && row.is_completed,
                             'text-muted-foreground':
                               row.debito <= 0 && !row.is_completed,
@@ -338,17 +338,47 @@ export function RotaTable({
                       </div>
                     </TableCell>
 
-                    {/* NEW: Vencimento (Rota) */}
+                    {/* NEW: Vencimento (Rota) with Status Text Logic */}
                     <TableCell className="text-center text-[10px]">
                       {row.debito > 0 && row.vencimento_cobranca ? (
-                        <span
-                          className={cn('font-semibold', {
-                            'text-red-600': !row.is_completed,
-                            'text-red-200': row.is_completed,
-                          })}
-                        >
-                          {safeFormatDate(row.vencimento_cobranca, 'dd/MM/yy')}
-                        </span>
+                        <div className="flex flex-col items-center">
+                          <span
+                            className={cn('font-semibold', {
+                              'text-red-600':
+                                row.vencimento_status === 'VENCIDO' &&
+                                !row.is_completed,
+                              'text-green-600':
+                                row.vencimento_status === 'A VENCER' &&
+                                !row.is_completed,
+                              'text-red-200':
+                                row.vencimento_status === 'VENCIDO' &&
+                                row.is_completed,
+                              'text-green-200':
+                                row.vencimento_status === 'A VENCER' &&
+                                row.is_completed,
+                            })}
+                          >
+                            {safeFormatDate(
+                              row.vencimento_cobranca,
+                              'dd/MM/yy',
+                            )}
+                          </span>
+                          <span
+                            className={cn('text-[9px] font-bold uppercase', {
+                              'text-red-600':
+                                row.vencimento_status === 'VENCIDO' &&
+                                !row.is_completed,
+                              'text-green-600':
+                                row.vencimento_status === 'A VENCER' &&
+                                !row.is_completed,
+                              'text-white': row.is_completed,
+                            })}
+                          >
+                            {row.vencimento_status === 'VENCIDO'
+                              ? 'Vencida'
+                              : 'A Vencer'}
+                          </span>
+                        </div>
                       ) : (
                         '-'
                       )}
@@ -560,7 +590,7 @@ export function RotaTable({
                           min={0}
                           max={99}
                           disabled={disabled || row.is_completed}
-                          // If completed, visually force 0 even if state lags slightly before refresh
+                          // Requirement: Reset x_na_rota to 0 if client was successfully attended
                           value={row.is_completed ? 0 : row.x_na_rota}
                           onChange={(e) =>
                             onUpdateRow(

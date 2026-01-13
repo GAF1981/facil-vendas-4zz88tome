@@ -92,9 +92,9 @@ export const rotaService = {
     if (startError) throw startError
 
     // 3. Transfer Unattended Items from Old to New
-    // Using the new SQL function that handles persistence logic
+    // Using the NEW SQL function that handles persistence logic (v2)
     const { error: transferError } = await supabase.rpc(
-      'transfer_unattended_items',
+      'transfer_unattended_items_v2',
       {
         p_old_rota_id: currentRotaId,
         p_new_rota_id: nextId,
