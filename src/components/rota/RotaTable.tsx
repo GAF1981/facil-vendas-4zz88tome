@@ -118,7 +118,6 @@ export function RotaTable({
 
   const today = new Date()
 
-  // Custom Table implementation to allow horizontal scrolling independent of shadcn's Table wrapper constraints
   return (
     <div className="rounded-md border bg-card overflow-hidden shadow-sm flex flex-col h-full">
       <div className="flex-1 overflow-auto">
@@ -135,12 +134,24 @@ export function RotaTable({
                 />
 
                 {/* NEW: Vencimento (Rota) - Oldest collection date */}
-                <SortableHeader
-                  column="vencimento_cobranca"
-                  label="Vencimento"
-                  align="center"
-                  className="min-w-[90px] bg-muted/50"
-                />
+                <TableHead
+                  className="min-w-[90px] bg-muted/50 cursor-pointer hover:bg-muted/50 transition-colors text-center"
+                  onClick={() => onSort('vencimento_cobranca')}
+                >
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center justify-center gap-1">
+                          Vencimento
+                          {getSortIcon('vencimento_cobranca')}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Data de vencimento mais antiga em aberto</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </TableHead>
 
                 {/* 2. Projeção */}
                 <SortableHeader

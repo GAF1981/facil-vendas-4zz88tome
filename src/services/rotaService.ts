@@ -153,7 +153,7 @@ export const rotaService = {
   },
 
   async getFullRotaData(rota: Rota | null) {
-    // 1. Fetch all Clients (FILTERED BY 'ATIVO' OR 'INATIVO - ROTA')
+    // 1. Fetch all Clients
     const { data: clients, error: clientsError } = await supabase
       .from('CLIENTES')
       .select('*')
@@ -164,7 +164,7 @@ export const rotaService = {
     if (clientsError) throw clientsError
     if (!clients) return []
 
-    // 2. Optimized Debt Fetching using debitos_historico (Source of Truth)
+    // 2. Optimized Debt Fetching
     const { data: debtData, error: debtError } = await supabase
       .from('debitos_historico')
       .select('cliente_codigo, debito, data_acerto, pedido_id')
@@ -178,6 +178,11 @@ export const rotaService = {
       { totalDebt: number; orderCount: number; oldestDate: string | null }
     >()
     const ordersWithDebt = new Set<number>()
+    // Map to link Order -> Client & Original Date for fallback
+    const orderDataMap = new Map<
+      number,
+      { clientId: number; dataAcerto: string | null }
+    >()
 
     if (debtData) {
       debtData.forEach((row) => {
@@ -201,6 +206,10 @@ export const rotaService = {
 
           if (row.pedido_id) {
             ordersWithDebt.add(row.pedido_id)
+            orderDataMap.set(row.pedido_id, {
+              clientId: cid,
+              dataAcerto: row.data_acerto || null,
+            })
           }
 
           if (row.data_acerto) {
@@ -223,7 +232,7 @@ export const rotaService = {
       items.forEach((i) => rotaItemsMap.set(i.cliente_id, i))
     }
 
-    // 5. Fetch Projections via Reports Service (Linked by Order Number)
+    // 5. Fetch Projections
     const projectionsReport = await reportsService.getProjectionsReport()
     const orderProjectionMap = new Map<number, number>()
     projectionsReport.forEach((p) => {
@@ -232,8 +241,7 @@ export const rotaService = {
       }
     })
 
-    // 6. Fetch basic Summary Stats (Max Order ID and Last Date from View)
-    // Fetching from view for accurate MAX Order ID per client
+    // 6. Fetch basic Summary Stats
     const { data: statsData, error: statsError } = await supabase
       .from('client_stats_view' as any)
       .select('client_id, max_pedido, max_data_acerto')
@@ -256,19 +264,16 @@ export const rotaService = {
     statsData?.forEach((row: any) => {
       const cid = row.client_id
       if (!cid) return
-
-      // Map using the aggregated data
       statsMap.set(cid, {
         lastDate: row.max_data_acerto || null,
         lastOrderId: row.max_pedido || null,
       })
-
       if (row.max_pedido) {
         orderIdsForStock.add(row.max_pedido)
       }
     })
 
-    // 7. Fetch Stock Values from QUANTIDADE DE ESTOQUE FINAL based on collected Orders (MAX Orders)
+    // 7. Fetch Stock Values
     const stockMapByOrder = new Map<
       number,
       { value: number; clientId: number }
@@ -279,7 +284,6 @@ export const rotaService = {
       const chunkSize = 1000
       for (let i = 0; i < orderIdsArray.length; i += chunkSize) {
         const chunk = orderIdsArray.slice(i, i + chunkSize)
-
         const { data: stockRows, error: stockError } = await supabase
           .from('QUANTIDADE DE ESTOQUE FINAL')
           .select(
@@ -287,40 +291,25 @@ export const rotaService = {
           )
           .in('"NUMERO DO PEDIDO"', chunk)
 
-        if (stockError) {
-          console.error(
-            'Error fetching stock from QUANTIDADE DE ESTOQUE FINAL:',
-            stockError,
-          )
-          continue
+        if (!stockError) {
+          stockRows?.forEach((row: any) => {
+            const orderId = Number(row.pedido_id)
+            const clientId = Number(row.client_id)
+            const val = Number(row.valor_total) || 0
+            if (orderId && clientId) {
+              if (!stockMapByOrder.has(orderId)) {
+                stockMapByOrder.set(orderId, { value: val, clientId: clientId })
+              }
+            }
+          })
         }
-
-        stockRows?.forEach((row: any) => {
-          const orderId = Number(row.pedido_id)
-          const clientId = Number(row.client_id)
-          const val = Number(row.valor_total) || 0
-
-          if (!orderId || !clientId) return
-
-          if (!stockMapByOrder.has(orderId)) {
-            stockMapByOrder.set(orderId, {
-              value: val,
-              clientId: clientId,
-            })
-          }
-        })
       }
     }
 
-    // 8. Fetch Consigned Values (New Requirement)
-    const { data: consignedData, error: consignedError } = await supabase
+    // 8. Fetch Consigned Values
+    const { data: consignedData } = await supabase
       .from('view_client_latest_consigned_value' as any)
       .select('*')
-
-    if (consignedError) {
-      console.error('Error fetching consigned values:', consignedError)
-    }
-
     const consignedMap = new Map<number, number>()
     if (consignedData) {
       consignedData.forEach((row: any) => {
@@ -328,85 +317,118 @@ export const rotaService = {
       })
     }
 
-    // 9. Fetch Collection Action Maturity Dates (For "Vencimento" column in Rota)
-    // Updated Logic: Find the minimum (oldest) date from acoes_cobranca_vencimentos for each client
-    // We fetch actions that have open debts (linked to ordersWithDebt) to keep relevance
+    // 9. Fetch Oldest Unpaid Due Date (Vencimento) - REVISED
+    // Considers: Negotiated Actions > Receivables > Original Date
+    const clientOldestDueMap = new Map<number, string>()
     const ordersWithDebtArray = Array.from(ordersWithDebt)
-    const collectionDateMap = new Map<number, string>()
+    const orderExplicitDateMap = new Map<number, string>() // OrderID -> Min Explicit Date found in Details
+    const ordersWithExplicitDates = new Set<number>() // To track precedence
 
     if (ordersWithDebtArray.length > 0) {
       const chunkSize = 1000
       for (let i = 0; i < ordersWithDebtArray.length; i += chunkSize) {
         const chunk = ordersWithDebtArray.slice(i, i + chunkSize)
 
-        // Fetch actions linked to debt-having orders, including their installments
-        const { data: actionsData, error: actionsError } = await supabase
+        // A. Fetch Negotiated Actions (Highest Priority)
+        const { data: actionsData } = await supabase
           .from('acoes_cobranca')
           .select(
-            `
-            cliente_id,
-            pedido_id,
-            acoes_cobranca_vencimentos (
-              vencimento
-            )
-          `,
+            'pedido_id, acoes_cobranca_vencimentos(vencimento, valor, id)',
           )
           .in('pedido_id', chunk)
 
-        if (actionsError) {
-          console.error('Error fetching collection actions:', actionsError)
-          continue
+        if (actionsData) {
+          actionsData.forEach((action: any) => {
+            const pid = action.pedido_id
+            if (!pid) return
+
+            // Check installments
+            const installments = action.acoes_cobranca_vencimentos
+            if (installments && installments.length > 0) {
+              // Extract dates, filter nulls, sort asc
+              const dates = installments
+                .map((inst: any) => inst.vencimento)
+                .filter(Boolean)
+                .sort()
+
+              if (dates.length > 0) {
+                // If negotiation exists, it usually overrides previous terms
+                orderExplicitDateMap.set(pid, dates[0])
+                ordersWithExplicitDates.add(pid)
+              }
+            }
+          })
         }
 
-        actionsData?.forEach((action: any) => {
-          const cid = action.cliente_id
-          const installments = action.acoes_cobranca_vencimentos
+        // B. Fetch Receivables (If no negotiation found for the order or complementary)
+        const { data: recData } = await supabase
+          .from('RECEBIMENTOS')
+          .select('venda_id, vencimento, valor_pago, valor_registrado')
+          .in('venda_id', chunk)
+          .gt('valor_registrado', 0)
 
-          if (!cid || !installments || installments.length === 0) return
+        if (recData) {
+          // Filter for unpaid/partially paid items
+          const unpaidRecs = recData.filter(
+            (r: any) => (r.valor_pago || 0) < (r.valor_registrado || 0),
+          )
 
-          // Find oldest date in this action's installments
-          const dates = installments
-            .map((inst: any) => inst.vencimento)
-            .filter(Boolean)
-            .sort()
-          if (dates.length === 0) return
-          const oldestInAction = dates[0]
-
-          // Update client map with global minimum
-          if (!collectionDateMap.has(cid)) {
-            collectionDateMap.set(cid, oldestInAction)
-          } else {
-            const currentMin = collectionDateMap.get(cid)!
-            if (oldestInAction < currentMin) {
-              collectionDateMap.set(cid, oldestInAction)
+          // Group by order
+          const recDatesByOrder = new Map<number, string[]>()
+          unpaidRecs.forEach((r: any) => {
+            const pid = r.venda_id
+            if (pid && r.vencimento) {
+              if (!recDatesByOrder.has(pid)) recDatesByOrder.set(pid, [])
+              recDatesByOrder.get(pid)!.push(r.vencimento)
             }
-          }
-        })
+          })
+
+          // Update map only if NOT already set by negotiation (Precedence: Action > Receipt)
+          recDatesByOrder.forEach((dates, pid) => {
+            if (!ordersWithExplicitDates.has(pid) && dates.length > 0) {
+              dates.sort()
+              orderExplicitDateMap.set(pid, dates[0])
+              ordersWithExplicitDates.add(pid)
+            }
+          })
+        }
       }
     }
 
-    // 10. Check for Completed Status (Visits within active route range)
+    // Assign min dates to clients
+    ordersWithDebtArray.forEach((pid) => {
+      const info = orderDataMap.get(pid)
+      if (!info) return
+
+      let date = orderExplicitDateMap.get(pid)
+
+      // Fallback: If no explicit installment/action date found, use Original Data Acerto
+      if (!date && info.dataAcerto) {
+        date = info.dataAcerto
+      }
+
+      if (date) {
+        const currentMin = clientOldestDueMap.get(info.clientId)
+        if (!currentMin || date < currentMin) {
+          clientOldestDueMap.set(info.clientId, date)
+        }
+      }
+    })
+
+    // 10. Check for Completed Status
     const completedSet = new Set<number>()
     if (rota) {
       const startDate = format(parseISO(rota.data_inicio), 'yyyy-MM-dd')
-      // If data_fim is null (active), use today as end range to capture all recent visits
       const endDate = rota.data_fim
         ? format(parseISO(rota.data_fim), 'yyyy-MM-dd')
         : format(new Date(), 'yyyy-MM-dd')
 
-      const { data: visits, error: visitsError } = await supabase
+      const { data: visits } = await supabase
         .from('BANCO_DE_DADOS')
         .select('"CÓDIGO DO CLIENTE"')
         .gte('DATA DO ACERTO', startDate)
         .lte('DATA DO ACERTO', endDate)
         .limit(20000)
-
-      if (visitsError) {
-        console.error(
-          'Error fetching visits for completion check:',
-          visitsError,
-        )
-      }
 
       visits?.forEach((v) => {
         const cid = v['CÓDIGO DO CLIENTE']
@@ -422,30 +444,24 @@ export const rotaService = {
       const rotaItem = rotaItemsMap.get(cid)
       const stats = statsMap.get(cid)
 
-      // Projection linked by Order ID
       let projection: number | null = null
       if (stats?.lastOrderId) {
         const p = orderProjectionMap.get(stats.lastOrderId)
-        if (p !== undefined) {
-          projection = p
-        }
+        if (p !== undefined) projection = p
       }
 
-      // Stock Value linked by Order ID (with Client ID verification)
       let stockValue: number | null = null
       if (stats?.lastOrderId) {
         const stockInfo = stockMapByOrder.get(stats.lastOrderId)
-        // Ensure the stock record found actually belongs to this client
-        if (stockInfo && stockInfo.clientId === cid) {
+        if (stockInfo && stockInfo.clientId === cid)
           stockValue = stockInfo.value
-        }
       }
 
-      // Calculate Status & Earliest Unpaid Date
       let vencimentoStatus: 'VENCIDO' | 'A VENCER' | 'PAGO' | 'SEM DÉBITO' =
         'SEM DÉBITO'
       let earliestUnpaid: string | null = null
 
+      // This logic preserves "General Status" based on general debt age > 30 days
       if (debtEntry && debtEntry.totalDebt > 0.05) {
         earliestUnpaid = debtEntry.oldestDate
         if (debtEntry.oldestDate) {
@@ -472,13 +488,13 @@ export const rotaService = {
         data_acerto: stats?.lastDate || null,
         projecao: projection,
         numero_pedido: stats?.lastOrderId || null,
-        estoque: stockValue, // Now nullable
-        valor_consignado: consignedMap.get(cid) || null, // Map from view
+        estoque: stockValue,
+        valor_consignado: consignedMap.get(cid) || null,
         has_pendency: pendencyMap.has(cid),
         is_completed: completedSet.has(cid),
         earliest_unpaid_date: earliestUnpaid,
         vencimento_status: vencimentoStatus,
-        vencimento_cobranca: collectionDateMap.get(cid) || null,
+        vencimento_cobranca: clientOldestDueMap.get(cid) || null,
       }
     })
   },

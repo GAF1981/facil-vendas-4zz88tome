@@ -40,7 +40,8 @@ export interface RotaRow {
   // Status Logic
   earliest_unpaid_date: string | null
   vencimento_status: 'VENCIDO' | 'A VENCER' | 'PAGO' | 'SEM DÉBITO'
-  // New specific field for oldest collection action date
+  // Specific field for the oldest calculated due date (Vencimento)
+  // Derived from: Negotiated Actions > Unpaid Installments > Order Date
   vencimento_cobranca: string | null
 }
 
