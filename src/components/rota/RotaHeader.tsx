@@ -3,9 +3,21 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Rota } from '@/types/rota'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { Play, Square, Loader2, Download, Save } from 'lucide-react'
+import {
+  Play,
+  Square,
+  Loader2,
+  Download,
+  Save,
+  AlertTriangle,
+} from 'lucide-react'
 import { usePermissions } from '@/hooks/use-permissions'
 import { useUserStore } from '@/stores/useUserStore'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 
 interface RotaHeaderProps {
   activeRota: Rota | null
@@ -15,6 +27,7 @@ interface RotaHeaderProps {
   onExport: () => void
   loading: boolean
   hasPendingUpdates?: boolean
+  pendingClosures?: string[]
 }
 
 export function RotaHeader({
@@ -25,13 +38,13 @@ export function RotaHeader({
   onExport,
   loading,
   hasPendingUpdates = false,
+  pendingClosures = [],
 }: RotaHeaderProps) {
   const displayRota = activeRota || lastRota
   const { canAccess } = usePermissions()
   const { employee } = useUserStore()
 
   // Logic for visibility of "Finalizar Rota"
-  // Visible if user has 'Relatório' permission OR is an Administrator/Manager
   const canFinalize = (() => {
     if (canAccess('Relatório')) return true
 
@@ -45,6 +58,8 @@ export function RotaHeader({
     }
     return false
   })()
+
+  const hasPendingClosures = pendingClosures.length > 0
 
   return (
     <Card className="w-full border-l-4 border-l-primary shadow-sm bg-muted/20">
@@ -116,24 +131,65 @@ export function RotaHeader({
             </Button>
           ) : (
             canFinalize && (
-              <Button
-                onClick={onEnd}
-                disabled={loading || hasPendingUpdates}
-                variant="destructive"
-                className="w-full sm:w-auto"
-                title={
-                  hasPendingUpdates
-                    ? 'Aguarde o salvamento das alterações'
-                    : 'Finalizar rota atual'
-                }
-              >
-                {loading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Square className="mr-2 h-4 w-4" />
+              <>
+                {hasPendingClosures && (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 gap-2 h-9 border border-orange-200"
+                      >
+                        <AlertTriangle className="h-4 w-4" />
+                        {pendingClosures.length} Pendência(s) de Fechamento
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="w-80 bg-orange-50 border-orange-200"
+                      align="end"
+                    >
+                      <div className="space-y-2">
+                        <h4 className="font-semibold text-orange-900 flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4" />
+                          Fechamentos Pendentes
+                        </h4>
+                        <p className="text-xs text-orange-800">
+                          Os seguintes vendedores precisam fechar o caixa antes
+                          de finalizar a rota:
+                        </p>
+                        <ul className="list-disc pl-4 text-sm text-orange-900">
+                          {pendingClosures.map((name, idx) => (
+                            <li key={idx}>{name}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 )}
-                Finalizar Rota
-              </Button>
+
+                <div className="relative group">
+                  <Button
+                    onClick={onEnd}
+                    disabled={
+                      loading || hasPendingUpdates || hasPendingClosures
+                    }
+                    variant="destructive"
+                    className="w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loading ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Square className="mr-2 h-4 w-4" />
+                    )}
+                    Finalizar Rota
+                  </Button>
+                  {hasPendingClosures && (
+                    <div className="absolute top-full right-0 mt-1 w-64 p-2 bg-black/80 text-white text-xs rounded hidden group-hover:block z-50 text-center">
+                      Não é possível finalizar. Existem caixas abertos.
+                    </div>
+                  )}
+                </div>
+              </>
             )
           )}
         </div>

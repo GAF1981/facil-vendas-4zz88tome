@@ -5,6 +5,7 @@ import { RotaTable } from '@/components/rota/RotaTable'
 import { RotaFilters } from '@/components/rota/RotaFilters'
 import { rotaService } from '@/services/rotaService'
 import { employeesService } from '@/services/employeesService'
+import { fechamentoService } from '@/services/fechamentoService'
 import { Rota, RotaRow, RotaFilterState, SortConfig } from '@/types/rota'
 import { Employee } from '@/types/employee'
 import { useToast } from '@/hooks/use-toast'
@@ -16,7 +17,8 @@ export default function RotaPage() {
   const [rows, setRows] = useState<RotaRow[]>([])
   const [sellers, setSellers] = useState<Employee[]>([])
   const [loading, setLoading] = useState(false)
-  const [pendingUpdates, setPendingUpdates] = useState(0) // Track pending saves
+  const [pendingUpdates, setPendingUpdates] = useState(0)
+  const [pendingClosures, setPendingClosures] = useState<string[]>([])
   const { toast } = useToast()
 
   const [isSelectionMode, setIsSelectionMode] = useState(false)
@@ -66,7 +68,40 @@ export default function RotaPage() {
       const rotaToFetch = active || last
       const data = await rotaService.getFullRotaData(rotaToFetch)
 
-      setRows(Array.isArray(data) ? data : [])
+      const fetchedRows = Array.isArray(data) ? data : []
+      setRows(fetchedRows)
+
+      // Check pending closures if there is an active route
+      if (active) {
+        const uniqueSellerIds = new Set<number>()
+        fetchedRows.forEach((r) => {
+          if (r.vendedor_id) uniqueSellerIds.add(r.vendedor_id)
+        })
+
+        if (uniqueSellerIds.size > 0) {
+          const closures = await fechamentoService.getByRoute(active.id)
+          // Consider "Fechado" as valid closure
+          const closedSellerIds = new Set(
+            closures
+              .filter((c) => c.status === 'Fechado')
+              .map((c) => c.funcionario_id),
+          )
+
+          const pendingNames: string[] = []
+          uniqueSellerIds.forEach((id) => {
+            if (!closedSellerIds.has(id)) {
+              // Find employee name from all employees, as they might not be 'Vendedor' set but acted as one
+              const emp = allEmployees.find((e) => e.id === id)
+              pendingNames.push(emp?.nome_completo || `Vendedor ${id}`)
+            }
+          })
+          setPendingClosures(pendingNames)
+        } else {
+          setPendingClosures([])
+        }
+      } else {
+        setPendingClosures([])
+      }
     } catch (error) {
       console.error(error)
       toast({
@@ -83,40 +118,37 @@ export default function RotaPage() {
     fetchData()
   }, [fetchData])
 
-  // Realtime subscription for Auto-Refresh
+  // Realtime subscription
   useEffect(() => {
     const channel = supabase
       .channel('rota-updates')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'BANCO_DE_DADOS' },
-        () => {
-          console.log('Detected change in BANCO_DE_DADOS, refreshing Rota...')
-          fetchData()
-        },
+        () => fetchData(),
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'RECEBIMENTOS' },
-        () => {
-          console.log('Detected change in RECEBIMENTOS, refreshing Rota...')
-          fetchData()
-        },
+        () => fetchData(),
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'ROTA_ITEMS' },
-        () => {
-          console.log('Detected change in ROTA_ITEMS, refreshing Rota...')
-          fetchData()
-        },
+        () => fetchData(),
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'debitos_historico' },
+        () => fetchData(),
+      )
+      // Listen to closure updates to refresh button state
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'fechamento_caixa' },
         () => {
           console.log(
-            'Detected change in debitos_historico, refreshing Rota...',
+            'Detected change in fechamento_caixa, refreshing Rota status...',
           )
           fetchData()
         },
@@ -135,6 +167,7 @@ export default function RotaPage() {
       setActiveRota(newRota)
       const data = await rotaService.getFullRotaData(newRota)
       setRows(Array.isArray(data) ? data : [])
+      setPendingClosures([]) // New route, no closures yet but also no rows/sellers assigned yet theoretically
       toast({ title: 'Rota Iniciada', className: 'bg-green-600 text-white' })
     } catch (error) {
       toast({
@@ -149,6 +182,16 @@ export default function RotaPage() {
 
   const handleEndRota = async () => {
     if (!activeRota) return
+    if (pendingClosures.length > 0) {
+      toast({
+        title: 'Ação Bloqueada',
+        description:
+          'Existem vendedores com caixa aberto. Finalize os caixas antes de fechar a rota.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     if (
       !window.confirm(
         'Confirma o fechamento da rota atual e início de uma nova? Esta ação irá transferir clientes não atendidos.',
@@ -163,6 +206,7 @@ export default function RotaPage() {
       setActiveRota(newRota)
       const data = await rotaService.getFullRotaData(newRota)
       setRows(Array.isArray(data) ? data : [])
+      setPendingClosures([]) // Reset pending closures
 
       toast({
         title: 'Rota Finalizada e Nova Iniciada',
@@ -234,6 +278,7 @@ export default function RotaPage() {
       }
 
       await rotaService.upsertRotaItem(payload)
+      // Note: Updating seller might affect pending closures list, but usually we just refresh via realtime or next fetch
     } catch (error) {
       console.error(error)
       toast({
@@ -485,6 +530,7 @@ export default function RotaPage() {
             onExport={handleExportExcel}
             loading={loading}
             hasPendingUpdates={pendingUpdates > 0}
+            pendingClosures={pendingClosures}
           />
         </div>
         <div className="flex items-center justify-between">
