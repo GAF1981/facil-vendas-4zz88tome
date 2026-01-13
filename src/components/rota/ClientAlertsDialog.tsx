@@ -9,9 +9,10 @@ import {
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { Bell, AlertCircle, Info, StickyNote } from 'lucide-react'
+import { Bell, AlertCircle, Info, StickyNote, ExternalLink } from 'lucide-react'
 import { RotaRow } from '@/types/rota'
 import { useToast } from '@/hooks/use-toast'
+import { useNavigate } from 'react-router-dom'
 
 interface ClientAlertsDialogProps {
   open: boolean
@@ -29,6 +30,7 @@ export function ClientAlertsDialog({
   const [task, setTask] = useState('')
   const [saving, setSaving] = useState(false)
   const { toast } = useToast()
+  const navigate = useNavigate()
 
   useEffect(() => {
     if (open) {
@@ -58,6 +60,12 @@ export function ClientAlertsDialog({
     }
   }
 
+  const handleGoToPendencies = () => {
+    // Navigate with query param to filter for this client
+    navigate(`/pendencias?cliente_id=${row.client.CODIGO}`)
+    onOpenChange(false)
+  }
+
   const pendencias = row.pendency_details || []
   const observacaoFixa = row.client['OBSERVAÇÃO FIXA']
 
@@ -74,10 +82,23 @@ export function ClientAlertsDialog({
         <div className="space-y-6 py-2">
           {/* Pendências Section */}
           <div className="space-y-2">
-            <h4 className="text-sm font-semibold flex items-center gap-2 text-red-600">
-              <AlertCircle className="h-4 w-4" />
-              Pendências ({pendencias.length})
-            </h4>
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-semibold flex items-center gap-2 text-red-600">
+                <AlertCircle className="h-4 w-4" />
+                Pendências ({pendencias.length})
+              </h4>
+              {pendencias.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 text-xs gap-1 border-red-200 text-red-700 hover:bg-red-50"
+                  onClick={handleGoToPendencies}
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  Ver Pendências
+                </Button>
+              )}
+            </div>
             {pendencias.length > 0 ? (
               <ul className="list-disc pl-5 space-y-1">
                 {pendencias.map((p, idx) => (

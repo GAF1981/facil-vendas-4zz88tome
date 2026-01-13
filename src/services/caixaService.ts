@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase/client'
 import { DespesaInsert } from '@/types/despesa'
 import { Rota } from '@/types/rota'
-import { parseISO, isAfter, isBefore, isEqual } from 'date-fns'
+import { parseISO, isAfter, isBefore, isEqual, startOfDay } from 'date-fns'
 
 export interface CaixaSummaryRow {
   funcionarioId: number
@@ -67,6 +67,10 @@ export const caixaService = {
     const routeStart = parseISO(rota.data_inicio)
     const routeEnd = rota.data_fim ? parseISO(rota.data_fim) : new Date()
 
+    // Normalize for day comparison to include all expenses of the start day
+    const routeStartDay = startOfDay(routeStart)
+    const routeEndDay = startOfDay(routeEnd)
+
     // 1. Fetch Employees
     const { data: employees, error: empError } = await supabase
       .from('FUNCIONARIOS')
@@ -103,6 +107,7 @@ export const caixaService = {
     })
 
     // 3. Receipts
+    // We assume strict timestamp for receipts to avoid prior route overlap if closed same day
     const { data: receipts, error: recError } = await supabase
       .from('RECEBIMENTOS')
       .select('funcionario_id, valor_pago, created_at, forma_pagamento')
@@ -131,25 +136,35 @@ export const caixaService = {
     })
 
     // 4. Expenses
+    // Using startOfDay logic for expenses to fix visibility issue
+    // We broaden the fetch to include the whole start day
+    const fetchStartDate = routeStartDay.toISOString()
+
     const { data: expenses, error: expError } = await supabase
       .from('DESPESAS')
       .select('funcionario_id, Valor, Data, saiu_do_caixa')
-      .gte('Data', rota.data_inicio)
+      .gte('Data', fetchStartDate)
 
     if (expError) throw expError
 
     expenses?.forEach((exp) => {
       if (!exp.Data) return
-      // Only count expenses that explicitly came out of the cashier
+      // Only count expenses that explicitly came out of the cashier for TOTALS
       if (exp.saiu_do_caixa === false) return
 
       const expDate = parseISO(exp.Data)
-      const isAfterStart =
-        isAfter(expDate, routeStart) || isEqual(expDate, routeStart)
-      const isBeforeEnd =
-        isBefore(expDate, routeEnd) || isEqual(expDate, routeEnd)
+      const expDay = startOfDay(expDate)
 
-      if (isAfterStart && (rota.data_fim ? isBeforeEnd : true)) {
+      // Check if expense day is same or after route start day
+      const isAfterOrSameStartDay =
+        isAfter(expDay, routeStartDay) || isEqual(expDay, routeStartDay)
+
+      // If route is closed, check if expense day is same or before route end day
+      const isBeforeOrSameEndDay = rota.data_fim
+        ? isBefore(expDay, routeEndDay) || isEqual(expDay, routeEndDay)
+        : true
+
+      if (isAfterOrSameStartDay && isBeforeOrSameEndDay) {
         const empId = exp.funcionario_id
         if (summaryMap.has(empId)) {
           const entry = summaryMap.get(empId)!
@@ -220,7 +235,11 @@ export const caixaService = {
 
   async getAllExpenses(rota: Rota): Promise<ExpenseDetail[]> {
     const routeStart = parseISO(rota.data_inicio)
+    const routeStartDay = startOfDay(routeStart)
     const routeEnd = rota.data_fim ? parseISO(rota.data_fim) : new Date()
+    const routeEndDay = startOfDay(routeEnd)
+
+    const fetchStartDate = routeStartDay.toISOString()
 
     const { data, error } = await supabase
       .from('DESPESAS')
@@ -230,7 +249,7 @@ export const caixaService = {
         FUNCIONARIOS ( nome_completo )
       `,
       )
-      .gte('Data', rota.data_inicio)
+      .gte('Data', fetchStartDate)
       .order('Data', { ascending: false })
 
     if (error) throw error
@@ -238,11 +257,15 @@ export const caixaService = {
     const filtered = (data || []).filter((exp) => {
       if (!exp.Data) return false
       const expDate = parseISO(exp.Data)
-      const isAfterStart =
-        isAfter(expDate, routeStart) || isEqual(expDate, routeStart)
-      const isBeforeEnd =
-        isBefore(expDate, routeEnd) || isEqual(expDate, routeEnd)
-      return isAfterStart && (rota.data_fim ? isBeforeEnd : true)
+      const expDay = startOfDay(expDate)
+
+      const isAfterOrSameStartDay =
+        isAfter(expDay, routeStartDay) || isEqual(expDay, routeStartDay)
+      const isBeforeOrSameEndDay = rota.data_fim
+        ? isBefore(expDay, routeEndDay) || isEqual(expDay, routeEndDay)
+        : true
+
+      return isAfterOrSameStartDay && isBeforeOrSameEndDay
     })
 
     return filtered.map((exp: any) => ({
@@ -309,13 +332,17 @@ export const caixaService = {
     rota: Rota,
   ): Promise<ExpenseDetail[]> {
     const routeStart = parseISO(rota.data_inicio)
+    const routeStartDay = startOfDay(routeStart)
     const routeEnd = rota.data_fim ? parseISO(rota.data_fim) : new Date()
+    const routeEndDay = startOfDay(routeEnd)
+
+    const fetchStartDate = routeStartDay.toISOString()
 
     const { data, error } = await supabase
       .from('DESPESAS')
       .select('*')
       .eq('funcionario_id', employeeId)
-      .gte('Data', rota.data_inicio)
+      .gte('Data', fetchStartDate)
       .order('Data', { ascending: false })
 
     if (error) throw error
@@ -323,11 +350,15 @@ export const caixaService = {
     const filtered = (data || []).filter((exp) => {
       if (!exp.Data) return false
       const expDate = parseISO(exp.Data)
-      const isAfterStart =
-        isAfter(expDate, routeStart) || isEqual(expDate, routeStart)
-      const isBeforeEnd =
-        isBefore(expDate, routeEnd) || isEqual(expDate, routeEnd)
-      return isAfterStart && (rota.data_fim ? isBeforeEnd : true)
+      const expDay = startOfDay(expDate)
+
+      const isAfterOrSameStartDay =
+        isAfter(expDay, routeStartDay) || isEqual(expDay, routeStartDay)
+      const isBeforeOrSameEndDay = rota.data_fim
+        ? isBefore(expDay, routeEndDay) || isEqual(expDay, routeEndDay)
+        : true
+
+      return isAfterOrSameStartDay && isBeforeOrSameEndDay
     })
 
     return filtered.map((exp) => ({

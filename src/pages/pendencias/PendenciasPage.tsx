@@ -46,6 +46,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog'
+import { useSearchParams } from 'react-router-dom'
 
 export default function PendenciasPage() {
   const [pendencias, setPendencias] = useState<Pendencia[]>([])
@@ -63,6 +64,19 @@ export default function PendenciasPage() {
   const [filterResolvida, setFilterResolvida] = useState('NÃO')
 
   const { toast } = useToast()
+  const [searchParams] = useSearchParams()
+
+  // Handle Initial Search from Query Param
+  useEffect(() => {
+    const clientIdParam = searchParams.get('cliente_id')
+    const searchParam = searchParams.get('search')
+
+    if (clientIdParam) {
+      setSearchTerm(clientIdParam)
+    } else if (searchParam) {
+      setSearchTerm(searchParam)
+    }
+  }, [searchParams])
 
   const fetchPendencias = async () => {
     // Logic for "Existe Pendências?": If NÃO, show nothing (or empty list)

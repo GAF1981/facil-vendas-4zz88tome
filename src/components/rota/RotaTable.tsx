@@ -269,9 +269,12 @@ export function RotaTable({
                     </TableHead>
                   )}
 
-                  <TableHead className="w-[100px] text-center font-bold text-xs">
-                    CEP
-                  </TableHead>
+                  <SortableHeader
+                    column="cep"
+                    label="CEP"
+                    align="center"
+                    className="w-[100px]"
+                  />
                 </TableRow>
               </TableHeader>
               <TableBody>

@@ -63,20 +63,15 @@ export function AcertoPaymentSummary({
     const start = new Date(baseDate + 'T12:00:00')
 
     return Array.from({ length: count }, (_, i) => {
-      // Logic for Date Automation:
-      // If "Sem Entrada" is checked, Requirements say:
-      // "the expiration dates in both the method field and the detail field must be automatically filled with the same date."
-      // This implies all dates are the same? Or just the start?
-      // Assuming for 1x it's same. For >1x, normally spaced by 30 days.
-      // But if "Sem Entrada" means delayed payment, maybe the 1st installment (0 value) has date X, and 2nd (real) has date X?
-      // Let's stick to standard spacing unless forced.
-      // The requirement focuses on "synchronization".
-
       let dueDateObj = i === 0 ? start : addDays(start, i * 30)
 
-      // If Boleto/Cheque 1x, date is explicitly synced.
-      // If Sem Entrada, date is explicitly synced.
-      // For >1x, we space out.
+      // If "Sem Entrada", we must sync the date fields as per requirement:
+      // "both maturity date fields ... automatically populated with the same date"
+      // This implies if Sem Entrada is checked, the first (0-value) payment date is the same as the "real" first payment date?
+      // Or simply: baseDate is applied to the first record.
+      // If "Sem Entrada", usually the first payment is skipped (0), so the date of that 0-payment doesn't matter much financially,
+      // but visually it should probably align with the start of the agreement.
+      // Let's keep standard logic where baseDate controls the start.
 
       let dueDate = format(dueDateObj, 'yyyy-MM-dd')
       let value = installmentValue
@@ -88,7 +83,6 @@ export function AcertoPaymentSummary({
         if (hasZeroDownPayment) {
           value = 0
           paidValue = 0
-          // If Sem Entrada, maybe first date is irrelevant, but we sync it anyway
         } else {
           paidValue = value
         }
@@ -168,17 +162,15 @@ export function AcertoPaymentSummary({
         // Date Sync Logic: If modifying main date
         if (field === 'dueDate') {
           const newDate = value as string
-          // Req 6: Boleto/Cheque 1x or Sem Entrada -> Sync details
+          // Req: Boleto/Cheque 1x or Sem Entrada -> Sync details
           const shouldSyncDetails =
             (method === 'Boleto' || method === 'Cheque') && p.installments === 1
 
           const isSemEntrada = p.hasZeroDownPayment
 
           if (shouldSyncDetails || isSemEntrada) {
-            // For Sem Entrada, req says "both method field and detail field... same date"
-            // If we change main date, sync all details start point
+            // For Sem Entrada, ensure start date propagates
             if (updated.details) {
-              // Regenerate to keep spacing correct relative to new start
               const newDetails = generateInstallments(
                 updated.value,
                 updated.installments,
@@ -218,8 +210,9 @@ export function AcertoPaymentSummary({
             newDetails.reduce((acc, d) => acc + d.paidValue, 0).toFixed(2),
           )
 
-          if (count === 1) {
-            // Sync back if 1x
+          // Auto-sync main date if Sem Entrada is toggled or if 1x
+          if (count === 1 || zeroDown) {
+            // Ensure visual consistency
             updated.dueDate = newDetails[0].dueDate
           }
         }
@@ -241,8 +234,8 @@ export function AcertoPaymentSummary({
       payments.map((p) => {
         if (p.method !== method || !p.details) return p
 
-        // Date Sync Logic: If modifying detail date
-        // Req 6: If Boleto/Cheque 1x, sync main date
+        // Date Sync Logic: If modifying detail date (especially the first one)
+        // Req: If Boleto/Cheque 1x OR Sem Entrada, sync main date
         if (field === 'dueDate' && index === 0) {
           const shouldSyncMain =
             (method === 'Boleto' || method === 'Cheque') && p.installments === 1
@@ -250,7 +243,6 @@ export function AcertoPaymentSummary({
 
           if (shouldSyncMain || isSemEntrada) {
             // If I change the detail date, update the main date too
-            // For Sem Entrada, if I change any detail date... well, usually just the first one matters for "base"
             return {
               ...p,
               dueDate: value as string,
@@ -527,26 +519,24 @@ export function AcertoPaymentSummary({
                         </Select>
                       </div>
 
-                      {entry.installments === 1 && (
-                        <div className="w-full md:w-32">
-                          <Label className="text-xs font-medium mb-1.5 flex items-center gap-1">
-                            <Calendar className="h-3 w-3" /> Vencimento
-                          </Label>
-                          <Input
-                            type="date"
-                            className="h-10 px-2 text-xs"
-                            value={entry.dueDate}
-                            disabled={disabled}
-                            onChange={(e) =>
-                              handleUpdateEntry(
-                                entry.method,
-                                'dueDate',
-                                e.target.value,
-                              )
-                            }
-                          />
-                        </div>
-                      )}
+                      <div className="w-full md:w-32">
+                        <Label className="text-xs font-medium mb-1.5 flex items-center gap-1">
+                          <Calendar className="h-3 w-3" /> Vencimento
+                        </Label>
+                        <Input
+                          type="date"
+                          className="h-10 px-2 text-xs"
+                          value={entry.dueDate}
+                          disabled={disabled}
+                          onChange={(e) =>
+                            handleUpdateEntry(
+                              entry.method,
+                              'dueDate',
+                              e.target.value,
+                            )
+                          }
+                        />
+                      </div>
                     </div>
 
                     {entry.installments >= 1 && entry.details && (

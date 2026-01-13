@@ -536,7 +536,9 @@ export type Database = {
           Detalhamento: string
           funcionario_id: number
           'Grupo de Despesas': string
+          hodometro: number | null
           id: number
+          saiu_do_caixa: boolean | null
           Valor: number
         }
         Insert: {
@@ -544,7 +546,9 @@ export type Database = {
           Detalhamento: string
           funcionario_id: number
           'Grupo de Despesas': string
+          hodometro?: number | null
           id?: number
+          saiu_do_caixa?: boolean | null
           Valor: number
         }
         Update: {
@@ -552,7 +556,9 @@ export type Database = {
           Detalhamento?: string
           funcionario_id?: number
           'Grupo de Despesas'?: string
+          hodometro?: number | null
           id?: number
+          saiu_do_caixa?: boolean | null
           Valor?: number
         }
         Relationships: [

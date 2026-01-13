@@ -359,6 +359,10 @@ export default function RotaPage() {
           valA = a.client.MUNICÍPIO || ''
           valB = b.client.MUNICÍPIO || ''
           break
+        case 'cep':
+          valA = a.client['CEP OFICIO'] || ''
+          valB = b.client['CEP OFICIO'] || ''
+          break
         case 'vencimento_cobranca':
           valA = a.vencimento_cobranca || ''
           valB = b.vencimento_cobranca || ''
