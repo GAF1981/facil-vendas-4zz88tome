@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import {
   Card,
   CardContent,
@@ -37,6 +37,7 @@ import { formatCurrency } from '@/lib/formatters'
 import { parseISO, isSameDay } from 'date-fns'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { Switch } from '@/components/ui/switch'
+import { supabase } from '@/lib/supabase/client'
 
 export default function CobrancaPage() {
   const [loading, setLoading] = useState(true)
@@ -61,7 +62,7 @@ export default function CobrancaPage() {
 
   const { toast } = useToast()
 
-  const fetchDebts = async () => {
+  const fetchDebts = useCallback(async () => {
     setLoading(true)
     try {
       const result = await cobrancaService.getDebts()
@@ -76,11 +77,60 @@ export default function CobrancaPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [toast])
 
   useEffect(() => {
     fetchDebts()
-  }, [])
+  }, [fetchDebts])
+
+  // Realtime subscription for Auto-Refresh
+  useEffect(() => {
+    const channel = supabase
+      .channel('cobranca-updates')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'debitos_historico' },
+        () => {
+          console.log(
+            'Detected change in debitos_historico, refreshing Cobranca...',
+          )
+          fetchDebts()
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'RECEBIMENTOS' },
+        () => {
+          console.log('Detected change in RECEBIMENTOS, refreshing Cobranca...')
+          fetchDebts()
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'acoes_cobranca' },
+        () => {
+          console.log(
+            'Detected change in acoes_cobranca, refreshing Cobranca...',
+          )
+          fetchDebts()
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'BANCO_DE_DADOS' },
+        () => {
+          console.log(
+            'Detected change in BANCO_DE_DADOS, refreshing Cobranca...',
+          )
+          fetchDebts()
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [fetchDebts])
 
   // Derived unique values for filters
   const uniqueGroups = useMemo(
@@ -280,7 +330,7 @@ export default function CobrancaPage() {
           <RefreshCw
             className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`}
           />
-          Atualizar
+          {loading ? 'Atualizando...' : 'Atualizar'}
         </Button>
       </div>
 

@@ -109,6 +109,7 @@ export const rotaService = {
       .from('ROTA_ITEMS')
       .select('*')
       .eq('rota_id', rotaId)
+      .limit(50000) // Added limit to ensure full fetch for large routes
 
     if (error) throw error
     return data as RotaItem[]
@@ -153,15 +154,17 @@ export const rotaService = {
       .select('*')
       .in('TIPO DE CLIENTE', ['ATIVO', 'INATIVO - ROTA'])
       .order('CODIGO', { ascending: false })
-      .limit(50000)
+      .limit(100000) // Increased limit for full dataset coverage
 
     if (clientsError) throw clientsError
     if (!clients) return []
 
     // 2. Optimized Debt Fetching
+    // Explicitly fetching a large number of rows to avoid missing debts (like order #392) due to default 1000 limit
     const { data: debtData, error: debtError } = await supabase
       .from('debitos_historico')
       .select('cliente_codigo, debito, data_acerto, pedido_id')
+      .limit(100000) // Crucial Fix: Increased limit to ensure all debts are fetched
 
     if (debtError) {
       console.error('Error fetching debitos_historico:', debtError)
@@ -244,7 +247,7 @@ export const rotaService = {
     const { data: statsData, error: statsError } = await supabase
       .from('client_stats_view' as any)
       .select('client_id, max_pedido, max_data_acerto')
-      .limit(50000)
+      .limit(100000) // Increased limit
 
     if (statsError) {
       console.error('Error fetching client stats view:', statsError)
@@ -309,6 +312,8 @@ export const rotaService = {
     const { data: consignedData } = await supabase
       .from('view_client_latest_consigned_value' as any)
       .select('*')
+      .limit(100000)
+
     const consignedMap = new Map<number, number>()
     if (consignedData) {
       consignedData.forEach((row: any) => {
@@ -415,7 +420,7 @@ export const rotaService = {
         .from('BANCO_DE_DADOS')
         .select('"CÓDIGO DO CLIENTE"')
         .gte('"DATA E HORA"', startDate)
-        .limit(20000)
+        .limit(50000) // Increased limit
 
       visits?.forEach((v) => {
         const cid = v['CÓDIGO DO CLIENTE']
@@ -427,6 +432,7 @@ export const rotaService = {
         .select('cliente_id')
         .gte('created_at', startDate)
         .lte('created_at', endDate)
+        .limit(50000) // Increased limit
 
       payments?.forEach((p) => {
         if (p.cliente_id) completedSet.add(p.cliente_id)

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { RotaHeader } from '@/components/rota/RotaHeader'
 import { RotaLegend } from '@/components/rota/RotaLegend'
 import { RotaTable } from '@/components/rota/RotaTable'
@@ -8,6 +8,7 @@ import { employeesService } from '@/services/employeesService'
 import { Rota, RotaRow, RotaFilterState, SortConfig } from '@/types/rota'
 import { Employee } from '@/types/employee'
 import { useToast } from '@/hooks/use-toast'
+import { supabase } from '@/lib/supabase/client'
 
 export default function RotaPage() {
   const [activeRota, setActiveRota] = useState<Rota | null>(null)
@@ -42,44 +43,90 @@ export default function RotaPage() {
     direction: 'desc',
   })
 
-  useEffect(() => {
-    const init = async () => {
-      setLoading(true)
-      try {
-        const [active, last, empRes] = await Promise.all([
-          rotaService.getActiveRota(),
-          rotaService.getLastRota(),
-          employeesService.getEmployees(1, 1000),
-        ])
-        setActiveRota(active)
-        setLastRota(last)
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [active, last, empRes] = await Promise.all([
+        rotaService.getActiveRota(),
+        rotaService.getLastRota(),
+        employeesService.getEmployees(1, 1000),
+      ])
+      setActiveRota(active)
+      setLastRota(last)
 
-        const allEmployees = empRes.data
-        const activeSellers = allEmployees.filter(
-          (e) =>
-            e.situacao === 'ATIVO' &&
-            Array.isArray(e.setor) &&
-            e.setor.includes('Vendedor'),
-        )
-        setSellers(activeSellers)
+      const allEmployees = empRes.data
+      const activeSellers = allEmployees.filter(
+        (e) =>
+          e.situacao === 'ATIVO' &&
+          Array.isArray(e.setor) &&
+          e.setor.includes('Vendedor'),
+      )
+      setSellers(activeSellers)
 
-        const rotaToFetch = active || last
-        const data = await rotaService.getFullRotaData(rotaToFetch)
+      const rotaToFetch = active || last
+      const data = await rotaService.getFullRotaData(rotaToFetch)
 
-        setRows(Array.isArray(data) ? data : [])
-      } catch (error) {
-        console.error(error)
-        toast({
-          title: 'Erro ao carregar',
-          description: 'Falha ao inicializar dados da rota.',
-          variant: 'destructive',
-        })
-      } finally {
-        setLoading(false)
-      }
+      setRows(Array.isArray(data) ? data : [])
+    } catch (error) {
+      console.error(error)
+      toast({
+        title: 'Erro ao carregar',
+        description: 'Falha ao inicializar dados da rota.',
+        variant: 'destructive',
+      })
+    } finally {
+      setLoading(false)
     }
-    init()
   }, [toast])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
+  // Realtime subscription for Auto-Refresh
+  useEffect(() => {
+    const channel = supabase
+      .channel('rota-updates')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'BANCO_DE_DADOS' },
+        () => {
+          console.log('Detected change in BANCO_DE_DADOS, refreshing Rota...')
+          fetchData()
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'RECEBIMENTOS' },
+        () => {
+          console.log('Detected change in RECEBIMENTOS, refreshing Rota...')
+          fetchData()
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'ROTA_ITEMS' },
+        () => {
+          console.log('Detected change in ROTA_ITEMS, refreshing Rota...')
+          fetchData()
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'debitos_historico' },
+        () => {
+          console.log(
+            'Detected change in debitos_historico, refreshing Rota...',
+          )
+          fetchData()
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [fetchData])
 
   const handleStartRota = async () => {
     setLoading(true)
@@ -150,9 +197,6 @@ export default function RotaPage() {
 
     let newXNaRota: number | undefined = undefined
 
-    // Logic: If seller is assigned (changed to a value), increment x_na_rota by 1
-    // This assumes the user is manually assigning, implying a new attempt/visit intention
-    // AND the client is NOT completed
     const currentRow = rows.find((r) => r.client.CODIGO === clientId)
 
     if (
@@ -177,7 +221,6 @@ export default function RotaPage() {
       }),
     )
 
-    // Indicate that an update is pending
     setPendingUpdates((prev) => prev + 1)
 
     try {
@@ -198,9 +241,7 @@ export default function RotaPage() {
         description: 'Falha ao salvar alteração.',
         variant: 'destructive',
       })
-      // Revert could be implemented here if needed, but optimistic UI usually prioritizes speed
     } finally {
-      // Decrement pending updates, ensuring it doesn't go below 0
       setPendingUpdates((prev) => Math.max(0, prev - 1))
     }
   }

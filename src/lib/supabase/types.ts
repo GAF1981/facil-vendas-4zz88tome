@@ -2038,6 +2038,7 @@ export type Database = {
           cliente_id: number | null
           id: number
           rota_id: number | null
+          tarefas: string | null
           vendedor_id: number | null
           x_na_rota: number | null
         }
@@ -2047,6 +2048,7 @@ export type Database = {
           cliente_id?: number | null
           id?: number
           rota_id?: number | null
+          tarefas?: string | null
           vendedor_id?: number | null
           x_na_rota?: number | null
         }
@@ -2056,6 +2058,7 @@ export type Database = {
           cliente_id?: number | null
           id?: number
           rota_id?: number | null
+          tarefas?: string | null
           vendedor_id?: number | null
           x_na_rota?: number | null
         }

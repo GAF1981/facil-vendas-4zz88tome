@@ -21,7 +21,7 @@ export const cobrancaService = {
         'pedido_id, cliente_codigo, cliente_nome, valor_venda, valor_pago, debito, data_acerto, vendedor_nome, rota_id, saldo_a_pagar',
       )
       .gt('debito', 1) // Only fetch relevant debts > 1.00
-      .limit(10000)
+      .limit(50000) // Increased limit to ensure coverage
 
     if (debtsError) throw debtsError
 
@@ -57,60 +57,61 @@ export const cobrancaService = {
     >()
 
     if (clientIds.length > 0) {
-      const { data: clientData, error: clientError } = await supabase
-        .from('CLIENTES')
-        .select(
-          'CODIGO, "TIPO DE CLIENTE", GRUPO, "GRUPO ROTA", ENDEREÇO, BAIRRO, MUNICÍPIO, situacao',
-        )
-        .in('CODIGO', clientIds)
+      // Chunking for large sets of clients
+      const chunkSize = 1000
+      for (let i = 0; i < clientIds.length; i += chunkSize) {
+        const chunk = clientIds.slice(i, i + chunkSize)
+        const { data: clientData, error: clientError } = await supabase
+          .from('CLIENTES')
+          .select(
+            'CODIGO, "TIPO DE CLIENTE", GRUPO, "GRUPO ROTA", ENDEREÇO, BAIRRO, MUNICÍPIO, situacao',
+          )
+          .in('CODIGO', chunk)
 
-      if (clientError) console.error('Error fetching clients:', clientError)
-      else {
-        clientData?.forEach((c) => {
-          if (!c.CODIGO) return
-          clientInfoMap.set(c.CODIGO, {
-            type: c['TIPO DE CLIENTE'] || 'N/D',
-            group: (c as any)['GRUPO'] || null,
-            route: (c as any)['GRUPO ROTA'] || null,
-            address: (c as any)['ENDEREÇO'] || null,
-            neighborhood: (c as any)['BAIRRO'] || null,
-            city: (c as any)['MUNICÍPIO'] || null,
-            situacao: (c as any)['situacao'] || 'ATIVO',
+        if (clientError) {
+          console.error('Error fetching clients:', clientError)
+        } else {
+          clientData?.forEach((c) => {
+            if (!c.CODIGO) return
+            clientInfoMap.set(c.CODIGO, {
+              type: c['TIPO DE CLIENTE'] || 'N/D',
+              group: (c as any)['GRUPO'] || null,
+              route: (c as any)['GRUPO ROTA'] || null,
+              address: (c as any)['ENDEREÇO'] || null,
+              neighborhood: (c as any)['BAIRRO'] || null,
+              city: (c as any)['MUNICÍPIO'] || null,
+              situacao: (c as any)['situacao'] || 'ATIVO',
+            })
           })
-        })
+        }
       }
     }
 
     // 3. Fetch Latest Collection Actions (Negotiated Installments)
-    const { data: actionsData, error: actionsError } = await supabase
-      .from('view_latest_collection_actions')
-      .select('*')
-      .in('pedido_id', orderIds)
-
-    if (actionsError) throw actionsError
-
+    // Chunking orderIds
     const actionsMap = new Map<number, LatestCollectionActionView[]>()
-    actionsData?.forEach((row: any) => {
-      // Ensure we handle potential nulls from the view safely
-      const pId = row.pedido_id
-      if (pId != null) {
-        if (!actionsMap.has(pId)) {
-          actionsMap.set(pId, [])
+    const chunkSize = 1000
+    for (let i = 0; i < orderIds.length; i += chunkSize) {
+      const chunk = orderIds.slice(i, i + chunkSize)
+      const { data: actionsData, error: actionsError } = await supabase
+        .from('view_latest_collection_actions')
+        .select('*')
+        .in('pedido_id', chunk)
+
+      if (actionsError) throw actionsError
+
+      actionsData?.forEach((row: any) => {
+        const pId = row.pedido_id
+        if (pId != null) {
+          if (!actionsMap.has(pId)) {
+            actionsMap.set(pId, [])
+          }
+          actionsMap.get(pId)!.push(row)
         }
-        actionsMap.get(pId)!.push(row)
-      }
-    })
+      })
+    }
 
     // 4. Fetch Receipts (RECEBIMENTOS) for payments made and fallback installments
-    const { data: recData, error: recError } = await supabase
-      .from('RECEBIMENTOS')
-      .select(
-        'id, venda_id, valor_pago, vencimento, valor_registrado, forma_pagamento, forma_cobranca, data_combinada',
-      )
-      .in('venda_id', orderIds)
-
-    if (recError) throw recError
-
     const paymentsMap = new Map<
       number,
       {
@@ -120,30 +121,42 @@ export const cobrancaService = {
       }
     >()
 
-    recData?.forEach((r: any) => {
-      const pid = r.venda_id
-      if (pid == null) return // Skip if no order link
+    for (let i = 0; i < orderIds.length; i += chunkSize) {
+      const chunk = orderIds.slice(i, i + chunkSize)
+      const { data: recData, error: recError } = await supabase
+        .from('RECEBIMENTOS')
+        .select(
+          'id, venda_id, valor_pago, vencimento, valor_registrado, forma_pagamento, forma_cobranca, data_combinada',
+        )
+        .in('venda_id', chunk)
 
-      if (!paymentsMap.has(pid)) {
-        paymentsMap.set(pid, {
-          totalPaid: 0,
-          history: [],
-          rawInstallments: [],
-        })
-      }
-      const entry = paymentsMap.get(pid)!
+      if (recError) throw recError
 
-      const valPago = Number(r.valor_pago) || 0
-      if (valPago > 0) {
-        entry.totalPaid += valPago
-        entry.history.push({
-          date: r.vencimento || '',
-          value: valPago,
-        })
-      }
+      recData?.forEach((r: any) => {
+        const pid = r.venda_id
+        if (pid == null) return
 
-      entry.rawInstallments.push(r)
-    })
+        if (!paymentsMap.has(pid)) {
+          paymentsMap.set(pid, {
+            totalPaid: 0,
+            history: [],
+            rawInstallments: [],
+          })
+        }
+        const entry = paymentsMap.get(pid)!
+
+        const valPago = Number(r.valor_pago) || 0
+        if (valPago > 0) {
+          entry.totalPaid += valPago
+          entry.history.push({
+            date: r.vencimento || '',
+            value: valPago,
+          })
+        }
+
+        entry.rawInstallments.push(r)
+      })
+    }
 
     // 5. Construct Data Structure
     const clientsMap = new Map<number, ClientDebt>()
