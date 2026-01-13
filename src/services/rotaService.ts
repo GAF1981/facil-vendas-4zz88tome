@@ -54,20 +54,6 @@ export const rotaService = {
     return data as Rota
   },
 
-  async endRota(id: number) {
-    const { data, error } = await supabase
-      .from('ROTA')
-      .update({
-        data_fim: new Date().toISOString(),
-      })
-      .eq('id', id)
-      .select()
-      .single()
-
-    if (error) throw error
-    return data as Rota
-  },
-
   async finishAndStartNewRoute(currentRotaId: number) {
     // 1. Determine Next ID
     const { data: maxIdData } = await supabase
@@ -103,7 +89,6 @@ export const rotaService = {
 
     if (transferError) {
       console.error('Error transferring unattended items:', transferError)
-      // We don't throw here to avoid blocking the closing process, but it's critical.
     }
 
     // 4. Close the Old Rota
@@ -187,7 +172,6 @@ export const rotaService = {
       { totalDebt: number; orderCount: number; oldestDate: string | null }
     >()
     const ordersWithDebt = new Set<number>()
-    // Map to link Order -> Client & Original Date for fallback
     const orderDataMap = new Map<
       number,
       { clientId: number; dataAcerto: string | null }
@@ -231,7 +215,7 @@ export const rotaService = {
     }
 
     // 3. Fetch Pendencies
-    const allPendencies = await pendenciasService.getAll(false) // Unresolved
+    const allPendencies = await pendenciasService.getAll(false)
     const pendencyMap = new Set(allPendencies.map((p) => p.cliente_id))
 
     // 4. Fetch Rota Items
@@ -524,6 +508,6 @@ export const rotaService = {
   },
 
   async checkAndDecrementXNaRota() {
-    // No-op - DB triggers handle this now
+    // No-op - DB triggers/logic handle this
   },
 }

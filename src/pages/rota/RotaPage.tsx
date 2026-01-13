@@ -17,7 +17,6 @@ export default function RotaPage() {
   const [loading, setLoading] = useState(false)
   const { toast } = useToast()
 
-  // New Selection Mode State
   const [isSelectionMode, setIsSelectionMode] = useState(false)
 
   const [filters, setFilters] = useState<RotaFilterState>({
@@ -55,7 +54,6 @@ export default function RotaPage() {
         setLastRota(last)
 
         const allEmployees = empRes.data
-        // Filter sellers: Active and sector includes 'Vendedor'
         const activeSellers = allEmployees.filter(
           (e) =>
             e.situacao === 'ATIVO' &&

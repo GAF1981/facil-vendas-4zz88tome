@@ -31,8 +31,8 @@ export interface RotaRow {
   data_acerto: string | null
   projecao: number | null
   numero_pedido: number | null
-  estoque: number | null // Updated to allow null for missing data
-  valor_consignado: number | null // New field for Total Consigned Value
+  estoque: number | null
+  valor_consignado: number | null
   // Pendencies
   has_pendency: boolean
   // Meta
@@ -40,18 +40,15 @@ export interface RotaRow {
   // Status Logic
   earliest_unpaid_date: string | null
   vencimento_status: 'VENCIDO' | 'A VENCER' | 'PAGO' | 'SEM DÉBITO'
-  // Specific field for the oldest calculated due date (Vencimento)
-  // Derived from: Negotiated Actions > Unpaid Installments > Order Date
   vencimento_cobranca: string | null
 }
 
 export interface RotaFilterState {
   search: string
   x_na_rota: string | 'todos'
-  agregado: string | 'todos' // 'SIM', 'NÃO'
-  vendedor: string[] // Multi-select ID strings
+  agregado: string | 'todos'
+  vendedor: string[]
   municipio: string | 'todos'
-  // tipo_cliente removed as it is auto-filtered to 'ATIVO'
   grupo_rota: string | 'todos'
   debito_min: string
   debito_max: string

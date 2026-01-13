@@ -125,7 +125,6 @@ export function RotaTable({
           <table className="w-full caption-bottom text-sm">
             <TableHeader className="bg-muted/50 sticky top-0 z-10 shadow-sm">
               <TableRow>
-                {/* 1. Débito */}
                 <SortableHeader
                   column="debito"
                   label="Débito"
@@ -133,7 +132,6 @@ export function RotaTable({
                   className="min-w-[100px]"
                 />
 
-                {/* NEW: Vencimento (Rota) - Oldest collection date */}
                 <TableHead
                   className="min-w-[90px] bg-muted/50 cursor-pointer hover:bg-muted/50 transition-colors text-center"
                   onClick={() => onSort('vencimento_cobranca')}
@@ -153,7 +151,6 @@ export function RotaTable({
                   </TooltipProvider>
                 </TableHead>
 
-                {/* 2. Projeção */}
                 <SortableHeader
                   column="projecao"
                   label="Projeção"
@@ -161,12 +158,10 @@ export function RotaTable({
                   className="min-w-[100px]"
                 />
 
-                {/* 3. Vendedor */}
                 <TableHead className="min-w-[140px] font-bold text-xs">
                   Vendedor
                 </TableHead>
 
-                {/* 4. Rota/Grupo Rota */}
                 <SortableHeader
                   column="grupo_rota"
                   label="Rota/Grupo"
@@ -174,7 +169,6 @@ export function RotaTable({
                   className="min-w-[120px]"
                 />
 
-                {/* 5. Consignado */}
                 <SortableHeader
                   column="valor_consignado"
                   label="Consignado"
@@ -182,17 +176,14 @@ export function RotaTable({
                   className="min-w-[100px]"
                 />
 
-                {/* 6. # (Row Number) */}
                 <TableHead className="w-[50px] text-center font-bold text-xs">
                   #
                 </TableHead>
 
-                {/* 7. Cliente */}
                 <TableHead className="min-w-[200px] font-bold text-xs">
                   Cliente
                 </TableHead>
 
-                {/* 8. Município */}
                 <SortableHeader
                   column="municipio"
                   label="Município"
@@ -200,33 +191,28 @@ export function RotaTable({
                   className="min-w-[120px]"
                 />
 
-                {/* 9. Endereço (Toggleable) */}
                 {!isSelectionMode && (
                   <TableHead className="min-w-[200px] font-bold text-xs">
                     Endereço
                   </TableHead>
                 )}
 
-                {/* 10. Tipo de Cliente */}
                 <TableHead className="min-w-[120px] font-bold text-xs">
                   Tipo
                 </TableHead>
 
-                {/* 11. Telefone 1 (Toggleable) */}
                 {!isSelectionMode && (
                   <TableHead className="min-w-[130px] font-bold text-xs">
                     Telefone 1
                   </TableHead>
                 )}
 
-                {/* 12. Contato 1 (Toggleable) */}
                 {!isSelectionMode && (
                   <TableHead className="min-w-[120px] font-bold text-xs">
                     Contato 1
                   </TableHead>
                 )}
 
-                {/* 13. xRota */}
                 <SortableHeader
                   column="x_na_rota"
                   label="xRota"
@@ -234,14 +220,12 @@ export function RotaTable({
                   className="w-[80px]"
                 />
 
-                {/* 14. Pedido (Toggleable) */}
                 {!isSelectionMode && (
                   <TableHead className="text-center font-bold text-xs w-[80px]">
                     Pedido
                   </TableHead>
                 )}
 
-                {/* 15. Data */}
                 <SortableHeader
                   column="data_acerto"
                   label="Data"
@@ -249,24 +233,20 @@ export function RotaTable({
                   className="min-w-[90px]"
                 />
 
-                {/* NEW: Dias de Acerto */}
                 <TableHead className="text-center font-bold text-xs w-[60px]">
                   Dias
                 </TableHead>
 
-                {/* 16. Status */}
                 <TableHead className="w-[100px] text-center font-bold text-xs">
                   Status
                 </TableHead>
 
-                {/* 17. Boleto (Toggleable) */}
                 {!isSelectionMode && (
                   <TableHead className="w-[60px] text-center font-bold text-xs">
                     Boleto
                   </TableHead>
                 )}
 
-                {/* 18. Agregado (Toggleable) */}
                 {!isSelectionMode && (
                   <TableHead className="w-[70px] text-center font-bold text-xs">
                     Agreg.
@@ -296,7 +276,7 @@ export function RotaTable({
                     className={cn(
                       'hover:bg-muted/30 transition-colors border-b text-xs',
                       {
-                        // Updated Dark Green for Completed (Activity during route) per User Story
+                        // Dark Green for Completed
                         'bg-green-800 hover:bg-green-700 text-white dark:bg-green-900 dark:hover:bg-green-800':
                           row.is_completed,
                         'bg-orange-50/50 hover:bg-orange-100/50 dark:bg-orange-950/10 dark:hover:bg-orange-950/20':
@@ -304,7 +284,6 @@ export function RotaTable({
                       },
                     )}
                   >
-                    {/* 1. Débito */}
                     <TableCell className="text-right font-medium">
                       <div className="flex flex-col items-end">
                         <span
@@ -338,7 +317,6 @@ export function RotaTable({
                       </div>
                     </TableCell>
 
-                    {/* NEW: Vencimento (Rota) with Status Text Logic */}
                     <TableCell className="text-center text-[10px]">
                       {row.debito > 0 && row.vencimento_cobranca ? (
                         <div className="flex flex-col items-center">
@@ -384,7 +362,6 @@ export function RotaTable({
                       )}
                     </TableCell>
 
-                    {/* 2. Projeção */}
                     <TableCell
                       className={cn(
                         'text-right',
@@ -398,7 +375,6 @@ export function RotaTable({
                         : '-'}
                     </TableCell>
 
-                    {/* 3. Vendedor */}
                     <TableCell>
                       <Select
                         disabled={disabled}
@@ -440,7 +416,6 @@ export function RotaTable({
                       </Select>
                     </TableCell>
 
-                    {/* 4. Rota/Grupo Rota */}
                     <TableCell
                       className={cn(
                         'truncate max-w-[120px]',
@@ -453,7 +428,6 @@ export function RotaTable({
                       {row.client['GRUPO ROTA'] || '-'}
                     </TableCell>
 
-                    {/* 5. Consignado */}
                     <TableCell
                       className={cn(
                         'text-right',
@@ -468,7 +442,6 @@ export function RotaTable({
                         : '-'}
                     </TableCell>
 
-                    {/* 6. # */}
                     <TableCell
                       className={cn(
                         'text-center font-mono',
@@ -480,7 +453,6 @@ export function RotaTable({
                       {row.rowNumber}
                     </TableCell>
 
-                    {/* 7. Cliente */}
                     <TableCell>
                       <div className="flex flex-col gap-0.5">
                         <span
@@ -523,7 +495,6 @@ export function RotaTable({
                       </div>
                     </TableCell>
 
-                    {/* 8. Município */}
                     <TableCell
                       className="truncate max-w-[120px]"
                       title={row.client.MUNICÍPIO || ''}
@@ -531,7 +502,6 @@ export function RotaTable({
                       {row.client.MUNICÍPIO || '-'}
                     </TableCell>
 
-                    {/* 9. Endereço (Toggleable) */}
                     {!isSelectionMode && (
                       <TableCell
                         className="truncate max-w-[200px]"
@@ -541,12 +511,10 @@ export function RotaTable({
                       </TableCell>
                     )}
 
-                    {/* 10. Tipo de Cliente */}
                     <TableCell className="truncate max-w-[120px]">
                       {row.client['TIPO DE CLIENTE'] || '-'}
                     </TableCell>
 
-                    {/* 11. Telefone 1 (WhatsApp) (Toggleable) */}
                     {!isSelectionMode && (
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -575,14 +543,12 @@ export function RotaTable({
                       </TableCell>
                     )}
 
-                    {/* 12. Contato 1 (Toggleable) */}
                     {!isSelectionMode && (
                       <TableCell className="truncate max-w-[120px]">
                         {row.client['CONTATO 1'] || '-'}
                       </TableCell>
                     )}
 
-                    {/* 13. xRota (Input) */}
                     <TableCell className="text-center">
                       <div className="flex justify-center">
                         <Input
@@ -590,7 +556,6 @@ export function RotaTable({
                           min={0}
                           max={99}
                           disabled={disabled || row.is_completed}
-                          // Requirement: Reset x_na_rota to 0 if client was successfully attended
                           value={row.is_completed ? 0 : row.x_na_rota}
                           onChange={(e) =>
                             onUpdateRow(
@@ -613,21 +578,18 @@ export function RotaTable({
                       </div>
                     </TableCell>
 
-                    {/* 14. Pedido (Toggleable) */}
                     {!isSelectionMode && (
                       <TableCell className="text-center font-mono text-[10px]">
                         {row.numero_pedido || '-'}
                       </TableCell>
                     )}
 
-                    {/* 15. Data */}
                     <TableCell className="text-center text-[10px]">
                       {row.data_acerto
                         ? safeFormatDate(row.data_acerto, 'dd/MM/yy')
                         : '-'}
                     </TableCell>
 
-                    {/* NEW: Dias de Acerto */}
                     <TableCell
                       className={cn(
                         'text-center text-[10px] font-medium',
@@ -641,7 +603,6 @@ export function RotaTable({
                         : '-'}
                     </TableCell>
 
-                    {/* 16. Status */}
                     <TableCell className="text-center">
                       <div className="flex flex-col items-center gap-1">
                         {row.vencimento_status === 'VENCIDO' && (
@@ -679,7 +640,6 @@ export function RotaTable({
                       </div>
                     </TableCell>
 
-                    {/* 17. Boleto (Toggleable) */}
                     {!isSelectionMode && (
                       <TableCell className="text-center">
                         <Checkbox
@@ -697,7 +657,6 @@ export function RotaTable({
                       </TableCell>
                     )}
 
-                    {/* 18. Agregado (Toggleable) */}
                     {!isSelectionMode && (
                       <TableCell className="text-center">
                         <Checkbox
