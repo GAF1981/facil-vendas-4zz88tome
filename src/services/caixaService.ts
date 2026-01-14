@@ -444,8 +444,8 @@ export const caixaService = {
           initialOdo = previous.hodometro
           const distance = current.hodometro - initialOdo
           if (distance > 0 && previous.Valor > 0) {
-            // Formula: Distance (km) / Previous Value (R$)
-            // This yields KM per R$ (Efficiency)
+            // Formula from AC: Current Row Km percorrido / Previous Row Valor (R$)
+            // This is Km/R$ (Efficiency)
             costPerKm = distance / previous.Valor
           }
         }

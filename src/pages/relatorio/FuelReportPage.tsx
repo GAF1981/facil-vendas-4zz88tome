@@ -75,7 +75,7 @@ export default function FuelReportPage() {
               Relatório de Combustível
             </h1>
             <p className="text-muted-foreground">
-              Análise de consumo e eficiência (KM/R$) por veículo.
+              Análise de consumo e eficiência (Km/R$) por veículo.
             </p>
           </div>
         </div>

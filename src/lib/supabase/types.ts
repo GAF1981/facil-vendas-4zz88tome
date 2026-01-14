@@ -540,6 +540,7 @@ export type Database = {
           id: number
           saiu_do_caixa: boolean | null
           Valor: number
+          veiculo_id: number | null
         }
         Insert: {
           Data?: string | null
@@ -550,6 +551,7 @@ export type Database = {
           id?: number
           saiu_do_caixa?: boolean | null
           Valor: number
+          veiculo_id?: number | null
         }
         Update: {
           Data?: string | null
@@ -560,6 +562,7 @@ export type Database = {
           id?: number
           saiu_do_caixa?: boolean | null
           Valor?: number
+          veiculo_id?: number | null
         }
         Relationships: [
           {
@@ -567,6 +570,13 @@ export type Database = {
             columns: ['funcionario_id']
             isOneToOne: false
             referencedRelation: 'FUNCIONARIOS'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'DESPESAS_veiculo_id_fkey'
+            columns: ['veiculo_id']
+            isOneToOne: false
+            referencedRelation: 'VEICULOS'
             referencedColumns: ['id']
           },
         ]
@@ -2173,6 +2183,30 @@ export type Database = {
             referencedColumns: ['id']
           },
         ]
+      }
+      VEICULOS: {
+        Row: {
+          created_at: string
+          hodometro_cadastro: number | null
+          id: number
+          placa: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          hodometro_cadastro?: number | null
+          id?: number
+          placa: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          hodometro_cadastro?: number | null
+          id?: number
+          placa?: string
+          status?: string
+        }
+        Relationships: []
       }
     }
     Views: {
