@@ -538,7 +538,10 @@ export type Database = {
           'Grupo de Despesas': string
           hodometro: number | null
           id: number
+          prestador_servico: string | null
           saiu_do_caixa: boolean | null
+          tipo_combustivel: string | null
+          tipo_servico: string | null
           Valor: number
           veiculo_id: number | null
         }
@@ -549,7 +552,10 @@ export type Database = {
           'Grupo de Despesas': string
           hodometro?: number | null
           id?: number
+          prestador_servico?: string | null
           saiu_do_caixa?: boolean | null
+          tipo_combustivel?: string | null
+          tipo_servico?: string | null
           Valor: number
           veiculo_id?: number | null
         }
@@ -560,7 +566,10 @@ export type Database = {
           'Grupo de Despesas'?: string
           hodometro?: number | null
           id?: number
+          prestador_servico?: string | null
           saiu_do_caixa?: boolean | null
+          tipo_combustivel?: string | null
+          tipo_servico?: string | null
           Valor?: number
           veiculo_id?: number | null
         }

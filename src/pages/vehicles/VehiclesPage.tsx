@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom'
 import { VehicleTable } from '@/components/vehicles/VehicleTable'
 import { VehicleFormDialog } from '@/components/vehicles/VehicleFormDialog'
 import { ExpenseFormDialog } from '@/components/caixa/ExpenseFormDialog'
+import { VehicleExpenseGallery } from '@/components/vehicles/VehicleExpenseGallery'
 import { vehicleService } from '@/services/vehicleService'
 import { Vehicle } from '@/types/vehicle'
 import { useToast } from '@/hooks/use-toast'
@@ -29,6 +30,7 @@ export default function VehiclesPage() {
     undefined,
   )
   const [deleteId, setDeleteId] = useState<number | null>(null)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [selectedVehicleForExpense, setSelectedVehicleForExpense] = useState<
     number | null
   >(null)
@@ -78,12 +80,6 @@ export default function VehiclesPage() {
   }
 
   const handleAddExpense = () => {
-    // If there is only one vehicle, select it automatically, else let the dialog handle it or show selection?
-    // The ExpenseFormDialog has a vehicle selector.
-    // However, user story says "allow registration directly from the Vehicles tab".
-    // I will add a button next to "Novo Veículo" or in actions?
-    // "In the Vehicles tab, a 'Cadastrar Despesa' button must be added."
-    // I'll add a main button. If specific row actions are needed I could add there too, but main button covers requirement.
     setSelectedVehicleForExpense(null)
     setIsExpenseDialogOpen(true)
   }
@@ -141,6 +137,8 @@ export default function VehiclesPage() {
         </CardContent>
       </Card>
 
+      <VehicleExpenseGallery />
+
       <VehicleFormDialog
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
@@ -152,7 +150,10 @@ export default function VehiclesPage() {
         open={isExpenseDialogOpen}
         onOpenChange={setIsExpenseDialogOpen}
         onSuccess={() => {
-          // Maybe refresh something if needed, but expenses are not listed here yet
+          // Trigger refresh of gallery if we could access it, or just let user refresh
+          // Ideally we would lift state up or use a context/store for refresh trigger
+          // For now, manual refresh on the gallery is enough or page reload
+          window.location.reload()
         }}
         preselectedVehicleId={selectedVehicleForExpense}
       />

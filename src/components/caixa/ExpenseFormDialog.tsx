@@ -42,7 +42,7 @@ interface ExpenseFormDialogProps {
   onOpenChange: (open: boolean) => void
   onSuccess: () => void
   preselectedEmployee?: { id: number; name: string } | null
-  preselectedVehicleId?: number | null // New prop
+  preselectedVehicleId?: number | null
 }
 
 export function ExpenseFormDialog({
@@ -80,11 +80,12 @@ export function ExpenseFormDialog({
       veiculo_id: '',
       prestador_servico: '',
       tipo_servico: '',
-      tipo_combustivel: 'alcool',
+      tipo_combustivel: 'gasolina', // Default set to gasolina per User Story
     },
   })
 
   const selectedGrupo = form.watch('grupo')
+  const selectedVehicle = form.watch('veiculo_id')
 
   useEffect(() => {
     if (open) {
@@ -114,7 +115,7 @@ export function ExpenseFormDialog({
         veiculo_id: preselectedVehicleId ? preselectedVehicleId.toString() : '',
         prestador_servico: '',
         tipo_servico: '',
-        tipo_combustivel: 'alcool' as const,
+        tipo_combustivel: 'gasolina' as const, // Ensure default is gasolina
       }
       form.reset(initialValues)
     }
@@ -128,10 +129,12 @@ export function ExpenseFormDialog({
       selectedGrupo === 'Gasolina' ||
       selectedGrupo === 'Abastecimento'
     ) {
-      // Don't auto-set detalhamento for Fuel anymore as it might be 'alcool' or 'gasolina'
-      // But for consistency we can set it to 'Abastecimento' if empty
       if (!form.getValues('detalhamento')) {
         form.setValue('detalhamento', 'Abastecimento')
+      }
+      // Ensure fuel defaults to gasolina if switched to fuel group
+      if (!form.getValues('tipo_combustivel')) {
+        form.setValue('tipo_combustivel', 'gasolina')
       }
     } else if (selectedGrupo === 'Outros') {
       const current = form.getValues('detalhamento')
@@ -181,6 +184,39 @@ export function ExpenseFormDialog({
         message: 'Veículo é obrigatório',
       })
       return
+    }
+
+    // Odometer Validation Logic
+    if (isFuel && data.veiculo_id && data.hodometro) {
+      try {
+        const lastOdometer = await vehicleService.getLastOdometer(
+          Number(data.veiculo_id),
+        )
+        const currentOdometer = Number(data.hodometro)
+
+        if (currentOdometer < lastOdometer) {
+          form.setError('hodometro', {
+            message: `Hodômetro inválido. Último registro: ${lastOdometer} km.`,
+          })
+          return
+        }
+
+        if (currentOdometer - lastOdometer > 5000) {
+          form.setError('hodometro', {
+            message: `Diferença suspeita (> 5000km). Último: ${lastOdometer} km.`,
+          })
+          return
+        }
+      } catch (error) {
+        console.error('Failed to validate odometer', error)
+        // Proceed with warning or block? Let's block if validation fails technically
+        toast({
+          title: 'Erro de Validação',
+          description: 'Não foi possível validar o hodômetro.',
+          variant: 'destructive',
+        })
+        return
+      }
     }
 
     if (data.grupo === 'Manutenção') {
@@ -366,6 +402,7 @@ export function ExpenseFormDialog({
                       <Select
                         onValueChange={field.onChange}
                         defaultValue={field.value}
+                        value={field.value}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -373,8 +410,8 @@ export function ExpenseFormDialog({
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="alcool">Álcool</SelectItem>
                           <SelectItem value="gasolina">Gasolina</SelectItem>
+                          <SelectItem value="alcool">Álcool</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />

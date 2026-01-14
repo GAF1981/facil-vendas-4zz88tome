@@ -10,9 +10,10 @@ import {
 import { formatCurrency } from '@/lib/formatters'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { Eye, Filter } from 'lucide-react'
+import { Eye, Filter, ListChecks } from 'lucide-react'
 import { useState, useMemo } from 'react'
 import { EstoqueCarroMovementDetailsDialog } from './EstoqueCarroMovementDetailsDialog'
+import { EstoqueCarroCountDialog } from './EstoqueCarroCountDialog' // Reuse or adapt
 import {
   Popover,
   PopoverContent,
@@ -36,6 +37,7 @@ export function EstoqueCarroTable({ items }: Props) {
   const [selectedItem, setSelectedItem] = useState<EstoqueCarroItem | null>(
     null,
   )
+  const [countItem, setCountItem] = useState<EstoqueCarroItem | null>(null)
 
   // Filter States
   const [contagemFilter, setContagemFilter] = useState<string>('todos')
@@ -163,7 +165,6 @@ export function EstoqueCarroTable({ items }: Props) {
                 </div>
               </TableHead>
               <TableHead className="text-right">Dif (Val)</TableHead>
-              {/* Ajustes column removed as per request */}
               <TableHead className="text-right font-bold bg-gray-100">
                 Novo Saldo
               </TableHead>
@@ -171,7 +172,6 @@ export function EstoqueCarroTable({ items }: Props) {
           </TableHeader>
           <TableBody>
             {filteredItems.map((item) => {
-              // Status Logic: If there is a diff and no count record, it's PENDING
               const isPendente =
                 item.diferenca_qtd !== 0 && !item.has_count_record
 
@@ -187,9 +187,20 @@ export function EstoqueCarroTable({ items }: Props) {
                       <Eye className="h-4 w-4" />
                     </Button>
                   </TableCell>
-                  <TableCell className="font-medium">
+                  <TableCell className="font-medium group relative">
                     <div className="flex flex-col">
-                      <span>{item.produto}</span>
+                      <div className="flex items-center gap-2">
+                        <span>{item.produto}</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity text-blue-600 hover:bg-blue-100"
+                          onClick={() => setCountItem(item)}
+                          title="Realizar Contagem"
+                        >
+                          <ListChecks className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                       {item.codigo && (
                         <span className="text-xs text-muted-foreground">
                           Cod: {item.codigo}
@@ -258,6 +269,15 @@ export function EstoqueCarroTable({ items }: Props) {
           sessionId={selectedItem.id_estoque_carro}
           productId={selectedItem.produto_id}
           productName={selectedItem.produto}
+        />
+      )}
+
+      {countItem && (
+        <EstoqueCarroCountDialog
+          open={!!countItem}
+          onOpenChange={(o) => !o && setCountItem(null)}
+          sessionId={countItem.id_estoque_carro}
+          onSuccess={() => window.location.reload()} // Simplified refresh for now
         />
       )}
     </>

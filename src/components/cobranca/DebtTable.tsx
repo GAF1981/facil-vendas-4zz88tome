@@ -48,7 +48,7 @@ interface DebtTableProps {
   selectedItems: Set<string>
   onToggleItem: (id: string) => void
   isCobrancaMode: boolean
-  onToggleAll?: (ids: string[]) => void // New prop for master toggle
+  onToggleAll?: (ids: string[]) => void
 }
 
 // Flattened row type for display
@@ -58,27 +58,21 @@ interface FlatRow {
   clientId: number
   clientName: string
   clientType: string
-  // Address info
   address: string | null
   neighborhood: string | null
   city: string | null
-  // Order info
   clientOrderCount: number
   orderId: number
   orderDate: string
-  // Installment specific
   vencimento: string | null
   formaPagamento: string
   valorRegistrado: number
   valorPago: number
   debito: number
   status: 'VENCIDO' | 'A VENCER' | 'PAGO'
-  // Editable fields (Receivable Level)
   formaCobranca: string | null
   dataCombinada: string | null
-  // New field
   collectionActionCount: number
-  // For Popover Details
   orderTotal: number
   orderPayments: { method: string; value: number; dueDate: string }[]
   source: 'NEGOTIATION' | 'RECEIPT' | 'ORIGINAL'
@@ -101,7 +95,6 @@ export function DebtTable({
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [sortConfig, setSortConfig] = useState<SortConfig>(null)
 
-  // Sheet State
   const [selectedOrderForActions, setSelectedOrderForActions] = useState<{
     orderId: string
     clientId: number
@@ -110,7 +103,6 @@ export function DebtTable({
 
   const { toast } = useToast()
 
-  // Local state for optimistic updates on editable fields (Receivable Level)
   const [localUpdates, setLocalUpdates] = useState<
     Record<string, { formaCobranca?: any; dataCombinada?: any }>
   >({})
@@ -288,24 +280,17 @@ export function DebtTable({
           <TableHeader className="bg-background sticky top-0 z-10 shadow-sm">
             <TableRow>
               <TableHead className="w-[70px] bg-background">Código</TableHead>
-
-              {/* Toggleable Type */}
               {!isCobrancaMode && (
                 <TableHead className="w-[90px] bg-background">Tipo</TableHead>
               )}
-
               <TableHead className="min-w-[150px] bg-background">
                 Nome Cliente
               </TableHead>
-
-              {/* Toggleable Address */}
               {!isCobrancaMode && (
                 <TableHead className="min-w-[150px] bg-background">
                   Endereço
                 </TableHead>
               )}
-
-              {/* Toggleable Neighborhood */}
               {!isCobrancaMode && (
                 <TableHead
                   className="min-w-[100px] cursor-pointer hover:bg-muted bg-background"
@@ -317,7 +302,6 @@ export function DebtTable({
                   </div>
                 </TableHead>
               )}
-
               <TableHead
                 className="min-w-[100px] cursor-pointer hover:bg-muted bg-background"
                 onClick={() => requestSort('city')}
@@ -327,13 +311,9 @@ export function DebtTable({
                   {getSortIcon('city')}
                 </div>
               </TableHead>
-
-              {/* Toggleable Order */}
               {!isCobrancaMode && (
                 <TableHead className="w-[80px] bg-background">Pedido</TableHead>
               )}
-
-              {/* Sortable Vencimento */}
               <TableHead
                 className="bg-background cursor-pointer hover:bg-muted"
                 onClick={() => requestSort('vencimento')}
@@ -343,7 +323,6 @@ export function DebtTable({
                   {getSortIcon('vencimento')}
                 </div>
               </TableHead>
-
               <TableHead className="bg-background">F. Pagamento</TableHead>
               <TableHead className="text-right bg-background">
                 Valor Parc.
@@ -353,7 +332,6 @@ export function DebtTable({
               <TableHead className="text-center bg-background">
                 Status
               </TableHead>
-
               <TableHead className="min-w-[150px] bg-background">
                 Forma Cobrança
               </TableHead>
@@ -363,7 +341,6 @@ export function DebtTable({
               <TableHead className="min-w-[80px] text-center bg-background">
                 Ações
               </TableHead>
-
               <TableHead
                 className="w-[50px] text-center bg-background"
                 title="Rota Motoqueiro"
@@ -407,19 +384,14 @@ export function DebtTable({
                     <TableCell className="font-mono text-xs font-medium">
                       {row.clientId}
                     </TableCell>
-
-                    {/* Toggleable Type */}
                     {!isCobrancaMode && (
                       <TableCell className="text-xs text-muted-foreground">
                         {row.clientType}
                       </TableCell>
                     )}
-
                     <TableCell className="font-medium text-sm">
                       {row.clientName}
                     </TableCell>
-
-                    {/* Toggleable Address */}
                     {!isCobrancaMode && (
                       <TableCell
                         className="text-xs text-muted-foreground truncate max-w-[150px]"
@@ -428,8 +400,6 @@ export function DebtTable({
                         {row.address || '-'}
                       </TableCell>
                     )}
-
-                    {/* Toggleable Neighborhood */}
                     {!isCobrancaMode && (
                       <TableCell
                         className="text-xs text-muted-foreground truncate max-w-[100px]"
@@ -438,21 +408,17 @@ export function DebtTable({
                         {row.neighborhood || '-'}
                       </TableCell>
                     )}
-
                     <TableCell
                       className="text-xs text-muted-foreground truncate max-w-[100px]"
                       title={row.city || ''}
                     >
                       {row.city || '-'}
                     </TableCell>
-
-                    {/* Toggleable Order */}
                     {!isCobrancaMode && (
                       <TableCell className="font-mono text-xs">
                         {row.orderId}
                       </TableCell>
                     )}
-
                     <TableCell className="text-xs">
                       {row.vencimento
                         ? format(parseISO(row.vencimento), 'dd/MM/yyyy')
@@ -542,7 +508,6 @@ export function DebtTable({
                         {row.status}
                       </Badge>
                     </TableCell>
-
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <Select
@@ -582,7 +547,6 @@ export function DebtTable({
                         </Button>
                       </div>
                     </TableCell>
-
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <Input
@@ -610,30 +574,13 @@ export function DebtTable({
                         </Button>
                       </div>
                     </TableCell>
-
                     <TableCell className="text-center">
                       <div className="flex items-center justify-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-blue-600 hover:bg-blue-100"
-                          onClick={() =>
-                            handleOpenActions(
-                              row.orderId,
-                              row.clientId,
-                              row.clientName,
-                            )
-                          }
-                          title="Registrar Ação de Cobrança"
-                        >
-                          <PlusCircle className="h-4 w-4" />
-                        </Button>
-
                         <div className="relative">
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                            className="h-7 w-7 text-blue-600 hover:bg-blue-100"
                             onClick={() =>
                               handleOpenActions(
                                 row.orderId,
@@ -641,9 +588,9 @@ export function DebtTable({
                                 row.clientName,
                               )
                             }
-                            title="Ver Histórico"
+                            title="Registrar Ação de Cobrança"
                           >
-                            <MessageSquareText className="h-4 w-4" />
+                            <PlusCircle className="h-4 w-4" />
                           </Button>
                           {row.collectionActionCount > 0 && (
                             <span className="absolute -top-1 -right-1 flex h-3 w-3 items-center justify-center rounded-full bg-red-600 text-[8px] text-white">
@@ -651,7 +598,21 @@ export function DebtTable({
                             </span>
                           )}
                         </div>
-
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                          onClick={() =>
+                            handleOpenActions(
+                              row.orderId,
+                              row.clientId,
+                              row.clientName,
+                            )
+                          }
+                          title="Ver Histórico"
+                        >
+                          <MessageSquareText className="h-4 w-4" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -669,7 +630,6 @@ export function DebtTable({
                         </Button>
                       </div>
                     </TableCell>
-
                     <TableCell className="text-center">
                       <Checkbox
                         checked={isSelected}
