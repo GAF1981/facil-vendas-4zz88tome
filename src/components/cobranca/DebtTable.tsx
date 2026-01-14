@@ -45,9 +45,9 @@ import {
 interface DebtTableProps {
   data: ClientDebt[]
   onRefresh?: () => void
-  selectedClients: Set<number>
-  onToggleClient: (clientId: number) => void
-  isCobrancaMode: boolean // NEW PROP
+  selectedItems: Set<string>
+  onToggleItem: (id: string) => void
+  isCobrancaMode: boolean
 }
 
 // Flattened row type for display
@@ -91,8 +91,8 @@ type SortConfig = {
 export function DebtTable({
   data,
   onRefresh,
-  selectedClients,
-  onToggleClient,
+  selectedItems,
+  onToggleItem,
   isCobrancaMode,
 }: DebtTableProps) {
   const [selectedClient, setSelectedClient] = useState<ClientDebt | null>(null)
@@ -368,7 +368,7 @@ export function DebtTable({
               </TableRow>
             ) : (
               flattenedData.map((row) => {
-                const isSelected = selectedClients.has(row.clientId)
+                const isSelected = selectedItems.has(row.uniqueId)
                 return (
                   <TableRow
                     key={row.uniqueId}
@@ -508,7 +508,6 @@ export function DebtTable({
                           'text-[10px] px-2 py-0.5 h-6 whitespace-nowrap',
                           row.status === 'PAGO' &&
                             'bg-green-100 text-green-700 hover:bg-green-200 border-transparent',
-                          // UPDATED: A VENCER is now green themed
                           row.status === 'A VENCER' &&
                             'bg-green-50 text-green-600 border-green-200 hover:bg-green-100 font-bold',
                         )}
@@ -647,8 +646,8 @@ export function DebtTable({
                     <TableCell className="text-center">
                       <Checkbox
                         checked={isSelected}
-                        onCheckedChange={() => onToggleClient(row.clientId)}
-                        aria-label={`Selecionar cliente ${row.clientName} para rota`}
+                        onCheckedChange={() => onToggleItem(row.uniqueId)}
+                        aria-label={`Selecionar item para rota`}
                       />
                     </TableCell>
                   </TableRow>

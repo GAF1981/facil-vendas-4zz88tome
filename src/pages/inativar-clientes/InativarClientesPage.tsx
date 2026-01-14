@@ -135,15 +135,20 @@ export default function InativarClientesPage() {
   const handleInactivate = async () => {
     if (!targetClient) return
 
+    // Determine Status based on debt (Scenario A/B)
+    const hasDebt = (targetClient.debito || 0) > 0
+    const newStatus = hasDebt ? 'INATIVO-COBRANÇA' : 'INATIVO'
+
     try {
       await inativarClientesService.inactivateClient(
         targetClient.id,
         targetClient.cliente_codigo,
         targetClient.cliente_nome,
+        newStatus,
       )
       toast({
         title: 'Sucesso',
-        description: `Cliente ${targetClient.cliente_nome} inativado com sucesso.`,
+        description: `Cliente ${targetClient.cliente_nome} inativado com sucesso para ${newStatus}.`,
         className: 'bg-green-600 text-white',
       })
       setTargetClient(null)
@@ -178,6 +183,16 @@ export default function InativarClientesPage() {
         variant: 'destructive',
       })
     }
+  }
+
+  // Helper to determine confirmation message
+  const getConfirmationMessage = () => {
+    if (!targetClient) return ''
+    const hasDebt = (targetClient.debito || 0) > 0
+    if (hasDebt) {
+      return 'O cliente está sendo passando de ATIVO para INATIVO-COBRANÇA, porque possui débitos em aberto, confirmar essa alteração?'
+    }
+    return 'O cliente está sendo passando de ATIVO para INATIVO, confirmar essa alteração?'
   }
 
   return (
@@ -352,12 +367,12 @@ export default function InativarClientesPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar Inativação</AlertDialogTitle>
+            <AlertDialogDescription className="text-foreground font-medium">
+              {getConfirmationMessage()}
+            </AlertDialogDescription>
             <AlertDialogDescription>
-              Deseja realmente inativar o cliente{' '}
-              <strong>{targetClient?.cliente_nome}</strong>?
               <br />
-              <br />
-              <span className="flex items-center gap-2 text-amber-600 bg-amber-50 p-2 rounded border border-amber-200">
+              <span className="flex items-center gap-2 text-amber-600 bg-amber-50 p-2 rounded border border-amber-200 text-sm font-normal">
                 <CheckCircle className="h-4 w-4" />
                 Expositor retirado e observação registrada.
               </span>
@@ -369,7 +384,7 @@ export default function InativarClientesPage() {
               onClick={handleInactivate}
               className="bg-red-600 hover:bg-red-700"
             >
-              Sim, Inativar
+              Sim, Confirmar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

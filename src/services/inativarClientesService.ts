@@ -57,11 +57,12 @@ export const inativarClientesService = {
     id: number,
     clientCode: number,
     currentName: string | null,
+    newStatus: string = 'INATIVO', // Added status parameter with default
   ) {
-    // 1. Update client status to 'INATIVO'
+    // 1. Update client status to new Status
     const { error: updateError } = await supabase
       .from('CLIENTES')
-      .update({ situacao: 'INATIVO' } as any)
+      .update({ situacao: newStatus, 'TIPO DE CLIENTE': newStatus } as any) // Updating both likely fields for consistency, usually TIPO DE CLIENTE maps to status logic in this system based on usage
       .eq('CODIGO', clientCode)
 
     if (updateError) throw updateError

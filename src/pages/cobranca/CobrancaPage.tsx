@@ -14,7 +14,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import {
@@ -44,7 +43,6 @@ export default function CobrancaPage() {
   const [data, setData] = useState<ClientDebt[]>([])
   const [filteredData, setFilteredData] = useState<ClientDebt[]>([])
   const [searchTerm, setSearchTerm] = useState('')
-  // statusFilter controls filtering.
   const [statusFilter, setStatusFilter] = useState<string>('todos')
   const [typeFilter, setTypeFilter] = useState<string>('all')
   const [groupFilter, setGroupFilter] = useState<string>('all')
@@ -55,7 +53,10 @@ export default function CobrancaPage() {
   const [bairroFilter, setBairroFilter] = useState<string>('all')
   const [municipioFilter, setMunicipioFilter] = useState<string>('all')
   const [showSelectedOnly, setShowSelectedOnly] = useState(false)
-  const [selectedClients, setSelectedClients] = useState<Set<number>>(new Set())
+
+  // GRANULAR SELECTION STATE
+  // Stores uniqueId strings instead of clientId numbers
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
 
   // New Mode State
   const [isCobrancaMode, setIsCobrancaMode] = useState(false)
@@ -94,7 +95,7 @@ export default function CobrancaPage() {
     if (timeoutRef.current) clearTimeout(timeoutRef.current)
     timeoutRef.current = setTimeout(() => {
       fetchDebts(true)
-    }, 1500) // 1.5s debounce to allow DB triggers to settle
+    }, 1500)
   }, [fetchDebts])
 
   // Realtime subscription for Auto-Refresh
@@ -104,40 +105,22 @@ export default function CobrancaPage() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'debitos_historico' },
-        () => {
-          console.log(
-            'Detected change in debitos_historico, refreshing Cobranca...',
-          )
-          debouncedRefresh()
-        },
+        () => debouncedRefresh(),
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'RECEBIMENTOS' },
-        () => {
-          console.log('Detected change in RECEBIMENTOS, refreshing Cobranca...')
-          debouncedRefresh()
-        },
+        () => debouncedRefresh(),
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'acoes_cobranca' },
-        () => {
-          console.log(
-            'Detected change in acoes_cobranca, refreshing Cobranca...',
-          )
-          debouncedRefresh()
-        },
+        () => debouncedRefresh(),
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'BANCO_DE_DADOS' },
-        () => {
-          console.log(
-            'Detected change in BANCO_DE_DADOS, refreshing Cobranca...',
-          )
-          debouncedRefresh()
-        },
+        () => debouncedRefresh(),
       )
       .subscribe()
 
@@ -168,14 +151,15 @@ export default function CobrancaPage() {
     [data],
   )
 
-  const toggleClientSelection = (clientId: number) => {
-    const newSelected = new Set(selectedClients)
-    if (newSelected.has(clientId)) {
-      newSelected.delete(clientId)
+  // UPDATED: Toggle Item Selection (Granular)
+  const toggleItemSelection = (uniqueId: string) => {
+    const newSelected = new Set(selectedItems)
+    if (newSelected.has(uniqueId)) {
+      newSelected.delete(uniqueId)
     } else {
-      newSelected.add(clientId)
+      newSelected.add(uniqueId)
     }
-    setSelectedClients(newSelected)
+    setSelectedItems(newSelected)
   }
 
   useEffect(() => {
@@ -208,15 +192,13 @@ export default function CobrancaPage() {
     }
 
     // Default Filter: Show only debts > 1.00
-    // Applied unless user specifically asks for 'SEM DÉBITO' (Paid) or 'PAGO' context
     if (statusFilter !== 'SEM DÉBITO') {
       res.forEach((client) => {
         client.orders.forEach((order) => {
           order.installments = order.installments.filter((inst) => {
             const debito = Math.max(0, inst.valorRegistrado - inst.valorPago)
-            // If source is NEGOTIATION, we show it even if paid 0, because it's a promise
             if (inst.source === 'NEGOTIATION') return true
-            return debito > 1.0 // Only show items with debt > 1.00
+            return debito > 1.0
           })
         })
         client.orders = client.orders.filter((o) => o.installments.length > 0)
@@ -271,7 +253,36 @@ export default function CobrancaPage() {
     }
 
     if (showSelectedOnly) {
-      res = res.filter((c) => selectedClients.has(c.clientId))
+      // Filter logic needs to check if ANY item in the client is selected
+      // But we render flat rows in DebtTable, so filtering here is tricky if we want to show only selected ROWS.
+      // However, DebtTable handles flattenedData.
+      // If we filter clients here, we might hide clients who have SOME selected items but maybe we want to show only selected ITEMS?
+      // For simplicity and standard pattern, we filter clients that have AT LEAST ONE selected item.
+      // Then DebtTable (if it respected filtering inside itself) would be fine.
+      // But DebtTable flattens whatever is passed.
+      // So if we pass a client, it shows all its items (filtered by previous steps).
+      // To strictly show ONLY selected items, we need to filter installments inside.
+
+      res = res.filter((c) => {
+        // Check if client has any selected item
+        return c.orders.some((o) =>
+          o.installments.some((inst, index) => {
+            const uniqueId = `${c.clientId || '0'}-${o.orderId || '0'}-${inst.id || '0'}-${index}`
+            return selectedItems.has(uniqueId)
+          }),
+        )
+      })
+
+      // Further filter installments to ONLY show selected ones
+      res.forEach((client) => {
+        client.orders.forEach((order) => {
+          order.installments = order.installments.filter((inst, index) => {
+            const uniqueId = `${client.clientId || '0'}-${order.orderId || '0'}-${inst.id || '0'}-${index}`
+            return selectedItems.has(uniqueId)
+          })
+        })
+        client.orders = client.orders.filter((o) => o.installments.length > 0)
+      })
     }
 
     setFilteredData(res)
@@ -286,7 +297,7 @@ export default function CobrancaPage() {
     bairroFilter,
     municipioFilter,
     showSelectedOnly,
-    selectedClients,
+    selectedItems, // Replaces selectedClients
   ])
 
   // Summary Metrics
@@ -324,7 +335,7 @@ export default function CobrancaPage() {
     0,
   )
 
-  const selectedCount = selectedClients.size
+  const selectedCount = selectedItems.size
 
   return (
     <div className="space-y-6 animate-fade-in p-2 pb-20 sm:p-0 flex flex-col h-full">
@@ -355,7 +366,6 @@ export default function CobrancaPage() {
             </p>
           </div>
         </div>
-        {/* Removed Manual Refresh Button as per user request */}
         {loading && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground animate-pulse">
             <RefreshCw className="h-3 w-3 animate-spin" />
@@ -420,9 +430,7 @@ export default function CobrancaPage() {
             <div className="text-2xl font-bold text-primary">
               {selectedCount}
             </div>
-            <p className="text-xs text-muted-foreground">
-              Clientes selecionados
-            </p>
+            <p className="text-xs text-muted-foreground">Itens selecionados</p>
           </CardContent>
         </Card>
       </div>
@@ -586,7 +594,7 @@ export default function CobrancaPage() {
                   htmlFor="rota-motoqueiro-filter"
                   className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
                 >
-                  Filtrar Rota Motoqueiro ({selectedClients.size})
+                  Filtrar Rota Motoqueiro ({selectedItems.size})
                 </Label>
               </div>
             </div>
@@ -605,8 +613,8 @@ export default function CobrancaPage() {
             <DebtTable
               data={filteredData}
               onRefresh={fetchDebts}
-              selectedClients={selectedClients}
-              onToggleClient={toggleClientSelection}
+              selectedItems={selectedItems}
+              onToggleItem={toggleItemSelection}
               isCobrancaMode={isCobrancaMode}
             />
           </div>

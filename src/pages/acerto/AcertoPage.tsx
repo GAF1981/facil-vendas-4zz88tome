@@ -308,6 +308,18 @@ export default function AcertoPage() {
 
   const handlePreSaveValidation = async () => {
     if (!client) return
+
+    // Inactivity Check
+    if (client['TIPO DE CLIENTE'] !== 'ATIVO') {
+      toast({
+        title: 'Ação Bloqueada',
+        description:
+          'Não é possível realizar Acerto em um cliente Inativo! Favor ATIVAR o cliente no cadastro!',
+        variant: 'destructive',
+      })
+      return
+    }
+
     const emp = employees.find((e) => e.id.toString() === selectedEmployeeId)
     if (!emp) {
       toast({

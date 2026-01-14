@@ -28,6 +28,7 @@ import {
   AlertCircle,
   MessageCircle,
   Bell,
+  History,
 } from 'lucide-react'
 import {
   Tooltip,
@@ -38,6 +39,13 @@ import {
 import { Button } from '@/components/ui/button'
 import { differenceInDays, parseISO, isValid } from 'date-fns'
 import { ClientAlertsDialog } from './ClientAlertsDialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { AcertoHistoryTable } from '@/components/acerto/AcertoHistoryTable'
 
 interface RotaTableProps {
   rows: RotaRow[]
@@ -63,9 +71,19 @@ export function RotaTable({
   const [alertDialogOpen, setAlertDialogOpen] = useState(false)
   const [selectedAlertRow, setSelectedAlertRow] = useState<RotaRow | null>(null)
 
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false)
+  const [historyClientId, setHistoryClientId] = useState<number | null>(null)
+  const [historyClientName, setHistoryClientName] = useState<string>('')
+
   const handleOpenAlert = (row: RotaRow) => {
     setSelectedAlertRow(row)
     setAlertDialogOpen(true)
+  }
+
+  const handleOpenHistory = (clientId: number, clientName: string) => {
+    setHistoryClientId(clientId)
+    setHistoryClientName(clientName)
+    setHistoryDialogOpen(true)
   }
 
   const getSortIcon = (columnKey: string) => {
@@ -141,6 +159,22 @@ export function RotaTable({
             <table className="w-full caption-bottom text-sm">
               <TableHeader className="bg-muted/50 sticky top-0 z-10 shadow-sm">
                 <TableRow>
+                  <TableHead className="w-[50px] text-center font-bold text-xs">
+                    #
+                  </TableHead>
+
+                  <TableHead className="min-w-[200px] font-bold text-xs">
+                    Cliente
+                  </TableHead>
+
+                  <SortableHeader
+                    column="municipio"
+                    label="Município"
+                    align="left"
+                    className="min-w-[120px]"
+                  />
+
+                  {/* REORDERED: Debito, Vencimento, Projecao moved here */}
                   <SortableHeader
                     column="debito"
                     label="Débito"
@@ -192,30 +226,18 @@ export function RotaTable({
                     className="min-w-[100px]"
                   />
 
-                  <TableHead className="w-[50px] text-center font-bold text-xs">
-                    #
-                  </TableHead>
-
-                  <TableHead className="min-w-[200px] font-bold text-xs">
-                    Cliente
-                  </TableHead>
-
-                  <SortableHeader
-                    column="municipio"
-                    label="Município"
-                    align="left"
-                    className="min-w-[120px]"
-                  />
-
                   {!isSelectionMode && (
                     <TableHead className="min-w-[200px] font-bold text-xs">
                       Endereço
                     </TableHead>
                   )}
 
-                  <TableHead className="min-w-[120px] font-bold text-xs">
-                    Tipo
-                  </TableHead>
+                  {/* HIDDEN IN SIMPLIFIED */}
+                  {!isSelectionMode && (
+                    <TableHead className="min-w-[120px] font-bold text-xs">
+                      Tipo
+                    </TableHead>
+                  )}
 
                   {!isSelectionMode && (
                     <TableHead className="min-w-[130px] font-bold text-xs">
@@ -321,6 +343,92 @@ export function RotaTable({
 
                     return (
                       <TableRow key={row.client.CODIGO} className={rowClass}>
+                        <TableCell
+                          className={cn(
+                            'text-center font-mono',
+                            textClass || 'text-muted-foreground',
+                          )}
+                        >
+                          {row.rowNumber}
+                        </TableCell>
+
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className={cn(
+                                'h-6 w-6 shrink-0 rounded-full',
+                                hasAlerts
+                                  ? 'text-yellow-500 hover:text-yellow-600 hover:bg-yellow-100 bg-yellow-50 animate-pulse'
+                                  : row.is_completed || row.x_na_rota > 3
+                                    ? 'text-white/70 hover:text-white hover:bg-white/20'
+                                    : 'text-muted-foreground hover:text-primary',
+                              )}
+                              onClick={() => handleOpenAlert(row)}
+                              title="Alertas, Pendências e Tarefas"
+                            >
+                              <Bell
+                                className={cn(
+                                  'h-4 w-4',
+                                  hasAlerts && 'fill-current',
+                                )}
+                              />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className={cn(
+                                'h-6 w-6 shrink-0 rounded-full',
+                                row.is_completed || row.x_na_rota > 3
+                                  ? 'text-white/70 hover:text-white hover:bg-white/20'
+                                  : 'text-muted-foreground hover:text-primary',
+                              )}
+                              onClick={() =>
+                                handleOpenHistory(
+                                  row.client.CODIGO,
+                                  row.client['NOME CLIENTE'],
+                                )
+                              }
+                              title="Ver Histórico de Acertos"
+                            >
+                              <History className="h-4 w-4" />
+                            </Button>
+                            <div className="flex flex-col gap-0.5">
+                              <span
+                                className="font-semibold text-sm truncate max-w-[160px] block"
+                                title={row.client['NOME CLIENTE'] || ''}
+                              >
+                                {row.client['NOME CLIENTE']}
+                              </span>
+                              <div
+                                className={cn(
+                                  'flex flex-wrap gap-1.5 text-[10px]',
+                                  textClass || 'text-muted-foreground',
+                                )}
+                              >
+                                <span
+                                  className={cn(
+                                    'font-mono px-1 rounded',
+                                    row.is_completed || row.x_na_rota > 3
+                                      ? 'bg-white/20'
+                                      : 'bg-muted',
+                                  )}
+                                >
+                                  {row.client.CODIGO}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </TableCell>
+
+                        <TableCell
+                          className="truncate max-w-[120px]"
+                          title={row.client.MUNICÍPIO || ''}
+                        >
+                          {row.client.MUNICÍPIO || '-'}
+                        </TableCell>
+
                         <TableCell className="text-right font-medium">
                           <div className="flex flex-col items-end">
                             <span
@@ -490,73 +598,6 @@ export function RotaTable({
                             : '-'}
                         </TableCell>
 
-                        <TableCell
-                          className={cn(
-                            'text-center font-mono',
-                            textClass || 'text-muted-foreground',
-                          )}
-                        >
-                          {row.rowNumber}
-                        </TableCell>
-
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className={cn(
-                                'h-6 w-6 shrink-0 rounded-full',
-                                hasAlerts
-                                  ? 'text-yellow-500 hover:text-yellow-600 hover:bg-yellow-100 bg-yellow-50 animate-pulse'
-                                  : row.is_completed || row.x_na_rota > 3
-                                    ? 'text-white/70 hover:text-white hover:bg-white/20'
-                                    : 'text-muted-foreground hover:text-primary',
-                              )}
-                              onClick={() => handleOpenAlert(row)}
-                              title="Alertas, Pendências e Tarefas"
-                            >
-                              <Bell
-                                className={cn(
-                                  'h-4 w-4',
-                                  hasAlerts && 'fill-current',
-                                )}
-                              />
-                            </Button>
-                            <div className="flex flex-col gap-0.5">
-                              <span
-                                className="font-semibold text-sm truncate max-w-[160px] block"
-                                title={row.client['NOME CLIENTE'] || ''}
-                              >
-                                {row.client['NOME CLIENTE']}
-                              </span>
-                              <div
-                                className={cn(
-                                  'flex flex-wrap gap-1.5 text-[10px]',
-                                  textClass || 'text-muted-foreground',
-                                )}
-                              >
-                                <span
-                                  className={cn(
-                                    'font-mono px-1 rounded',
-                                    row.is_completed || row.x_na_rota > 3
-                                      ? 'bg-white/20'
-                                      : 'bg-muted',
-                                  )}
-                                >
-                                  {row.client.CODIGO}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        </TableCell>
-
-                        <TableCell
-                          className="truncate max-w-[120px]"
-                          title={row.client.MUNICÍPIO || ''}
-                        >
-                          {row.client.MUNICÍPIO || '-'}
-                        </TableCell>
-
                         {!isSelectionMode && (
                           <TableCell
                             className="truncate max-w-[200px]"
@@ -566,9 +607,11 @@ export function RotaTable({
                           </TableCell>
                         )}
 
-                        <TableCell className="truncate max-w-[120px]">
-                          {row.client['TIPO DE CLIENTE'] || '-'}
-                        </TableCell>
+                        {!isSelectionMode && (
+                          <TableCell className="truncate max-w-[120px]">
+                            {row.client['TIPO DE CLIENTE'] || '-'}
+                          </TableCell>
+                        )}
 
                         {!isSelectionMode && (
                           <TableCell>
@@ -760,6 +803,19 @@ export function RotaTable({
           row={selectedAlertRow}
           onSaveTask={handleSaveTask}
         />
+      )}
+
+      {historyClientId && (
+        <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
+          <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Histórico: {historyClientName}</DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+              <AcertoHistoryTable clientId={historyClientId} />
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </>
   )

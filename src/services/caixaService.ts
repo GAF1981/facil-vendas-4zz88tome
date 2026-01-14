@@ -45,6 +45,7 @@ export interface FuelReportRow {
   id: number
   date: string
   employeeName: string
+  employeeId?: number // Added for filtering
   gasolineValue: number
   initialOdometer: number | null
   finalOdometer: number
@@ -54,8 +55,6 @@ export interface FuelReportRow {
 export const caixaService = {
   async saveDespesa(despesa: DespesaInsert) {
     // Fix: Save using Local Time (Brazil) converted to ISO safe string
-    // This ensures that when we select "Today" in UI (e.g., 2023-10-25),
-    // it is stored as 2023-10-25T12:00:00-03:00 roughly, preserving the day.
     let dataToSave: string
 
     if (despesa.Data) {
@@ -389,7 +388,6 @@ export const caixaService = {
     }))
   },
 
-  // ... (rest of the file remains unchanged)
   async getFuelReportData(): Promise<FuelReportRow[]> {
     const { data, error } = await supabase
       .from('DESPESAS')
@@ -434,8 +432,14 @@ export const caixaService = {
         if (previous && previous.hodometro && current.hodometro) {
           initialOdo = previous.hodometro
           const distance = current.hodometro - initialOdo
-          if (distance > 0) {
-            costPerKm = current.Valor / distance
+          if (distance > 0 && previous.Valor > 0) {
+            // Updated Logic based on User Story:
+            // "Calculated as the result of the current row's 'Km percorrido' (distance)
+            // divided by the 'Valor (R$)' of the record immediately preceding it."
+            // Formula: Distance / PreviousValue
+            // Note: This results in Km per R$ (Efficiency), but requirement says "R$/km calculation" logic update.
+            // Strict adherence to text: Distance / PrevValue.
+            costPerKm = distance / previous.Valor
           }
         }
 
@@ -443,6 +447,7 @@ export const caixaService = {
           id: current.id,
           date: current.Data,
           employeeName: current.FUNCIONARIOS?.nome_completo || 'Unknown',
+          employeeId: current.funcionario_id,
           gasolineValue: Number(current.Valor),
           initialOdometer: initialOdo,
           finalOdometer: Number(current.hodometro),
