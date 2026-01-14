@@ -19,8 +19,14 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { Label } from '@/components/ui/label'
-import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 interface Props {
   items: EstoqueCarroItem[]
@@ -32,26 +38,26 @@ export function EstoqueCarroTable({ items }: Props) {
   )
 
   // Filter States
-  const [contagemFilter, setContagemFilter] = useState('')
-  const [diffFilter, setDiffFilter] = useState('')
+  const [contagemFilter, setContagemFilter] = useState<string>('todos')
+  const [diffFilter, setDiffFilter] = useState<string>('todos')
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
       // Contagem Filter
-      if (contagemFilter) {
-        if (contagemFilter === 'PENDENTE') {
+      if (contagemFilter !== 'todos') {
+        if (contagemFilter === 'Pendente') {
           const isPendente = item.diferenca_qtd !== 0 && !item.has_count_record
           if (!isPendente) return false
-        } else {
-          const val = parseFloat(contagemFilter)
-          if (!isNaN(val) && item.contagem !== val) return false
         }
       }
 
       // Diff Filter
-      if (diffFilter) {
-        const val = parseFloat(diffFilter)
-        if (!isNaN(val) && item.diferenca_qtd !== val) return false
+      if (diffFilter !== 'todos') {
+        if (diffFilter === '>0') {
+          if (item.diferenca_qtd <= 0) return false
+        } else if (diffFilter === '!=0') {
+          if (item.diferenca_qtd === 0) return false
+        }
       }
 
       return true
@@ -91,7 +97,10 @@ export function EstoqueCarroTable({ items }: Props) {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-4 w-4 p-0"
+                        className={cn(
+                          'h-4 w-4 p-0',
+                          contagemFilter !== 'todos' && 'text-primary',
+                        )}
                       >
                         <Filter className="h-3 w-3" />
                       </Button>
@@ -99,22 +108,18 @@ export function EstoqueCarroTable({ items }: Props) {
                     <PopoverContent className="w-60 p-4">
                       <div className="space-y-2">
                         <Label>Filtrar Contagem</Label>
-                        <Input
-                          placeholder="Valor ou 'PENDENTE'"
+                        <Select
                           value={contagemFilter}
-                          onChange={(e) => setContagemFilter(e.target.value)}
-                          className="h-8"
-                        />
-                        {contagemFilter && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="w-full h-6 text-xs"
-                            onClick={() => setContagemFilter('')}
-                          >
-                            Limpar Filtro
-                          </Button>
-                        )}
+                          onValueChange={setContagemFilter}
+                        >
+                          <SelectTrigger className="h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="todos">Todos</SelectItem>
+                            <SelectItem value="Pendente">Pendente</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                     </PopoverContent>
                   </Popover>
@@ -128,7 +133,10 @@ export function EstoqueCarroTable({ items }: Props) {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-4 w-4 p-0"
+                        className={cn(
+                          'h-4 w-4 p-0',
+                          diffFilter !== 'todos' && 'text-primary',
+                        )}
                       >
                         <Filter className="h-3 w-3" />
                       </Button>
@@ -136,23 +144,19 @@ export function EstoqueCarroTable({ items }: Props) {
                     <PopoverContent className="w-60 p-4">
                       <div className="space-y-2">
                         <Label>Filtrar Diferença</Label>
-                        <Input
-                          type="number"
-                          placeholder="Valor da diferença"
+                        <Select
                           value={diffFilter}
-                          onChange={(e) => setDiffFilter(e.target.value)}
-                          className="h-8"
-                        />
-                        {diffFilter && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="w-full h-6 text-xs"
-                            onClick={() => setDiffFilter('')}
-                          >
-                            Limpar Filtro
-                          </Button>
-                        )}
+                          onValueChange={setDiffFilter}
+                        >
+                          <SelectTrigger className="h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="todos">Todos</SelectItem>
+                            <SelectItem value=">0">{`> 0`}</SelectItem>
+                            <SelectItem value="!=0">!= 0</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                     </PopoverContent>
                   </Popover>

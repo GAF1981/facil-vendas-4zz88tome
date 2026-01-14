@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Plus, Car, ArrowLeft, Loader2 } from 'lucide-react'
+import { Plus, Car, ArrowLeft, Loader2, Wrench } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { VehicleTable } from '@/components/vehicles/VehicleTable'
 import { VehicleFormDialog } from '@/components/vehicles/VehicleFormDialog'
+import { ExpenseFormDialog } from '@/components/caixa/ExpenseFormDialog'
 import { vehicleService } from '@/services/vehicleService'
 import { Vehicle } from '@/types/vehicle'
 import { useToast } from '@/hooks/use-toast'
@@ -23,10 +24,14 @@ export default function VehiclesPage() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [loading, setLoading] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false)
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | undefined>(
     undefined,
   )
   const [deleteId, setDeleteId] = useState<number | null>(null)
+  const [selectedVehicleForExpense, setSelectedVehicleForExpense] = useState<
+    number | null
+  >(null)
   const { toast } = useToast()
 
   const loadVehicles = async () => {
@@ -72,9 +77,20 @@ export default function VehiclesPage() {
     }
   }
 
+  const handleAddExpense = () => {
+    // If there is only one vehicle, select it automatically, else let the dialog handle it or show selection?
+    // The ExpenseFormDialog has a vehicle selector.
+    // However, user story says "allow registration directly from the Vehicles tab".
+    // I will add a button next to "Novo Veículo" or in actions?
+    // "In the Vehicles tab, a 'Cadastrar Despesa' button must be added."
+    // I'll add a main button. If specific row actions are needed I could add there too, but main button covers requirement.
+    setSelectedVehicleForExpense(null)
+    setIsExpenseDialogOpen(true)
+  }
+
   return (
     <div className="space-y-6 animate-fade-in p-4 sm:p-6 pb-20">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex items-center gap-4">
           <Button variant="outline" size="icon" asChild>
             <Link to="/">
@@ -91,14 +107,22 @@ export default function VehiclesPage() {
             </p>
           </div>
         </div>
-        <Button
-          onClick={() => {
-            setEditingVehicle(undefined)
-            setIsDialogOpen(true)
-          }}
-        >
-          <Plus className="mr-2 h-4 w-4" /> Novo Veículo
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={handleAddExpense}
+            className="bg-orange-600 hover:bg-orange-700 text-white"
+          >
+            <Wrench className="mr-2 h-4 w-4" /> Cadastrar Despesa
+          </Button>
+          <Button
+            onClick={() => {
+              setEditingVehicle(undefined)
+              setIsDialogOpen(true)
+            }}
+          >
+            <Plus className="mr-2 h-4 w-4" /> Novo Veículo
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -122,6 +146,15 @@ export default function VehiclesPage() {
         onOpenChange={setIsDialogOpen}
         vehicle={editingVehicle}
         onSuccess={loadVehicles}
+      />
+
+      <ExpenseFormDialog
+        open={isExpenseDialogOpen}
+        onOpenChange={setIsExpenseDialogOpen}
+        onSuccess={() => {
+          // Maybe refresh something if needed, but expenses are not listed here yet
+        }}
+        preselectedVehicleId={selectedVehicleForExpense}
       />
 
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>

@@ -48,6 +48,7 @@ interface DebtTableProps {
   selectedItems: Set<string>
   onToggleItem: (id: string) => void
   isCobrancaMode: boolean
+  onToggleAll?: (ids: string[]) => void // New prop for master toggle
 }
 
 // Flattened row type for display
@@ -94,6 +95,7 @@ export function DebtTable({
   selectedItems,
   onToggleItem,
   isCobrancaMode,
+  onToggleAll,
 }: DebtTableProps) {
   const [selectedClient, setSelectedClient] = useState<ClientDebt | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -265,6 +267,20 @@ export function DebtTable({
     return <ArrowDown className="h-3 w-3 ml-1 text-primary" />
   }
 
+  const handleToggleAllVisible = (checked: boolean) => {
+    if (onToggleAll) {
+      if (checked) {
+        onToggleAll(flattenedData.map((r) => r.uniqueId))
+      } else {
+        onToggleAll([])
+      }
+    }
+  }
+
+  const allVisibleSelected =
+    flattenedData.length > 0 &&
+    flattenedData.every((r) => selectedItems.has(r.uniqueId))
+
   return (
     <>
       <div className="rounded-md border bg-card">
@@ -352,7 +368,18 @@ export function DebtTable({
                 className="w-[50px] text-center bg-background"
                 title="Rota Motoqueiro"
               >
-                Rota
+                <div className="flex flex-col items-center gap-1">
+                  <span>Rota</span>
+                  {onToggleAll && (
+                    <Checkbox
+                      checked={allVisibleSelected}
+                      onCheckedChange={(c) =>
+                        handleToggleAllVisible(c as boolean)
+                      }
+                      className="h-3 w-3 border-muted-foreground/50"
+                    />
+                  )}
+                </div>
               </TableHead>
             </TableRow>
           </TableHeader>

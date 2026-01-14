@@ -22,43 +22,62 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ArrowLeft, Fuel, Loader2, Filter, Car } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { ArrowLeft, Fuel, Loader2, Filter, Car, Calendar } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { caixaService, FuelReportRow } from '@/services/caixaService'
 import { formatCurrency, safeFormatDate } from '@/lib/formatters'
 import { employeesService } from '@/services/employeesService'
+import { vehicleService } from '@/services/vehicleService'
 import { Employee } from '@/types/employee'
+import { Vehicle } from '@/types/vehicle'
+import { Label } from '@/components/ui/label'
 
 export default function FuelReportPage() {
   const [data, setData] = useState<FuelReportRow[]>([])
   const [loading, setLoading] = useState(true)
   const [employees, setEmployees] = useState<Employee[]>([])
+  const [vehicles, setVehicles] = useState<Vehicle[]>([])
+
+  // Filters
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('todos')
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string>('todos')
+  const [startDate, setStartDate] = useState<string>('')
+  const [endDate, setEndDate] = useState<string>('')
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [report, empResult] = await Promise.all([
-          caixaService.getFuelReportData(),
-          employeesService.getEmployees(1, 100),
-        ])
-        setData(report)
-        setEmployees(empResult.data.filter((e) => e.situacao === 'ATIVO'))
-      } catch (error) {
-        console.error('Failed to load fuel report', error)
-      } finally {
-        setLoading(false)
-      }
+  const fetchData = async () => {
+    setLoading(true)
+    try {
+      const [report, empResult, vehResult] = await Promise.all([
+        caixaService.getFuelReportData({
+          employeeId: selectedEmployeeId,
+          vehicleId: selectedVehicleId,
+          startDate,
+          endDate,
+        }),
+        employeesService.getEmployees(1, 100),
+        vehicleService.getAll(),
+      ])
+      // Limit to 10 most recent as per acceptance criteria
+      setData(report.slice(0, 10))
+      setEmployees(empResult.data.filter((e) => e.situacao === 'ATIVO'))
+      setVehicles(vehResult)
+    } catch (error) {
+      console.error('Failed to load fuel report', error)
+    } finally {
+      setLoading(false)
     }
-    fetchData()
-  }, [])
+  }
 
-  const filteredData = useMemo(() => {
-    if (selectedEmployeeId === 'todos') return data
-    return data.filter(
-      (row) => row.employeeId?.toString() === selectedEmployeeId,
-    )
-  }, [data, selectedEmployeeId])
+  // Initial load
+  useEffect(() => {
+    fetchData()
+  }, []) // Load once on mount
+
+  // Manual Trigger for filters
+  const handleApplyFilters = () => {
+    fetchData()
+  }
 
   return (
     <div className="space-y-6 animate-fade-in p-4 sm:p-6 pb-20">
@@ -79,34 +98,82 @@ export default function FuelReportPage() {
             </p>
           </div>
         </div>
-
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <Filter className="h-4 w-4 text-muted-foreground" />
-          <Select
-            value={selectedEmployeeId}
-            onValueChange={setSelectedEmployeeId}
-          >
-            <SelectTrigger className="w-full sm:w-[200px]">
-              <SelectValue placeholder="Filtrar por Funcionário" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos Funcionários</SelectItem>
-              {employees.map((emp) => (
-                <SelectItem key={emp.id} value={emp.id.toString()}>
-                  {emp.nome_completo}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
       </div>
 
       <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-wrap gap-4 items-end">
+            <div className="w-full sm:w-[200px] space-y-1">
+              <Label className="text-xs">Vendedor</Label>
+              <Select
+                value={selectedEmployeeId}
+                onValueChange={setSelectedEmployeeId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  {employees.map((emp) => (
+                    <SelectItem key={emp.id} value={emp.id.toString()}>
+                      {emp.nome_completo}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="w-full sm:w-[200px] space-y-1">
+              <Label className="text-xs">Veículo</Label>
+              <Select
+                value={selectedVehicleId}
+                onValueChange={setSelectedVehicleId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  {vehicles.map((v) => (
+                    <SelectItem key={v.id} value={v.id.toString()}>
+                      {v.placa}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="w-full sm:w-[150px] space-y-1">
+              <Label className="text-xs">Data Inicial</Label>
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
+            </div>
+
+            <div className="w-full sm:w-[150px] space-y-1">
+              <Label className="text-xs">Data Final</Label>
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
+            </div>
+
+            <Button onClick={handleApplyFilters}>
+              <Filter className="mr-2 h-4 w-4" /> Filtrar
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardHeader>
-          <CardTitle>Histórico de Abastecimentos (Gasolina)</CardTitle>
+          <CardTitle>Histórico Recente (Últimos 10)</CardTitle>
           <CardDescription>
             Cálculo de eficiência (Km/R$) baseado na distância percorrida e
-            valor do abastecimento anterior para cada veículo.
+            valor do abastecimento anterior.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -122,6 +189,7 @@ export default function FuelReportPage() {
                     <TableHead>Data</TableHead>
                     <TableHead>Funcionário</TableHead>
                     <TableHead>Veículo</TableHead>
+                    <TableHead>Tipo</TableHead>
                     <TableHead className="text-right">Valor (R$)</TableHead>
                     <TableHead className="text-right">
                       Hodômetro Inicial
@@ -139,17 +207,17 @@ export default function FuelReportPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredData.length === 0 ? (
+                  {data.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={8}
+                        colSpan={9}
                         className="text-center text-muted-foreground h-24"
                       >
-                        Nenhum registro de gasolina encontrado.
+                        Nenhum registro encontrado.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredData.map((row) => {
+                    data.map((row) => {
                       const dist =
                         row.initialOdometer !== null
                           ? row.finalOdometer - row.initialOdometer
@@ -170,6 +238,9 @@ export default function FuelReportPage() {
                             ) : (
                               '-'
                             )}
+                          </TableCell>
+                          <TableCell className="capitalize">
+                            {row.fuelType || '-'}
                           </TableCell>
                           <TableCell className="text-right font-mono text-orange-700">
                             {formatCurrency(row.gasolineValue)}

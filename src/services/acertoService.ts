@@ -67,23 +67,31 @@ export const acertoService = {
     return blob as Blob
   },
 
-  async reprintOrder(orderId: number, issuerName?: string) {
-    // Reprints default to A4 unless we extend this method later,
-    // but the backend will handle A4 default if not passed.
+  async reprintOrder(
+    orderId: number,
+    issuerName?: string,
+    format: 'A4' | '80mm' = '80mm', // Default to 80mm as per requirement
+  ) {
     return this.generateDocument(
       orderId,
       'ACERTO (REIMPRESSÃO)',
       false,
       issuerName,
+      format,
     )
   },
 
-  async reprintReceipt(orderId: number, issuerName?: string) {
+  async reprintReceipt(
+    orderId: number,
+    issuerName?: string,
+    format: 'A4' | '80mm' = 'A4',
+  ) {
     return this.generateDocument(
       orderId,
       'RECIBO DE PAGAMENTO',
       true,
       issuerName,
+      format,
     )
   },
 
@@ -93,6 +101,7 @@ export const acertoService = {
     acertoTipo: string,
     isReceipt: boolean,
     issuerName?: string,
+    format: 'A4' | '80mm' = 'A4',
   ) {
     const { items: dbItems, payments: dbPayments } =
       await bancoDeDadosService.getOrderDetails(orderId)
@@ -125,16 +134,11 @@ export const acertoService = {
     const lastAcertoInfo = await bancoDeDadosService.getLastAcerto(clientId)
     const lastAcertoDate = lastAcertoInfo?.date || null
 
-    // Fetch History using the optimized PDF-specific method
-    // This ensures data comes from 'debitos_historico' with correct columns (media_mensal, etc)
+    // Fetch History
     const history = await bancoDeDadosService.getHistoryForPdf(clientId)
-
-    // Filter out current order from history if present (though usually history is past)
     const previousOrders = history.filter((h) => h.id !== orderId)
     const lastOrder = previousOrders.length > 0 ? previousOrders[0] : null
-
-    // Use the history fetched from debitos_historico directly
-    const recentHistory = previousOrders // Already limited by the service
+    const recentHistory = previousOrders
 
     // Fetch Monthly Average for the PDF report
     const monthlyAverage = await bancoDeDadosService.getMonthlyAverage(clientId)
@@ -154,14 +158,12 @@ export const acertoService = {
     }))
 
     const payments: PaymentEntry[] = dbPayments.map((p) => {
-      // Logic to recreate granular details if possible or assume logic
       return {
         method: p.forma_pagamento as any,
         value: p.valor_registrado || 0,
         paidValue: p.valor_pago || 0,
-        installments: 1, // Assumption unless we can infer from DB
+        installments: 1,
         dueDate: p.vencimento ? p.vencimento.split('T')[0] : '',
-        // If granular info needed, we can construct `details` here if available
         details: [
           {
             number: 1,
@@ -185,7 +187,7 @@ export const acertoService = {
       client: {
         ...client,
       },
-      clientMunicipio: client.MUNICÍPIO, // Explicitly pass municipality
+      clientMunicipio: client.MUNICÍPIO,
       lastAcertoDate: lastAcertoDate,
       employee: { nome_completo: funcionarioName },
       items,
@@ -204,9 +206,9 @@ export const acertoService = {
       issuerName,
       lastOrder: lastOrder ? { id: lastOrder.id, date: lastOrder.data } : null,
       history: recentHistory,
-      monthlyAverage, // Passed for PDF Summary
+      monthlyAverage,
     }
 
-    return this.generatePdf(data)
+    return this.generatePdf(data, { format })
   },
 }

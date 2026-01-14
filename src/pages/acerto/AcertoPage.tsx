@@ -361,6 +361,18 @@ export default function AcertoPage() {
       return
     }
 
+    // Financial Validation: Paid Amount > Due Amount Check
+    const totalPaid = payments.reduce((acc, p) => acc + p.paidValue, 0)
+    // Use a small epsilon for floating point comparison safety
+    if (totalPaid > amountToPay + 0.01) {
+      toast({
+        title: 'Erro Financeiro',
+        description: `O valor pago (R$ ${totalPaid.toFixed(2)}) não pode ser maior que o saldo a pagar (R$ ${amountToPay.toFixed(2)}).`,
+        variant: 'destructive',
+      })
+      return
+    }
+
     if (payments.length === 0 && amountToPay > 0.01) {
       toast({
         title: 'Pagamento Obrigatório',

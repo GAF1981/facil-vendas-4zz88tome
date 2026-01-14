@@ -1,11 +1,8 @@
-import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from '@/components/ui/card'
+import { useEffect, useState } from 'react'
+import { cobrancaService } from '@/services/cobrancaService'
+import { ClientDebt } from '@/types/cobranca'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -14,613 +11,256 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Label } from '@/components/ui/label'
-import {
-  CreditCard,
-  Search,
-  RefreshCw,
-  Loader2,
-  Filter,
-  Calendar,
-  MapPin,
-  Users,
-  Building2,
-  Bike,
-} from 'lucide-react'
+import { Loader2, Search, RefreshCw, HandCoins, Users } from 'lucide-react'
 import { DebtTable } from '@/components/cobranca/DebtTable'
-import { cobrancaService } from '@/services/cobrancaService'
-import { ClientDebt } from '@/types/cobranca'
 import { useToast } from '@/hooks/use-toast'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Badge } from '@/components/ui/badge'
 import { formatCurrency } from '@/lib/formatters'
-import { parseISO, isSameDay } from 'date-fns'
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
-import { Switch } from '@/components/ui/switch'
-import { supabase } from '@/lib/supabase/client'
 
 export default function CobrancaPage() {
   const [loading, setLoading] = useState(true)
-  const [data, setData] = useState<ClientDebt[]>([])
-  const [filteredData, setFilteredData] = useState<ClientDebt[]>([])
+  const [debts, setDebts] = useState<ClientDebt[]>([])
+  const [filteredDebts, setFilteredDebts] = useState<ClientDebt[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('todos')
-  const [typeFilter, setTypeFilter] = useState<string>('all')
-  const [groupFilter, setGroupFilter] = useState<string>('all')
-  const [routeFilter, setRouteFilter] = useState<string>('all')
-  const [vencimentoFilter, setVencimentoFilter] = useState<string>('')
-
-  // New Filters
-  const [bairroFilter, setBairroFilter] = useState<string>('all')
-  const [municipioFilter, setMunicipioFilter] = useState<string>('all')
-  const [showSelectedOnly, setShowSelectedOnly] = useState(false)
-
-  // GRANULAR SELECTION STATE
-  // Stores uniqueId strings instead of clientId numbers
+  const [cityFilter, setCityFilter] = useState<string>('todos')
+  const [routeFilter, setRouteFilter] = useState<string>('todos') // Rota Motoqueiro Filter
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
-
-  // New Mode State
-  const [isCobrancaMode, setIsCobrancaMode] = useState(false)
-
-  // Filter Visibility Toggle
-  const [showFilters, setShowFilters] = useState(true)
-
   const { toast } = useToast()
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  const fetchDebts = useCallback(
-    async (isBackground = false) => {
-      if (!isBackground) setLoading(true)
-      try {
-        const result = await cobrancaService.getDebts()
-        setData(result)
-      } catch (error) {
-        console.error(error)
-        toast({
-          title: 'Erro ao carregar cobranças',
-          description: 'Não foi possível carregar a lista de débitos.',
-          variant: 'destructive',
-        })
-      } finally {
-        if (!isBackground) setLoading(false)
-      }
-    },
-    [toast],
-  )
-
-  useEffect(() => {
-    fetchDebts()
-  }, [fetchDebts])
-
-  const debouncedRefresh = useCallback(() => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current)
-    timeoutRef.current = setTimeout(() => {
-      fetchDebts(true)
-    }, 1500)
-  }, [fetchDebts])
-
-  // Realtime subscription for Auto-Refresh
-  useEffect(() => {
-    const channel = supabase
-      .channel('cobranca-updates')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'debitos_historico' },
-        () => debouncedRefresh(),
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'RECEBIMENTOS' },
-        () => debouncedRefresh(),
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'acoes_cobranca' },
-        () => debouncedRefresh(),
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'BANCO_DE_DADOS' },
-        () => debouncedRefresh(),
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
+  const loadDebts = async () => {
+    setLoading(true)
+    try {
+      const data = await cobrancaService.getDebts()
+      setDebts(data)
+    } catch (error) {
+      console.error(error)
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível carregar a lista de cobrança.',
+        variant: 'destructive',
+      })
+    } finally {
+      setLoading(false)
     }
-  }, [debouncedRefresh])
+  }
 
-  // Derived unique values for filters
-  const uniqueGroups = useMemo(
-    () => Array.from(new Set(data.map((c) => c.group).filter(Boolean))).sort(),
-    [data],
-  )
-  const uniqueRoutes = useMemo(
-    () =>
-      Array.from(new Set(data.map((c) => c.routeGroup).filter(Boolean))).sort(),
-    [data],
-  )
-  const uniqueBairros = useMemo(
-    () =>
-      Array.from(
-        new Set(data.map((c) => c.neighborhood).filter(Boolean)),
-      ).sort(),
-    [data],
-  )
-  const uniqueMunicipios = useMemo(
-    () => Array.from(new Set(data.map((c) => c.city).filter(Boolean))).sort(),
-    [data],
-  )
+  useEffect(() => {
+    loadDebts()
+  }, [])
 
-  // UPDATED: Toggle Item Selection (Granular)
-  const toggleItemSelection = (uniqueId: string) => {
+  // Derived Filters
+  const uniqueCities = Array.from(
+    new Set(
+      debts.map((d) => d.city).filter((c): c is string => !!c && c !== 'N/D'),
+    ),
+  ).sort()
+
+  useEffect(() => {
+    let result = debts
+
+    // Search
+    if (searchTerm) {
+      const lower = searchTerm.toLowerCase()
+      result = result.filter(
+        (d) =>
+          d.clientName.toLowerCase().includes(lower) ||
+          d.clientId.toString().includes(lower) ||
+          d.orders.some((o) => o.orderId.toString().includes(lower)),
+      )
+    }
+
+    // Status Filter
+    if (statusFilter !== 'todos') {
+      result = result.filter((d) => d.status === statusFilter)
+    }
+
+    // City Filter
+    if (cityFilter !== 'todos') {
+      result = result.filter((d) => d.city === cityFilter)
+    }
+
+    // Rota Filter (Based on 'formaCobranca' or 'Group Rota')
+    // Here we filter if ANY receivable has 'MOTOQUEIRO'
+    if (routeFilter === 'motoqueiro') {
+      result = result.filter((d) =>
+        d.orders.some((o) =>
+          o.installments.some((i) => i.formaCobranca === 'MOTOQUEIRO'),
+        ),
+      )
+    }
+
+    setFilteredDebts(result)
+  }, [debts, searchTerm, statusFilter, cityFilter, routeFilter])
+
+  const handleToggleItem = (id: string) => {
     const newSelected = new Set(selectedItems)
-    if (newSelected.has(uniqueId)) {
-      newSelected.delete(uniqueId)
+    if (newSelected.has(id)) {
+      newSelected.delete(id)
     } else {
-      newSelected.add(uniqueId)
+      newSelected.add(id)
     }
     setSelectedItems(newSelected)
   }
 
-  useEffect(() => {
-    let res = [...data]
+  // Master Checkbox Logic
+  const handleToggleAll = (ids: string[]) => {
+    const newSelected = new Set(selectedItems)
+    const allSelected = ids.every((id) => newSelected.has(id))
 
-    // Deep copy enough to modify nested arrays without affecting state directly
-    res = res.map((client) => ({
-      ...client,
-      orders: client.orders.map((order) => ({
-        ...order,
-        installments: [...order.installments],
-      })),
-    }))
-
-    // Filter Installments based on Vencimento
-    if (vencimentoFilter) {
-      const targetDate = parseISO(vencimentoFilter)
-      res.forEach((client) => {
-        client.orders.forEach((order) => {
-          order.installments = order.installments.filter((inst) => {
-            if (inst.vencimento) {
-              return isSameDay(parseISO(inst.vencimento), targetDate)
-            }
-            return false
-          })
-        })
-        client.orders = client.orders.filter((o) => o.installments.length > 0)
-      })
-      res = res.filter((c) => c.orders.length > 0)
+    if (allSelected) {
+      ids.forEach((id) => newSelected.delete(id))
+    } else {
+      ids.forEach((id) => newSelected.add(id))
     }
+    setSelectedItems(newSelected)
+  }
 
-    // Default Filter: Show only debts > 1.00
-    if (statusFilter !== 'SEM DÉBITO') {
-      res.forEach((client) => {
-        client.orders.forEach((order) => {
-          order.installments = order.installments.filter((inst) => {
-            const debito = Math.max(0, inst.valorRegistrado - inst.valorPago)
-            if (inst.source === 'NEGOTIATION') return true
-            return debito > 1.0
-          })
-        })
-        client.orders = client.orders.filter((o) => o.installments.length > 0)
-      })
-      res = res.filter((c) => c.orders.length > 0)
-    }
-
-    if (searchTerm.trim()) {
-      const lowerSearch = searchTerm.toLowerCase()
-      res = res.filter(
-        (c) =>
-          (c.clientName || '').toLowerCase().includes(lowerSearch) ||
-          (c.clientId != null ? c.clientId.toString() : '').includes(
-            lowerSearch,
-          ),
-      )
-    }
-
-    if (statusFilter !== 'todos') {
-      res.forEach((client) => {
-        client.orders.forEach((order) => {
-          order.installments = order.installments.filter((inst) => {
-            if (statusFilter === 'SEM DÉBITO') return inst.status === 'PAGO'
-            if (statusFilter === 'A VENCER' || statusFilter === 'VENCIDO')
-              return inst.status === statusFilter
-            return true
-          })
-        })
-        client.orders = client.orders.filter((o) => o.installments.length > 0)
-      })
-      res = res.filter((c) => c.orders.length > 0)
-    }
-
-    if (typeFilter !== 'all') {
-      res = res.filter((c) => c.clientType === typeFilter)
-    }
-
-    if (groupFilter !== 'all') {
-      res = res.filter((c) => c.group === groupFilter)
-    }
-
-    if (routeFilter !== 'all') {
-      res = res.filter((c) => c.routeGroup === routeFilter)
-    }
-
-    if (bairroFilter !== 'all') {
-      res = res.filter((c) => c.neighborhood === bairroFilter)
-    }
-
-    if (municipioFilter !== 'all') {
-      res = res.filter((c) => c.city === municipioFilter)
-    }
-
-    if (showSelectedOnly) {
-      // Filter logic needs to check if ANY item in the client is selected
-      // But we render flat rows in DebtTable, so filtering here is tricky if we want to show only selected ROWS.
-      // However, DebtTable handles flattenedData.
-      // If we filter clients here, we might hide clients who have SOME selected items but maybe we want to show only selected ITEMS?
-      // For simplicity and standard pattern, we filter clients that have AT LEAST ONE selected item.
-      // Then DebtTable (if it respected filtering inside itself) would be fine.
-      // But DebtTable flattens whatever is passed.
-      // So if we pass a client, it shows all its items (filtered by previous steps).
-      // To strictly show ONLY selected items, we need to filter installments inside.
-
-      res = res.filter((c) => {
-        // Check if client has any selected item
-        return c.orders.some((o) =>
-          o.installments.some((inst, index) => {
-            const uniqueId = `${c.clientId || '0'}-${o.orderId || '0'}-${inst.id || '0'}-${index}`
-            return selectedItems.has(uniqueId)
-          }),
-        )
-      })
-
-      // Further filter installments to ONLY show selected ones
-      res.forEach((client) => {
-        client.orders.forEach((order) => {
-          order.installments = order.installments.filter((inst, index) => {
-            const uniqueId = `${client.clientId || '0'}-${order.orderId || '0'}-${inst.id || '0'}-${index}`
-            return selectedItems.has(uniqueId)
-          })
-        })
-        client.orders = client.orders.filter((o) => o.installments.length > 0)
-      })
-    }
-
-    setFilteredData(res)
-  }, [
-    data,
-    searchTerm,
-    statusFilter,
-    typeFilter,
-    groupFilter,
-    routeFilter,
-    vencimentoFilter,
-    bairroFilter,
-    municipioFilter,
-    showSelectedOnly,
-    selectedItems, // Replaces selectedClients
-  ])
-
-  // Summary Metrics
-  const totalReceivable = filteredData.reduce(
-    (acc, c) =>
-      acc +
-      c.orders.reduce(
-        (oAcc, o) =>
-          oAcc +
-          o.installments.reduce(
-            (iAcc, i) =>
-              iAcc +
-              (i.status !== 'PAGO' ? i.valorRegistrado - i.valorPago : 0),
-            0,
-          ),
-        0,
-      ),
-    0,
-  )
-
-  const countVencidos = filteredData.reduce(
-    (acc, c) =>
-      acc +
-      c.orders.reduce(
-        (oAcc, o) =>
-          oAcc + o.installments.filter((i) => i.status === 'VENCIDO').length,
-        0,
-      ),
-    0,
-  )
-
-  const totalRows = filteredData.reduce(
-    (acc, c) =>
-      acc + c.orders.reduce((oAcc, o) => oAcc + o.installments.length, 0),
-    0,
-  )
-
-  const selectedCount = selectedItems.size
+  const totalDebt = filteredDebts.reduce((acc, curr) => acc + curr.totalDebt, 0)
+  const totalClients = filteredDebts.length
 
   return (
-    <div className="space-y-6 animate-fade-in p-2 pb-20 sm:p-0 flex flex-col h-full">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-red-100 text-red-700 rounded-lg shrink-0">
-            <CreditCard className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="flex items-center gap-4">
-              <h1 className="text-3xl font-bold tracking-tight">Cobrança</h1>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="show-filters"
-                  checked={showFilters}
-                  onCheckedChange={setShowFilters}
-                />
-                <Label
-                  htmlFor="show-filters"
-                  className="cursor-pointer text-sm"
-                >
-                  Filtros
-                </Label>
-              </div>
-            </div>
-            <p className="text-muted-foreground">
-              Gestão de inadimplência e monitoramento de parcelas.
-            </p>
-          </div>
+    <div className="space-y-6 animate-fade-in p-4 sm:p-6 pb-20">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <HandCoins className="h-8 w-8 text-blue-600" />
+            Central de Cobrança
+          </h1>
+          <p className="text-muted-foreground">
+            Gerenciamento de inadimplência e acordos.
+          </p>
         </div>
-        {loading && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground animate-pulse">
-            <RefreshCw className="h-3 w-3 animate-spin" />
-            Atualizando...
-          </div>
-        )}
+        <Button variant="outline" onClick={loadDebts} disabled={loading}>
+          <RefreshCw
+            className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`}
+          />
+          Atualizar
+        </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Total a Receber (Filtro)
+              Total em Débito
             </CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
+            <HandCoins className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              R$ {formatCurrency(totalReceivable)}
+              R$ {formatCurrency(totalDebt)}
             </div>
             <p className="text-xs text-muted-foreground">
-              Soma das parcelas em aberto
+              {totalClients} clientes listados
             </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Itens Listados
-            </CardTitle>
-            <Search className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalRows}</div>
-            <p className="text-xs text-muted-foreground">
-              Parcelas/Registros encontrados
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Parcelas Vencidas
-            </CardTitle>
-            <div className="h-4 w-4 rounded-full bg-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">
-              {countVencidos}
-            </div>
-            <p className="text-xs text-muted-foreground">Status VENCIDO</p>
-          </CardContent>
-        </Card>
-        <Card className={showSelectedOnly ? 'border-primary bg-primary/5' : ''}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Rota Motoqueiro
-            </CardTitle>
-            <Bike className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-primary">
-              {selectedCount}
-            </div>
-            <p className="text-xs text-muted-foreground">Itens selecionados</p>
           </CardContent>
         </Card>
       </div>
 
-      {showFilters && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Filtros e Busca</CardTitle>
-            <CardDescription>
-              Refine a lista para focar nas cobranças prioritárias e organize
-              rotas.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-4">
-              <div className="col-span-1 sm:col-span-2 relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por nome ou código..."
-                  className="pl-8"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <div className="col-span-1">
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos Status</SelectItem>
-                    <SelectItem value="A VENCER">A Vencer</SelectItem>
-                    <SelectItem value="VENCIDO">Vencido</SelectItem>
-                    <SelectItem value="SEM DÉBITO">
-                      Pago / Sem Débito
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="col-span-1">
-                <Select value={typeFilter} onValueChange={setTypeFilter}>
-                  <SelectTrigger>
-                    <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
-                    <SelectValue placeholder="Tipo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos Tipos</SelectItem>
-                    <SelectItem value="ATIVO">Ativo</SelectItem>
-                    <SelectItem value="INATIVO">Inativo</SelectItem>
-                    <SelectItem value="BLOQUEADO">Bloqueado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="col-span-1">
-                <Select value={groupFilter} onValueChange={setGroupFilter}>
-                  <SelectTrigger>
-                    <Users className="w-4 h-4 mr-2 text-muted-foreground" />
-                    <SelectValue placeholder="Grupo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos Grupos</SelectItem>
-                    {uniqueGroups.map((g) => (
-                      <SelectItem key={g as string} value={g as string}>
-                        {g}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="col-span-1">
-                <Select value={routeFilter} onValueChange={setRouteFilter}>
-                  <SelectTrigger>
-                    <MapPin className="w-4 h-4 mr-2 text-muted-foreground" />
-                    <SelectValue placeholder="Grupo Rota" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas Rotas</SelectItem>
-                    {uniqueRoutes.map((r) => (
-                      <SelectItem key={r as string} value={r as string}>
-                        {r}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="col-span-1">
-                <Select value={bairroFilter} onValueChange={setBairroFilter}>
-                  <SelectTrigger>
-                    <MapPin className="w-4 h-4 mr-2 text-muted-foreground" />
-                    <SelectValue placeholder="Bairro" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos Bairros</SelectItem>
-                    {uniqueBairros.map((b) => (
-                      <SelectItem key={b as string} value={b as string}>
-                        {b}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="col-span-1">
-                <Select
-                  value={municipioFilter}
-                  onValueChange={setMunicipioFilter}
-                >
-                  <SelectTrigger>
-                    <Building2 className="w-4 h-4 mr-2 text-muted-foreground" />
-                    <SelectValue placeholder="Município" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos Municípios</SelectItem>
-                    {uniqueMunicipios.map((m) => (
-                      <SelectItem key={m as string} value={m as string}>
-                        {m}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+      <Card>
+        <CardContent className="p-4 space-y-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar cliente, código ou pedido..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9"
+              />
             </div>
+            <div className="w-full md:w-[200px]">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos Status</SelectItem>
+                  <SelectItem value="VENCIDO">Vencidos</SelectItem>
+                  <SelectItem value="A VENCER">A Vencer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-full md:w-[200px]">
+              <Select value={cityFilter} onValueChange={setCityFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Cidade" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todas Cidades</SelectItem>
+                  {uniqueCities.map((city) => (
+                    <SelectItem key={city} value={city}>
+                      {city}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mt-4 items-center">
-              <div className="col-span-1 sm:col-span-2">
-                <div className="relative">
-                  <Calendar className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    type="date"
-                    className="pl-8"
-                    value={vencimentoFilter}
-                    onChange={(e) => setVencimentoFilter(e.target.value)}
-                    placeholder="Vencimento"
-                  />
+          <Tabs defaultValue="geral" className="w-full">
+            <TabsList>
+              <TabsTrigger value="geral" className="flex items-center gap-2">
+                <Users className="h-4 w-4" /> Geral
+              </TabsTrigger>
+              <TabsTrigger
+                value="motoqueiro"
+                className="flex items-center gap-2"
+                onClick={() => setRouteFilter('motoqueiro')}
+              >
+                Rota Motoqueiro
+                {selectedItems.size > 0 && (
+                  <Badge variant="secondary" className="ml-1 h-5 px-1.5">
+                    {selectedItems.size}
+                  </Badge>
+                )}
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="geral" className="mt-4">
+              <DebtTable
+                data={filteredDebts}
+                onRefresh={loadDebts}
+                selectedItems={selectedItems}
+                onToggleItem={handleToggleItem}
+                isCobrancaMode={false}
+                onToggleAll={handleToggleAll}
+              />
+            </TabsContent>
+
+            <TabsContent value="motoqueiro" className="mt-4">
+              <div className="mb-4 p-4 bg-blue-50 border border-blue-100 rounded-md flex justify-between items-center">
+                <div className="text-sm text-blue-800">
+                  <span className="font-bold">{selectedItems.size}</span> itens
+                  selecionados para rota de cobrança.
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline">
+                    Gerar PDF Rota
+                  </Button>
+                  <Button size="sm">Enviar para Motoqueiro</Button>
                 </div>
               </div>
-
-              {/* NEW: Mode Toggle */}
-              <div className="col-span-1 sm:col-span-2 flex items-center space-x-2 border p-2 rounded-md bg-muted/20">
-                <Switch
-                  id="cobranca-mode"
-                  checked={isCobrancaMode}
-                  onCheckedChange={setIsCobrancaMode}
-                />
-                <Label
-                  htmlFor="cobranca-mode"
-                  className="text-sm font-medium leading-none cursor-pointer"
-                >
-                  Modo de Cobrança (Simplificado)
-                </Label>
-              </div>
-
-              <div className="col-span-1 sm:col-span-2 flex items-center space-x-2 border p-2 rounded-md bg-muted/20">
-                <Checkbox
-                  id="rota-motoqueiro-filter"
-                  checked={showSelectedOnly}
-                  onCheckedChange={(checked) =>
-                    setShowSelectedOnly(checked === true)
-                  }
-                />
-                <Label
-                  htmlFor="rota-motoqueiro-filter"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                >
-                  Filtrar Rota Motoqueiro ({selectedItems.size})
-                </Label>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Scrollable Container for Desktop List */}
-      <ScrollArea className="h-[calc(100vh-250px)] min-h-[500px] border rounded-md bg-card">
-        {loading && data.length === 0 ? (
-          <div className="flex justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        ) : (
-          <div className="w-max min-w-full">
-            <DebtTable
-              data={filteredData}
-              onRefresh={fetchDebts}
-              selectedItems={selectedItems}
-              onToggleItem={toggleItemSelection}
-              isCobrancaMode={isCobrancaMode}
-            />
-          </div>
-        )}
-        <ScrollBar orientation="horizontal" />
-      </ScrollArea>
+              <DebtTable
+                data={filteredDebts.filter((d) =>
+                  d.orders.some((o) =>
+                    o.installments.some(
+                      (i) => i.formaCobranca === 'MOTOQUEIRO',
+                    ),
+                  ),
+                )}
+                onRefresh={loadDebts}
+                selectedItems={selectedItems}
+                onToggleItem={handleToggleItem}
+                isCobrancaMode={true}
+                onToggleAll={handleToggleAll}
+              />
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
     </div>
   )
 }

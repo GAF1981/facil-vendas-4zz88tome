@@ -95,7 +95,7 @@ export default function CaixaPage() {
   }>({ open: false, empId: null, empName: '' })
 
   const [generatingPdf, setGeneratingPdf] = useState(false)
-  const [printFormat, setPrintFormat] = useState<'A4' | '80mm'>('A4')
+  const [printFormat, setPrintFormat] = useState<'A4' | '80mm'>('80mm') // Default to 80mm
 
   // Initialization: Fetch Routes and Set Default User
   useEffect(() => {

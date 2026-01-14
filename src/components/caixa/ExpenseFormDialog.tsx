@@ -42,6 +42,7 @@ interface ExpenseFormDialogProps {
   onOpenChange: (open: boolean) => void
   onSuccess: () => void
   preselectedEmployee?: { id: number; name: string } | null
+  preselectedVehicleId?: number | null // New prop
 }
 
 export function ExpenseFormDialog({
@@ -49,6 +50,7 @@ export function ExpenseFormDialog({
   onOpenChange,
   onSuccess,
   preselectedEmployee,
+  preselectedVehicleId,
 }: ExpenseFormDialogProps) {
   const [loading, setLoading] = useState(false)
   const [employees, setEmployees] = useState<Employee[]>([])
@@ -76,6 +78,9 @@ export function ExpenseFormDialog({
       saiu_do_caixa: true,
       hodometro: '',
       veiculo_id: '',
+      prestador_servico: '',
+      tipo_servico: '',
+      tipo_combustivel: 'alcool',
     },
   })
 
@@ -89,10 +94,16 @@ export function ExpenseFormDialog({
 
       vehicleService.getActive().then(setVehicles).catch(console.error)
 
+      // Determine initial group based on context
+      let initialGrupo = 'Alimentação' as const
+      if (preselectedVehicleId) {
+        initialGrupo = 'Abastecimento'
+      }
+
       const initialValues = {
         data: getLocalDateString(),
-        grupo: 'Alimentação' as const,
-        detalhamento: 'Alimentação',
+        grupo: initialGrupo,
+        detalhamento: initialGrupo === 'Alimentação' ? 'Alimentação' : '',
         valor: '',
         funcionario_id:
           preselectedEmployee?.id.toString() ||
@@ -100,25 +111,35 @@ export function ExpenseFormDialog({
           '',
         saiu_do_caixa: true,
         hodometro: '',
-        veiculo_id: '',
+        veiculo_id: preselectedVehicleId ? preselectedVehicleId.toString() : '',
+        prestador_servico: '',
+        tipo_servico: '',
+        tipo_combustivel: 'alcool' as const,
       }
       form.reset(initialValues)
     }
-  }, [open, form, preselectedEmployee, loggedInUser])
+  }, [open, form, preselectedEmployee, loggedInUser, preselectedVehicleId])
 
   useEffect(() => {
     if (selectedGrupo === 'Alimentação') {
       form.setValue('detalhamento', 'Alimentação')
-    } else if (selectedGrupo === 'Combustível') {
-      form.setValue('detalhamento', 'Combustível')
-    } else if (selectedGrupo === 'Gasolina') {
-      form.setValue('detalhamento', 'Gasolina')
+    } else if (
+      selectedGrupo === 'Combustível' ||
+      selectedGrupo === 'Gasolina' ||
+      selectedGrupo === 'Abastecimento'
+    ) {
+      // Don't auto-set detalhamento for Fuel anymore as it might be 'alcool' or 'gasolina'
+      // But for consistency we can set it to 'Abastecimento' if empty
+      if (!form.getValues('detalhamento')) {
+        form.setValue('detalhamento', 'Abastecimento')
+      }
     } else if (selectedGrupo === 'Outros') {
       const current = form.getValues('detalhamento')
       if (
         current === 'Alimentação' ||
         current === 'Combustível' ||
-        current === 'Gasolina'
+        current === 'Gasolina' ||
+        current === 'Abastecimento'
       ) {
         form.setValue('detalhamento', '')
       }
@@ -134,24 +155,47 @@ export function ExpenseFormDialog({
         })
         return
       }
+    } else if (data.grupo === 'Abastecimento') {
+      detalhamentoToSave = `Abastecimento (${data.tipo_combustivel})`
+    } else if (data.grupo === 'Manutenção') {
+      detalhamentoToSave = `${data.tipo_servico} - ${data.prestador_servico}`
     } else {
       detalhamentoToSave = data.grupo
     }
 
-    const isFuel = data.grupo === 'Gasolina' || data.grupo === 'Combustível'
+    const isFuel =
+      data.grupo === 'Gasolina' ||
+      data.grupo === 'Combustível' ||
+      data.grupo === 'Abastecimento'
 
-    if (data.grupo === 'Gasolina' && !data.hodometro) {
+    if (isFuel && !data.hodometro) {
       form.setError('hodometro', {
-        message: 'Hodômetro é obrigatório para Gasolina',
+        message: 'Hodômetro é obrigatório para Abastecimento',
       })
       return
     }
 
-    if (isFuel && !data.veiculo_id) {
+    // Vehicle mandatory for Fuel and Maintenance
+    if ((isFuel || data.grupo === 'Manutenção') && !data.veiculo_id) {
       form.setError('veiculo_id', {
-        message: 'Veículo é obrigatório para Combustível/Gasolina',
+        message: 'Veículo é obrigatório',
       })
       return
+    }
+
+    if (data.grupo === 'Manutenção') {
+      if (!data.prestador_servico) {
+        form.setError('prestador_servico', {
+          message: 'Prestador de Serviço obrigatório',
+        })
+        return
+      }
+      if (!data.tipo_servico) {
+        form.setError('tipo_servico', {
+          message: 'Tipo de Serviço obrigatório',
+        })
+        return
+      }
     }
 
     setLoading(true)
@@ -165,6 +209,9 @@ export function ExpenseFormDialog({
         saiu_do_caixa: data.saiu_do_caixa,
         hodometro: data.hodometro ? parseFloat(data.hodometro) : null,
         veiculo_id: data.veiculo_id ? parseInt(data.veiculo_id) : null,
+        prestador_servico: data.prestador_servico || null,
+        tipo_servico: data.tipo_servico || null,
+        tipo_combustivel: isFuel ? data.tipo_combustivel : null,
       })
 
       toast({
@@ -186,9 +233,15 @@ export function ExpenseFormDialog({
     }
   }
 
+  const isFuel =
+    selectedGrupo === 'Abastecimento' ||
+    selectedGrupo === 'Gasolina' ||
+    selectedGrupo === 'Combustível'
+  const isMaintenance = selectedGrupo === 'Manutenção'
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {preselectedEmployee
@@ -259,8 +312,10 @@ export function ExpenseFormDialog({
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="Alimentação">Alimentação</SelectItem>
-                      <SelectItem value="Gasolina">Gasolina</SelectItem>
-                      <SelectItem value="Combustível">Combustível</SelectItem>
+                      <SelectItem value="Abastecimento">
+                        Abastecimento
+                      </SelectItem>
+                      <SelectItem value="Manutenção">Manutenção</SelectItem>
                       <SelectItem value="Outros">Outros</SelectItem>
                     </SelectContent>
                   </Select>
@@ -269,15 +324,18 @@ export function ExpenseFormDialog({
               )}
             />
 
-            {(selectedGrupo === 'Combustível' ||
-              selectedGrupo === 'Gasolina') && (
+            {(isFuel || isMaintenance) && (
               <FormField
                 control={form.control}
                 name="veiculo_id"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Veículo *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                      disabled={!!preselectedVehicleId}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione o veículo" />
@@ -297,6 +355,125 @@ export function ExpenseFormDialog({
               />
             )}
 
+            {isFuel && (
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="tipo_combustivel"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tipo de Combustível</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="alcool">Álcool</SelectItem>
+                          <SelectItem value="gasolina">Gasolina</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="hodometro"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Hodômetro *</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="Km atual"
+                          {...field}
+                          value={field.value || ''}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            )}
+
+            {isMaintenance && (
+              <div className="space-y-4 border p-3 rounded-md bg-muted/10">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="hodometro"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Hodômetro</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="Km atual"
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="valor"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Valor (R$)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormField
+                  control={form.control}
+                  name="prestador_servico"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Prestador de Serviço *</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Nome da Oficina/Loja" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="tipo_servico"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tipo de Serviço *</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Ex: Troca de Óleo, Pneu..."
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            )}
+
             {selectedGrupo === 'Outros' && (
               <FormField
                 control={form.control}
@@ -313,19 +490,19 @@ export function ExpenseFormDialog({
               />
             )}
 
-            {selectedGrupo === 'Gasolina' && (
+            {!isMaintenance && (
               <FormField
                 control={form.control}
-                name="hodometro"
+                name="valor"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Hodômetro do carro *</FormLabel>
+                    <FormLabel>Valor (R$)</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
-                        placeholder="Km atual"
+                        step="0.01"
+                        placeholder="0.00"
                         {...field}
-                        value={field.value || ''}
                       />
                     </FormControl>
                     <FormMessage />
@@ -333,25 +510,6 @@ export function ExpenseFormDialog({
                 )}
               />
             )}
-
-            <FormField
-              control={form.control}
-              name="valor"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Valor (R$)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      placeholder="0.00"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
 
             <FormField
               control={form.control}

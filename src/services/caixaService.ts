@@ -52,6 +52,7 @@ export interface FuelReportRow {
   costPerKm: number | null
   vehiclePlate: string | null // New Field
   vehicleId: number | null // New Field
+  fuelType?: string // New Field
 }
 
 export const caixaService = {
@@ -79,6 +80,9 @@ export const caixaService = {
       saiu_do_caixa: despesa.saiu_do_caixa,
       hodometro: despesa.hodometro,
       veiculo_id: despesa.veiculo_id,
+      prestador_servico: despesa.prestador_servico,
+      tipo_servico: despesa.tipo_servico,
+      tipo_combustivel: despesa.tipo_combustivel,
     })
 
     if (error) throw error
@@ -391,8 +395,13 @@ export const caixaService = {
     }))
   },
 
-  async getFuelReportData(): Promise<FuelReportRow[]> {
-    const { data, error } = await supabase
+  async getFuelReportData(filters?: {
+    startDate?: string
+    endDate?: string
+    vehicleId?: string
+    employeeId?: string
+  }): Promise<FuelReportRow[]> {
+    let query = supabase
       .from('DESPESAS')
       .select(
         `
@@ -402,12 +411,29 @@ export const caixaService = {
         hodometro,
         funcionario_id,
         veiculo_id,
+        tipo_combustivel,
         FUNCIONARIOS ( nome_completo ),
         VEICULOS ( placa )
       `,
       )
-      .or('Grupo de Despesas.eq.Gasolina,Grupo de Despesas.eq.Combustível')
-      .order('Data', { ascending: true }) // Sorted by date to calculate distances
+      .or(
+        'Grupo de Despesas.eq.Gasolina,Grupo de Despesas.eq.Combustível,Grupo de Despesas.eq.Abastecimento',
+      )
+
+    if (filters?.startDate) {
+      query = query.gte('Data', filters.startDate)
+    }
+    if (filters?.endDate) {
+      query = query.lte('Data', filters.endDate)
+    }
+    if (filters?.vehicleId && filters.vehicleId !== 'todos') {
+      query = query.eq('veiculo_id', filters.vehicleId)
+    }
+    if (filters?.employeeId && filters.employeeId !== 'todos') {
+      query = query.eq('funcionario_id', filters.employeeId)
+    }
+
+    const { data, error } = await query.order('Data', { ascending: true }) // Sorted by date to calculate distances
 
     if (error) throw error
 
@@ -461,6 +487,7 @@ export const caixaService = {
           costPerKm: costPerKm,
           vehiclePlate: current.VEICULOS?.placa || null,
           vehicleId: current.veiculo_id || null,
+          fuelType: current.tipo_combustivel,
         })
       }
     })
