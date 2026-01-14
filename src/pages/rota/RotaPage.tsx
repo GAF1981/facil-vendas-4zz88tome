@@ -10,6 +10,8 @@ import { Rota, RotaRow, RotaFilterState, SortConfig } from '@/types/rota'
 import { Employee } from '@/types/employee'
 import { useToast } from '@/hooks/use-toast'
 import { supabase } from '@/lib/supabase/client'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
 
 export default function RotaPage() {
   const [activeRota, setActiveRota] = useState<Rota | null>(null)
@@ -22,6 +24,7 @@ export default function RotaPage() {
   const { toast } = useToast()
 
   const [isSelectionMode, setIsSelectionMode] = useState(false)
+  const [showFilters, setShowFilters] = useState(true)
 
   const [filters, setFilters] = useState<RotaFilterState>({
     search: '',
@@ -534,22 +537,37 @@ export default function RotaPage() {
           />
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-sm font-semibold bg-primary/10 text-primary px-3 py-1 rounded-full">
-            Total: {filteredRows.length} Clientes
-          </span>
+          <div className="flex items-center gap-4">
+            <span className="text-sm font-semibold bg-primary/10 text-primary px-3 py-1 rounded-full">
+              Total: {filteredRows.length} Clientes
+            </span>
+            {/* Filter Toggle */}
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="show-filters"
+                checked={showFilters}
+                onCheckedChange={setShowFilters}
+              />
+              <Label htmlFor="show-filters" className="cursor-pointer text-sm">
+                Filtros
+              </Label>
+            </div>
+          </div>
         </div>
-        <div className="w-full">
-          <RotaFilters
-            filters={filters}
-            setFilters={setFilters}
-            sellers={sellers}
-            municipios={uniqueMunicipios as string[]}
-            routes={uniqueRoutes as string[]}
-            isSelectionMode={isSelectionMode}
-            toggleSelectionMode={setIsSelectionMode}
-          />
-        </div>
-        <RotaLegend />
+        {showFilters && (
+          <div className="w-full">
+            <RotaFilters
+              filters={filters}
+              setFilters={setFilters}
+              sellers={sellers}
+              municipios={uniqueMunicipios as string[]}
+              routes={uniqueRoutes as string[]}
+              isSelectionMode={isSelectionMode}
+              toggleSelectionMode={setIsSelectionMode}
+            />
+          </div>
+        )}
+        {showFilters && <RotaLegend />}
       </div>
 
       <div className="flex-1 overflow-auto rounded-md border shadow-sm bg-card">

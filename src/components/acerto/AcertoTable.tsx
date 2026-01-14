@@ -142,12 +142,29 @@ export function AcertoTable({
 
   // Safety wrappers for callbacks
   const safeUpdateContagem = (uid: string, val: number) => {
+    // Validation: Negative check (handled by Math.max in NumberInputControl but good to check)
+    if (val < 0) return
+
+    // Validation: Contagem cannot be greater than Saldo Inicial
+    const item = items.find((i) => i.uid === uid)
+    if (item && val > (item.saldoInicial || 0)) {
+      toast({
+        title: 'Valor Inválido',
+        description: 'A contagem não pode ser maior que o saldo inicial.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     if (typeof onUpdateContagem === 'function') {
       onUpdateContagem(uid, val)
     }
   }
 
   const safeUpdateSaldoFinal = (uid: string, val: number) => {
+    // Validation: Negative check
+    if (val < 0) return
+
     if (typeof onUpdateSaldoFinal === 'function') {
       onUpdateSaldoFinal(uid, val)
     }

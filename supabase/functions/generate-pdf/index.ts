@@ -79,6 +79,13 @@ Deno.serve(async (req) => {
         const expensesCount = body.expenses ? body.expenses.length : 0
         const receiptsCount = body.receipts ? body.receipts.length : 0
         estimatedHeight = 600 + expensesCount * 40 + receiptsCount * 40
+      } else {
+        // Standard Acerto PDF estimation
+        const itemsCount = body.items ? body.items.length : 0
+        const historyCount = body.history ? body.history.length : 0
+        const paymentsCount = body.payments ? body.payments.length : 0
+        estimatedHeight =
+          600 + itemsCount * 30 + historyCount * 25 + paymentsCount * 30
       }
 
       page = pdfDoc.addPage([226, Math.max(842, estimatedHeight)])
@@ -540,6 +547,333 @@ Deno.serve(async (req) => {
         size: 9,
         align: 'center',
       })
+    } else {
+      // Default: Acerto/Settlement PDF
+      const {
+        client,
+        employee,
+        items,
+        date,
+        acertoTipo,
+        totalVendido,
+        valorDesconto,
+        valorAcerto,
+        valorPago,
+        debito,
+        payments,
+        monthlyAverage,
+        orderNumber,
+        issuerName,
+        history,
+        signature,
+        isReceipt,
+        clientMunicipio,
+      } = body
+
+      const title = isReceipt
+        ? 'RECIBO DE PAGAMENTO'
+        : `PEDIDO ${orderNumber || 'PREVIEW'}`
+
+      drawText('FACIL VENDAS', width / 2, y, {
+        size: isThermal ? 16 : 20,
+        font: fontBold,
+        align: 'center',
+      })
+      y -= 25
+      drawText(title, width / 2, y, {
+        size: isThermal ? 14 : 16,
+        font: fontBold,
+        align: 'center',
+      })
+      y -= 15
+      drawLine(y)
+      y -= 15
+
+      // Header Info
+      drawText(
+        `Cliente: ${client.CODIGO} - ${client['NOME CLIENTE']}`,
+        margins.left,
+        y,
+        { size: 10, font: fontBold },
+      )
+      y -= 15
+      drawText(
+        `End: ${client['ENDEREÇO'] || '-'}, ${client['BAIRRO'] || '-'}`,
+        margins.left,
+        y,
+        { size: 9 },
+      )
+      y -= 12
+      drawText(
+        `${clientMunicipio || client['MUNICÍPIO'] || '-'}`,
+        margins.left,
+        y,
+        { size: 9 },
+      )
+      y -= 15
+      drawText(
+        `Data: ${safeFormatDate(date)} ${safeFormatTime(date)}`,
+        margins.left,
+        y,
+        { size: 10 },
+      )
+      y -= 15
+      if (employee) {
+        drawText(
+          `Vendedor: ${employee.nome_completo || employee.name}`,
+          margins.left,
+          y,
+          {
+            size: 10,
+          },
+        )
+        y -= 15
+      }
+      drawLine(y)
+      y -= 15
+
+      // Items Table
+      if (items && items.length > 0 && !isReceipt) {
+        drawText('ITENS DO PEDIDO', width / 2, y, {
+          size: 10,
+          font: fontBold,
+          align: 'center',
+        })
+        y -= 15
+
+        // Table Header
+        const colX = isThermal
+          ? { prod: 10, qtd: 140, tot: 190 }
+          : { prod: 40, qtd: 350, tot: 450 }
+
+        drawText('PRODUTO', colX.prod, y, { size: 9, font: fontBold })
+        drawText('QTD', colX.qtd, y, {
+          size: 9,
+          font: fontBold,
+          align: 'right',
+        })
+        drawText('TOTAL', width - margins.right, y, {
+          size: 9,
+          font: fontBold,
+          align: 'right',
+        })
+        y -= 10
+
+        for (const item of items) {
+          // If sold > 0
+          if (item.quantVendida > 0 || item.valorVendido > 0) {
+            checkPageBreak(30)
+            const prodName = item.produtoNome || 'Item'
+            drawText(prodName.substring(0, isThermal ? 25 : 50), colX.prod, y, {
+              size: 9,
+            })
+            drawText(item.quantVendida.toString(), colX.qtd, y, {
+              size: 9,
+              align: 'right',
+            })
+            drawText(
+              formatCurrency(item.valorVendido),
+              width - margins.right,
+              y,
+              { size: 9, align: 'right' },
+            )
+            y -= 12
+          }
+        }
+        drawLine(y)
+        y -= 15
+      }
+
+      // Totals
+      if (!isReceipt) {
+        checkPageBreak(80)
+        drawText('Total Vendido:', margins.left, y, { size: 10 })
+        drawText(
+          `R$ ${formatCurrency(totalVendido)}`,
+          width - margins.right,
+          y,
+          { size: 10, align: 'right' },
+        )
+        y -= 15
+
+        if (valorDesconto > 0) {
+          drawText('Desconto:', margins.left, y, { size: 10 })
+          drawText(
+            `- R$ ${formatCurrency(valorDesconto)}`,
+            width - margins.right,
+            y,
+            { size: 10, align: 'right', color: rgb(1, 0, 0) },
+          )
+          y -= 15
+        }
+
+        drawText('TOTAL A PAGAR:', margins.left, y, {
+          size: 12,
+          font: fontBold,
+        })
+        drawText(
+          `R$ ${formatCurrency(valorAcerto)}`,
+          width - margins.right,
+          y,
+          { size: 12, font: fontBold, align: 'right' },
+        )
+        y -= 20
+        drawLine(y)
+        y -= 15
+      }
+
+      // Payments
+      if (payments && payments.length > 0) {
+        checkPageBreak(60)
+        drawText('PAGAMENTOS', width / 2, y, {
+          size: 10,
+          font: fontBold,
+          align: 'center',
+        })
+        y -= 15
+
+        for (const p of payments) {
+          checkPageBreak(20)
+          const pMethod = p.method || 'Pagamento'
+          const pValue = p.paidValue || 0
+          drawText(pMethod, margins.left, y, { size: 10 })
+          drawText(`R$ ${formatCurrency(pValue)}`, width - margins.right, y, {
+            size: 10,
+            align: 'right',
+          })
+          y -= 15
+        }
+        drawLine(y)
+        y -= 15
+      }
+
+      // Summary
+      checkPageBreak(60)
+      drawText('RESUMO FINANCEIRO', margins.left, y, {
+        size: 10,
+        font: fontBold,
+      })
+      y -= 15
+      drawText('Valor Total Pago:', margins.left, y, { size: 10 })
+      drawText(`R$ ${formatCurrency(valorPago)}`, width - margins.right, y, {
+        size: 10,
+        align: 'right',
+        font: fontBold,
+        color: rgb(0, 0.5, 0),
+      })
+      y -= 15
+
+      if (debito > 0.01) {
+        drawText('RESTANTE (DEBITO):', margins.left, y, {
+          size: 11,
+          font: fontBold,
+          color: rgb(0.8, 0, 0),
+        })
+        drawText(`R$ ${formatCurrency(debito)}`, width - margins.right, y, {
+          size: 11,
+          align: 'right',
+          font: fontBold,
+          color: rgb(0.8, 0, 0),
+        })
+        y -= 20
+      }
+
+      drawLine(y)
+      y -= 20
+
+      // History (Only for non-thermal or if space allows/requested)
+      if (history && history.length > 0) {
+        checkPageBreak(100)
+        drawText('HISTORICO RECENTE', width / 2, y, {
+          size: 10,
+          font: fontBold,
+          align: 'center',
+        })
+        y -= 15
+
+        const colH = isThermal
+          ? { dt: 10, val: 120, deb: 180 }
+          : { dt: 40, val: 300, deb: 450 }
+
+        drawText('DATA', colH.dt, y, { size: 8, font: fontBold })
+        drawText('VALOR', colH.val, y, {
+          size: 8,
+          font: fontBold,
+          align: 'right',
+        })
+        drawText('DEBITO', width - margins.right, y, {
+          size: 8,
+          font: fontBold,
+          align: 'right',
+        })
+        y -= 10
+
+        for (const h of history) {
+          checkPageBreak(20)
+          drawText(safeFormatDate(h.data), colH.dt, y, { size: 8 })
+          drawText(formatCurrency(h.valorVendaTotal), colH.val, y, {
+            size: 8,
+            align: 'right',
+          })
+          drawText(formatCurrency(h.debito), width - margins.right, y, {
+            size: 8,
+            align: 'right',
+            color: h.debito > 0 ? rgb(0.8, 0, 0) : rgb(0, 0, 0),
+          })
+          y -= 10
+        }
+        y -= 10
+        drawLine(y)
+        y -= 20
+      }
+
+      // Monthly Avg
+      if (monthlyAverage > 0) {
+        checkPageBreak(30)
+        drawText(
+          `Media Mensal: R$ ${formatCurrency(monthlyAverage)}`,
+          margins.left,
+          y,
+          { size: 9 },
+        )
+        y -= 20
+      }
+
+      // Signature
+      if (signature) {
+        checkPageBreak(100)
+        try {
+          const pngImage = await pdfDoc.embedPng(signature)
+          const imgDims = pngImage.scale(0.25)
+          y -= imgDims.height + 10
+          page.drawImage(pngImage, {
+            x: width / 2 - imgDims.width / 2,
+            y: y,
+            width: imgDims.width,
+            height: imgDims.height,
+          })
+          y -= 10
+        } catch {
+          // Ignore sig error
+        }
+      } else {
+        y -= 40
+      }
+
+      drawLine(y)
+      y -= 15
+      drawText('Assinatura do Cliente', width / 2, y, {
+        size: 10,
+        align: 'center',
+      })
+      y -= 15
+      if (issuerName) {
+        drawText(`Emitido por: ${issuerName}`, width / 2, y, {
+          size: 8,
+          align: 'center',
+          color: rgb(0.5, 0.5, 0.5),
+        })
+      }
     }
 
     const pdfBytes = await pdfDoc.save()

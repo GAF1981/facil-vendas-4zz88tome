@@ -60,6 +60,9 @@ export default function CobrancaPage() {
   // New Mode State
   const [isCobrancaMode, setIsCobrancaMode] = useState(false)
 
+  // Filter Visibility Toggle
+  const [showFilters, setShowFilters] = useState(true)
+
   const { toast } = useToast()
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -331,7 +334,22 @@ export default function CobrancaPage() {
             <CreditCard className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Cobrança</h1>
+            <div className="flex items-center gap-4">
+              <h1 className="text-3xl font-bold tracking-tight">Cobrança</h1>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="show-filters"
+                  checked={showFilters}
+                  onCheckedChange={setShowFilters}
+                />
+                <Label
+                  htmlFor="show-filters"
+                  className="cursor-pointer text-sm"
+                >
+                  Filtros
+                </Label>
+              </div>
+            </div>
             <p className="text-muted-foreground">
               Gestão de inadimplência e monitoramento de parcelas.
             </p>
@@ -409,168 +427,172 @@ export default function CobrancaPage() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Filtros e Busca</CardTitle>
-          <CardDescription>
-            Refine a lista para focar nas cobranças prioritárias e organize
-            rotas.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-4">
-            <div className="col-span-1 sm:col-span-2 relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por nome ou código..."
-                className="pl-8"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <div className="col-span-1">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos Status</SelectItem>
-                  <SelectItem value="A VENCER">A Vencer</SelectItem>
-                  <SelectItem value="VENCIDO">Vencido</SelectItem>
-                  <SelectItem value="SEM DÉBITO">Pago / Sem Débito</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="col-span-1">
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger>
-                  <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
-                  <SelectValue placeholder="Tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos Tipos</SelectItem>
-                  <SelectItem value="ATIVO">Ativo</SelectItem>
-                  <SelectItem value="INATIVO">Inativo</SelectItem>
-                  <SelectItem value="BLOQUEADO">Bloqueado</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="col-span-1">
-              <Select value={groupFilter} onValueChange={setGroupFilter}>
-                <SelectTrigger>
-                  <Users className="w-4 h-4 mr-2 text-muted-foreground" />
-                  <SelectValue placeholder="Grupo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos Grupos</SelectItem>
-                  {uniqueGroups.map((g) => (
-                    <SelectItem key={g as string} value={g as string}>
-                      {g}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="col-span-1">
-              <Select value={routeFilter} onValueChange={setRouteFilter}>
-                <SelectTrigger>
-                  <MapPin className="w-4 h-4 mr-2 text-muted-foreground" />
-                  <SelectValue placeholder="Grupo Rota" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas Rotas</SelectItem>
-                  {uniqueRoutes.map((r) => (
-                    <SelectItem key={r as string} value={r as string}>
-                      {r}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="col-span-1">
-              <Select value={bairroFilter} onValueChange={setBairroFilter}>
-                <SelectTrigger>
-                  <MapPin className="w-4 h-4 mr-2 text-muted-foreground" />
-                  <SelectValue placeholder="Bairro" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos Bairros</SelectItem>
-                  {uniqueBairros.map((b) => (
-                    <SelectItem key={b as string} value={b as string}>
-                      {b}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="col-span-1">
-              <Select
-                value={municipioFilter}
-                onValueChange={setMunicipioFilter}
-              >
-                <SelectTrigger>
-                  <Building2 className="w-4 h-4 mr-2 text-muted-foreground" />
-                  <SelectValue placeholder="Município" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos Municípios</SelectItem>
-                  {uniqueMunicipios.map((m) => (
-                    <SelectItem key={m as string} value={m as string}>
-                      {m}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mt-4 items-center">
-            <div className="col-span-1 sm:col-span-2">
-              <div className="relative">
-                <Calendar className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+      {showFilters && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Filtros e Busca</CardTitle>
+            <CardDescription>
+              Refine a lista para focar nas cobranças prioritárias e organize
+              rotas.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-4">
+              <div className="col-span-1 sm:col-span-2 relative">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
-                  type="date"
+                  placeholder="Buscar por nome ou código..."
                   className="pl-8"
-                  value={vencimentoFilter}
-                  onChange={(e) => setVencimentoFilter(e.target.value)}
-                  placeholder="Vencimento"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                 />
+              </div>
+              <div className="col-span-1">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos Status</SelectItem>
+                    <SelectItem value="A VENCER">A Vencer</SelectItem>
+                    <SelectItem value="VENCIDO">Vencido</SelectItem>
+                    <SelectItem value="SEM DÉBITO">
+                      Pago / Sem Débito
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-1">
+                <Select value={typeFilter} onValueChange={setTypeFilter}>
+                  <SelectTrigger>
+                    <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
+                    <SelectValue placeholder="Tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos Tipos</SelectItem>
+                    <SelectItem value="ATIVO">Ativo</SelectItem>
+                    <SelectItem value="INATIVO">Inativo</SelectItem>
+                    <SelectItem value="BLOQUEADO">Bloqueado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-1">
+                <Select value={groupFilter} onValueChange={setGroupFilter}>
+                  <SelectTrigger>
+                    <Users className="w-4 h-4 mr-2 text-muted-foreground" />
+                    <SelectValue placeholder="Grupo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos Grupos</SelectItem>
+                    {uniqueGroups.map((g) => (
+                      <SelectItem key={g as string} value={g as string}>
+                        {g}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-1">
+                <Select value={routeFilter} onValueChange={setRouteFilter}>
+                  <SelectTrigger>
+                    <MapPin className="w-4 h-4 mr-2 text-muted-foreground" />
+                    <SelectValue placeholder="Grupo Rota" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas Rotas</SelectItem>
+                    {uniqueRoutes.map((r) => (
+                      <SelectItem key={r as string} value={r as string}>
+                        {r}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-1">
+                <Select value={bairroFilter} onValueChange={setBairroFilter}>
+                  <SelectTrigger>
+                    <MapPin className="w-4 h-4 mr-2 text-muted-foreground" />
+                    <SelectValue placeholder="Bairro" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos Bairros</SelectItem>
+                    {uniqueBairros.map((b) => (
+                      <SelectItem key={b as string} value={b as string}>
+                        {b}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-1">
+                <Select
+                  value={municipioFilter}
+                  onValueChange={setMunicipioFilter}
+                >
+                  <SelectTrigger>
+                    <Building2 className="w-4 h-4 mr-2 text-muted-foreground" />
+                    <SelectValue placeholder="Município" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos Municípios</SelectItem>
+                    {uniqueMunicipios.map((m) => (
+                      <SelectItem key={m as string} value={m as string}>
+                        {m}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
-            {/* NEW: Mode Toggle */}
-            <div className="col-span-1 sm:col-span-2 flex items-center space-x-2 border p-2 rounded-md bg-muted/20">
-              <Switch
-                id="cobranca-mode"
-                checked={isCobrancaMode}
-                onCheckedChange={setIsCobrancaMode}
-              />
-              <Label
-                htmlFor="cobranca-mode"
-                className="text-sm font-medium leading-none cursor-pointer"
-              >
-                Modo de Cobrança (Simplificado)
-              </Label>
-            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mt-4 items-center">
+              <div className="col-span-1 sm:col-span-2">
+                <div className="relative">
+                  <Calendar className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="date"
+                    className="pl-8"
+                    value={vencimentoFilter}
+                    onChange={(e) => setVencimentoFilter(e.target.value)}
+                    placeholder="Vencimento"
+                  />
+                </div>
+              </div>
 
-            <div className="col-span-1 sm:col-span-2 flex items-center space-x-2 border p-2 rounded-md bg-muted/20">
-              <Checkbox
-                id="rota-motoqueiro-filter"
-                checked={showSelectedOnly}
-                onCheckedChange={(checked) =>
-                  setShowSelectedOnly(checked === true)
-                }
-              />
-              <Label
-                htmlFor="rota-motoqueiro-filter"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-              >
-                Filtrar Rota Motoqueiro ({selectedClients.size})
-              </Label>
+              {/* NEW: Mode Toggle */}
+              <div className="col-span-1 sm:col-span-2 flex items-center space-x-2 border p-2 rounded-md bg-muted/20">
+                <Switch
+                  id="cobranca-mode"
+                  checked={isCobrancaMode}
+                  onCheckedChange={setIsCobrancaMode}
+                />
+                <Label
+                  htmlFor="cobranca-mode"
+                  className="text-sm font-medium leading-none cursor-pointer"
+                >
+                  Modo de Cobrança (Simplificado)
+                </Label>
+              </div>
+
+              <div className="col-span-1 sm:col-span-2 flex items-center space-x-2 border p-2 rounded-md bg-muted/20">
+                <Checkbox
+                  id="rota-motoqueiro-filter"
+                  checked={showSelectedOnly}
+                  onCheckedChange={(checked) =>
+                    setShowSelectedOnly(checked === true)
+                  }
+                />
+                <Label
+                  htmlFor="rota-motoqueiro-filter"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                >
+                  Filtrar Rota Motoqueiro ({selectedClients.size})
+                </Label>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Scrollable Container for Desktop List */}
       <ScrollArea className="h-[calc(100vh-250px)] min-h-[500px] border rounded-md bg-card">

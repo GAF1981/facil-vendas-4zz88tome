@@ -33,6 +33,8 @@ import {
   TrendingUp,
   Receipt,
   User,
+  FileText,
+  Printer,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { Link } from 'react-router-dom'
@@ -41,6 +43,8 @@ import { Employee } from '@/types/employee'
 import { employeesService } from '@/services/employeesService'
 import { useUserStore } from '@/stores/useUserStore'
 import { supabase } from '@/lib/supabase/client'
+import { acertoService } from '@/services/acertoService'
+import { format } from 'date-fns'
 
 export default function ResumoAcertosPage() {
   const { employee: loggedInUser } = useUserStore()
@@ -52,6 +56,9 @@ export default function ResumoAcertosPage() {
   // Employee Filter
   const [employees, setEmployees] = useState<Employee[]>([])
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('todos')
+
+  // Reprint State
+  const [reprintingId, setReprintingId] = useState<number | null>(null)
 
   const { toast } = useToast()
 
@@ -161,6 +168,39 @@ export default function ResumoAcertosPage() {
       fetchData(selectedRouteId)
     }
   }, [selectedRouteId, routes, fetchData])
+
+  const handleReprint = async (orderId: number) => {
+    setReprintingId(orderId)
+    try {
+      const pdfBlob = await acertoService.reprintOrder(
+        orderId,
+        loggedInUser?.nome_completo,
+      )
+      const url = window.URL.createObjectURL(pdfBlob)
+      const a = document.createElement('a')
+      a.href = url
+      const timestamp = format(new Date(), 'yyyyMMdd_HHmm')
+      a.download = `Pedido_${orderId}_${timestamp}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.URL.revokeObjectURL(url)
+      toast({
+        title: 'Download Iniciado',
+        description: 'O arquivo PDF está sendo baixado.',
+        className: 'bg-green-50 border-green-200 text-green-900',
+      })
+    } catch (error) {
+      console.error(error)
+      toast({
+        title: 'Erro ao gerar PDF',
+        description: 'Não foi possível reimprimir o documento.',
+        variant: 'destructive',
+      })
+    } finally {
+      setReprintingId(null)
+    }
+  }
 
   // Filter Data Client-Side
   const filteredData = useMemo(() => {
@@ -386,13 +426,14 @@ export default function ResumoAcertosPage() {
                   <TableHead>Pagto (BD)</TableHead>
                   <TableHead>Pagto (Receb.)</TableHead>
                   <TableHead className="text-right">Valor Pago</TableHead>
+                  <TableHead className="text-center w-[60px]">PDF</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading && data.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={9}
+                      colSpan={10}
                       className="h-32 text-center text-muted-foreground"
                     >
                       <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
@@ -402,7 +443,7 @@ export default function ResumoAcertosPage() {
                 ) : filteredData.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={9}
+                      colSpan={10}
                       className="h-32 text-center text-muted-foreground"
                     >
                       Nenhum acerto encontrado.
@@ -464,6 +505,22 @@ export default function ResumoAcertosPage() {
                       </TableCell>
                       <TableCell className="text-right font-bold text-green-600">
                         R$ {formatCurrency(row.totalPaid)}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-primary"
+                          onClick={() => handleReprint(row.orderId)}
+                          disabled={reprintingId === row.orderId}
+                          title="Reimprimir Pedido"
+                        >
+                          {reprintingId === row.orderId ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Printer className="h-4 w-4" />
+                          )}
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))
