@@ -21,6 +21,7 @@ import {
   CheckCheck,
   FileText,
   CalendarClock,
+  Printer,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -29,6 +30,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 interface FechamentoTableProps {
   data: FechamentoCaixa[]
@@ -114,7 +121,8 @@ export function FechamentoTable({ data, onRefresh }: FechamentoTableProps) {
       })
 
       // Pass true for forceClosed to simulate the just-closed state
-      await handleGeneratePdf(item, true)
+      // Defaulting to A4 for automatic generation
+      await handleGeneratePdf(item, 'A4', true)
       onRefresh()
     } catch (error) {
       console.error(error)
@@ -135,6 +143,7 @@ export function FechamentoTable({ data, onRefresh }: FechamentoTableProps) {
 
   const handleGeneratePdf = async (
     item: FechamentoCaixa,
+    format: 'A4' | '80mm' = 'A4',
     forceClosed: boolean = false,
   ) => {
     const pdfData = {
@@ -149,7 +158,7 @@ export function FechamentoTable({ data, onRefresh }: FechamentoTableProps) {
     try {
       await fechamentoService.generateClosingPdf(
         pdfData as FechamentoCaixa,
-        'A4',
+        format,
       )
     } catch (error: any) {
       console.error(error)
@@ -351,28 +360,45 @@ export function FechamentoTable({ data, onRefresh }: FechamentoTableProps) {
 
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              disabled={isGeneratingPdf}
-                              className="h-8 w-8 text-muted-foreground hover:text-blue-600"
-                              onClick={() => handleGeneratePdf(item)}
-                            >
-                              {isGeneratingPdf ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <FileText className="h-4 w-4" />
-                              )}
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Gerar Relatório PDF</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                      <DropdownMenu>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  disabled={isGeneratingPdf}
+                                  className="h-8 w-8 text-muted-foreground hover:text-blue-600"
+                                >
+                                  {isGeneratingPdf ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <FileText className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </DropdownMenuTrigger>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Gerar Relatório PDF</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => handleGeneratePdf(item, 'A4')}
+                          >
+                            <FileText className="mr-2 h-4 w-4" />
+                            Relatório A4
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleGeneratePdf(item, '80mm')}
+                          >
+                            <Printer className="mr-2 h-4 w-4" />
+                            Relatório Térmico (80mm)
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
 
                       {isClosed ? (
                         <Button
