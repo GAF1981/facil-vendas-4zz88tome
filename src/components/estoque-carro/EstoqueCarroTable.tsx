@@ -10,10 +10,10 @@ import {
 import { formatCurrency } from '@/lib/formatters'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { Eye, Filter, ListChecks } from 'lucide-react'
+import { Eye, Filter, Calculator } from 'lucide-react'
 import { useState, useMemo } from 'react'
 import { EstoqueCarroMovementDetailsDialog } from './EstoqueCarroMovementDetailsDialog'
-import { EstoqueCarroCountDialog } from './EstoqueCarroCountDialog' // Reuse or adapt
+import { EstoqueCarroCountDialog } from './EstoqueCarroCountDialog'
 import {
   Popover,
   PopoverContent,
@@ -191,14 +191,18 @@ export function EstoqueCarroTable({ items }: Props) {
                     <div className="flex flex-col">
                       <div className="flex items-center gap-2">
                         <span>{item.produto}</span>
+                        {/* Quick Count Icon */}
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity text-blue-600 hover:bg-blue-100"
-                          onClick={() => setCountItem(item)}
-                          title="Realizar Contagem"
+                          className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-blue-600 hover:bg-blue-100 ml-2"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setCountItem(item)
+                          }}
+                          title="Realizar Contagem Rápida"
                         >
-                          <ListChecks className="h-3.5 w-3.5" />
+                          <Calculator className="h-4 w-4" />
                         </Button>
                       </div>
                       {item.codigo && (
@@ -277,7 +281,12 @@ export function EstoqueCarroTable({ items }: Props) {
           open={!!countItem}
           onOpenChange={(o) => !o && setCountItem(null)}
           sessionId={countItem.id_estoque_carro}
-          onSuccess={() => window.location.reload()} // Simplified refresh for now
+          onSuccess={() => window.location.reload()}
+          preselectedProduct={{
+            id: countItem.produto_id,
+            codigo: countItem.codigo,
+            produto: countItem.produto,
+          }}
         />
       )}
     </>

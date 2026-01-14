@@ -1711,6 +1711,7 @@ export type Database = {
           funcionario_id: number
           id: number
           resolvida: boolean
+          responsavel_id: number | null
         }
         Insert: {
           cliente_id: number
@@ -1720,6 +1721,7 @@ export type Database = {
           funcionario_id: number
           id?: number
           resolvida?: boolean
+          responsavel_id?: number | null
         }
         Update: {
           cliente_id?: number
@@ -1729,6 +1731,7 @@ export type Database = {
           funcionario_id?: number
           id?: number
           resolvida?: boolean
+          responsavel_id?: number | null
         }
         Relationships: [
           {
@@ -1741,6 +1744,13 @@ export type Database = {
           {
             foreignKeyName: 'PENDENCIAS_funcionario_id_fkey'
             columns: ['funcionario_id']
+            isOneToOne: false
+            referencedRelation: 'FUNCIONARIOS'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'PENDENCIAS_responsavel_id_fkey'
+            columns: ['responsavel_id']
             isOneToOne: false
             referencedRelation: 'FUNCIONARIOS'
             referencedColumns: ['id']

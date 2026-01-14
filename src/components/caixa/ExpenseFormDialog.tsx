@@ -58,7 +58,6 @@ export function ExpenseFormDialog({
   const { toast } = useToast()
   const { employee: loggedInUser } = useUserStore()
 
-  // Helper to get local date string YYYY-MM-DD
   const getLocalDateString = () => {
     const date = new Date()
     const year = date.getFullYear()
@@ -80,12 +79,11 @@ export function ExpenseFormDialog({
       veiculo_id: '',
       prestador_servico: '',
       tipo_servico: '',
-      tipo_combustivel: 'gasolina', // Default set to gasolina per User Story
+      tipo_combustivel: 'gasolina', // Default per User Story
     },
   })
 
   const selectedGrupo = form.watch('grupo')
-  const selectedVehicle = form.watch('veiculo_id')
 
   useEffect(() => {
     if (open) {
@@ -95,7 +93,6 @@ export function ExpenseFormDialog({
 
       vehicleService.getActive().then(setVehicles).catch(console.error)
 
-      // Determine initial group based on context
       let initialGrupo = 'Alimentação' as const
       if (preselectedVehicleId) {
         initialGrupo = 'Abastecimento'
@@ -115,7 +112,7 @@ export function ExpenseFormDialog({
         veiculo_id: preselectedVehicleId ? preselectedVehicleId.toString() : '',
         prestador_servico: '',
         tipo_servico: '',
-        tipo_combustivel: 'gasolina' as const, // Ensure default is gasolina
+        tipo_combustivel: 'gasolina' as const,
       }
       form.reset(initialValues)
     }
@@ -132,19 +129,9 @@ export function ExpenseFormDialog({
       if (!form.getValues('detalhamento')) {
         form.setValue('detalhamento', 'Abastecimento')
       }
-      // Ensure fuel defaults to gasolina if switched to fuel group
+      // Force default if switched
       if (!form.getValues('tipo_combustivel')) {
         form.setValue('tipo_combustivel', 'gasolina')
-      }
-    } else if (selectedGrupo === 'Outros') {
-      const current = form.getValues('detalhamento')
-      if (
-        current === 'Alimentação' ||
-        current === 'Combustível' ||
-        current === 'Gasolina' ||
-        current === 'Abastecimento'
-      ) {
-        form.setValue('detalhamento', '')
       }
     }
   }, [selectedGrupo, form])
@@ -178,7 +165,6 @@ export function ExpenseFormDialog({
       return
     }
 
-    // Vehicle mandatory for Fuel and Maintenance
     if ((isFuel || data.grupo === 'Manutenção') && !data.veiculo_id) {
       form.setError('veiculo_id', {
         message: 'Veículo é obrigatório',
@@ -196,20 +182,19 @@ export function ExpenseFormDialog({
 
         if (currentOdometer < lastOdometer) {
           form.setError('hodometro', {
-            message: `Hodômetro inválido. Último registro: ${lastOdometer} km.`,
+            message: `Inválido. Menor que anterior (${lastOdometer} km).`,
           })
           return
         }
 
         if (currentOdometer - lastOdometer > 5000) {
           form.setError('hodometro', {
-            message: `Diferença suspeita (> 5000km). Último: ${lastOdometer} km.`,
+            message: `Inválido. Diferença > 5000km. Anterior: ${lastOdometer} km.`,
           })
           return
         }
       } catch (error) {
         console.error('Failed to validate odometer', error)
-        // Proceed with warning or block? Let's block if validation fails technically
         toast({
           title: 'Erro de Validação',
           description: 'Não foi possível validar o hodômetro.',
@@ -398,7 +383,7 @@ export function ExpenseFormDialog({
                   name="tipo_combustivel"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Tipo de Combustível</FormLabel>
+                      <FormLabel>Combustível</FormLabel>
                       <Select
                         onValueChange={field.onChange}
                         defaultValue={field.value}

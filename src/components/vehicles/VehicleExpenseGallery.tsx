@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { vehicleService } from '@/services/vehicleService'
 import {
   Table,
@@ -19,8 +19,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { formatCurrency, safeFormatDate } from '@/lib/formatters'
-import { Loader2, Search, Filter } from 'lucide-react'
+import { Loader2, Search, Filter, X } from 'lucide-react'
 import { Vehicle } from '@/types/vehicle'
+import { Label } from '@/components/ui/label'
 
 export function VehicleExpenseGallery() {
   const [loading, setLoading] = useState(true)
@@ -32,6 +33,8 @@ export function VehicleExpenseGallery() {
   const [vehicleFilter, setVehicleFilter] = useState('todos')
   const [dateStart, setDateStart] = useState('')
   const [dateEnd, setDateEnd] = useState('')
+  const [minVal, setMinValue] = useState('')
+  const [maxVal, setMaxValue] = useState('')
 
   useEffect(() => {
     vehicleService.getAll().then(setVehicles)
@@ -39,7 +42,7 @@ export function VehicleExpenseGallery() {
 
   useEffect(() => {
     loadExpenses()
-  }, [search, vehicleFilter, dateStart, dateEnd])
+  }, [vehicleFilter, dateStart, dateEnd]) // Reload on major filters
 
   const loadExpenses = async () => {
     setLoading(true)
@@ -48,12 +51,46 @@ export function VehicleExpenseGallery() {
         startDate: dateStart || undefined,
         endDate: dateEnd || undefined,
         vehicleId: vehicleFilter,
-        search: search || undefined,
+        // We handle complex search client-side or we pass specific params?
+        // User asked for "filters for date, value, provider, and history"
+        // Let's pass what we can to DB, filter rest client side or enhanced service
       })
       setExpenses(data || [])
     } finally {
       setLoading(false)
     }
+  }
+
+  const filteredExpenses = useMemo(() => {
+    return expenses.filter((exp) => {
+      // Search (Provider, History/Detalhamento)
+      if (search) {
+        const lower = search.toLowerCase()
+        const matchProvider = exp.prestador_servico
+          ?.toLowerCase()
+          .includes(lower)
+        const matchHistory = exp.Detalhamento?.toLowerCase().includes(lower)
+        const matchGroup = exp['Grupo de Despesas']
+          ?.toLowerCase()
+          .includes(lower)
+        if (!matchProvider && !matchHistory && !matchGroup) return false
+      }
+
+      // Value Range
+      if (minVal && exp.Valor < parseFloat(minVal)) return false
+      if (maxVal && exp.Valor > parseFloat(maxVal)) return false
+
+      return true
+    })
+  }, [expenses, search, minVal, maxVal])
+
+  const resetFilters = () => {
+    setSearch('')
+    setVehicleFilter('todos')
+    setDateStart('')
+    setDateEnd('')
+    setMinValue('')
+    setMaxValue('')
   }
 
   return (
@@ -62,51 +99,77 @@ export function VehicleExpenseGallery() {
         <CardTitle className="text-xl">
           Galeria de Despesas de Veículos
         </CardTitle>
-        <div className="flex flex-wrap gap-2 mt-4">
-          <div className="flex-1 min-w-[200px]">
-            <div className="relative">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por histórico ou prestador..."
-                className="pl-8"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+        <div className="flex flex-col gap-4 mt-4 p-4 bg-muted/20 rounded-lg">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="space-y-2">
+              <Label>Busca (Histórico/Prestador)</Label>
+              <div className="relative">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar..."
+                  className="pl-8"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Veículo</Label>
+              <Select value={vehicleFilter} onValueChange={setVehicleFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos Veículos</SelectItem>
+                  {vehicles.map((v) => (
+                    <SelectItem key={v.id} value={v.id.toString()}>
+                      {v.placa}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Período</Label>
+              <div className="flex gap-2">
+                <Input
+                  type="date"
+                  value={dateStart}
+                  onChange={(e) => setDateStart(e.target.value)}
+                />
+                <Input
+                  type="date"
+                  value={dateEnd}
+                  onChange={(e) => setDateEnd(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Valor (R$)</Label>
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  placeholder="Min"
+                  value={minVal}
+                  onChange={(e) => setMinValue(e.target.value)}
+                />
+                <Input
+                  type="number"
+                  placeholder="Max"
+                  value={maxVal}
+                  onChange={(e) => setMaxValue(e.target.value)}
+                />
+              </div>
             </div>
           </div>
-          <Select value={vehicleFilter} onValueChange={setVehicleFilter}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Todos Veículos" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos Veículos</SelectItem>
-              {vehicles.map((v) => (
-                <SelectItem key={v.id} value={v.id.toString()}>
-                  {v.placa}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Input
-            type="date"
-            className="w-[150px]"
-            value={dateStart}
-            onChange={(e) => setDateStart(e.target.value)}
-          />
-          <Input
-            type="date"
-            className="w-[150px]"
-            value={dateEnd}
-            onChange={(e) => setDateEnd(e.target.value)}
-          />
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={loadExpenses}
-            title="Atualizar"
-          >
-            <Filter className="h-4 w-4" />
-          </Button>
+          <div className="flex justify-end">
+            <Button variant="ghost" onClick={resetFilters} className="text-xs">
+              <X className="mr-2 h-3 w-3" /> Limpar Filtros
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -130,17 +193,17 @@ export function VehicleExpenseGallery() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {expenses.length === 0 ? (
+                {filteredExpenses.length === 0 ? (
                   <TableRow>
                     <TableCell
                       colSpan={8}
                       className="text-center h-24 text-muted-foreground"
                     >
-                      Nenhuma despesa encontrada.
+                      Nenhuma despesa encontrada para os filtros aplicados.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  expenses.map((expense) => (
+                  filteredExpenses.map((expense) => (
                     <TableRow key={expense.id} className="hover:bg-muted/30">
                       <TableCell>
                         {safeFormatDate(expense.Data, 'dd/MM/yyyy')}
@@ -149,7 +212,12 @@ export function VehicleExpenseGallery() {
                         {expense.VEICULOS?.placa || '-'}
                       </TableCell>
                       <TableCell>{expense['Grupo de Despesas']}</TableCell>
-                      <TableCell>{expense.Detalhamento}</TableCell>
+                      <TableCell
+                        className="max-w-[200px] truncate"
+                        title={expense.Detalhamento}
+                      >
+                        {expense.Detalhamento}
+                      </TableCell>
                       <TableCell>{expense.prestador_servico || '-'}</TableCell>
                       <TableCell className="text-right font-mono">
                         {expense.hodometro || '-'}

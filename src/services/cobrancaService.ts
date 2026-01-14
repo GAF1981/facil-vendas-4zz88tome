@@ -7,27 +7,23 @@ import {
   CollectionActionInsert,
   LatestCollectionActionView,
 } from '@/types/cobranca'
-import { parseCurrency } from '@/lib/formatters'
 import { isBefore, parseISO, startOfDay, isValid } from 'date-fns'
 
 export const cobrancaService = {
   async getDebts(): Promise<ClientDebt[]> {
     const today = startOfDay(new Date())
 
-    // 1. Fetch Debts from debitos_historico (Primary Source for Debt Logic)
-    // ADDED: order by pedido_id DESC to ensure new orders (like 392, 393) appear even if limit is hit
     const { data: debtsData, error: debtsError } = await supabase
       .from('debitos_historico')
       .select(
         'pedido_id, cliente_codigo, cliente_nome, valor_venda, valor_pago, debito, data_acerto, vendedor_nome, rota_id, saldo_a_pagar',
       )
-      .gt('debito', 1) // Only fetch relevant debts > 1.00
+      .gt('debito', 1)
       .order('pedido_id', { ascending: false })
       .limit(50000)
 
     if (debtsError) throw debtsError
 
-    // Safe filtering for valid debts
     const validDebts = (debtsData || []).filter(
       (d) => d && d.pedido_id != null && d.debito != null,
     )
@@ -36,7 +32,6 @@ export const cobrancaService = {
 
     if (orderIds.length === 0) return []
 
-    // 2. Fetch Client Info (Address, etc)
     const clientIds = [
       ...new Set(
         validDebts
@@ -59,7 +54,6 @@ export const cobrancaService = {
     >()
 
     if (clientIds.length > 0) {
-      // Chunking for large sets of clients
       const chunkSize = 1000
       for (let i = 0; i < clientIds.length; i += chunkSize) {
         const chunk = clientIds.slice(i, i + chunkSize)
@@ -89,8 +83,6 @@ export const cobrancaService = {
       }
     }
 
-    // 3. Fetch Latest Collection Actions (Negotiated Installments)
-    // Chunking orderIds
     const actionsMap = new Map<number, LatestCollectionActionView[]>()
     const chunkSize = 1000
     for (let i = 0; i < orderIds.length; i += chunkSize) {
@@ -113,7 +105,6 @@ export const cobrancaService = {
       })
     }
 
-    // 4. Fetch Receipts (RECEBIMENTOS) for payments made and fallback installments
     const paymentsMap = new Map<
       number,
       {
@@ -160,13 +151,10 @@ export const cobrancaService = {
       })
     }
 
-    // 5. Construct Data Structure
     const clientsMap = new Map<number, ClientDebt>()
 
     validDebts.forEach((debt) => {
-      // Basic Order Info from debitos_historico
       const pid = debt.pedido_id
-      // Robustly handle null client codes by defaulting to 0 (which shouldn't happen due to filter, but robust)
       const cid = debt.cliente_codigo ?? 0
 
       const rawDebt = Number(debt.debito) || 0
@@ -175,7 +163,6 @@ export const cobrancaService = {
       const dateAcerto = debt.data_acerto || new Date().toISOString()
       const saldoPagar = Number(debt.saldo_a_pagar) || 0
 
-      // Determine Installments
       let installments: Receivable[] = []
       const actionRows = actionsMap.get(pid)
       const paymentInfo = paymentsMap.get(pid) || {
@@ -184,9 +171,7 @@ export const cobrancaService = {
         rawInstallments: [],
       }
 
-      // Logic: If Negotiated Actions exist, use them. Else use Receipts.
       if (actionRows && actionRows.length > 0) {
-        // Use Negotiated Installments
         installments = actionRows.map((row) => {
           const vDate = row.installment_vencimento
           const parsedDate = vDate ? parseISO(vDate) : null
@@ -197,7 +182,7 @@ export const cobrancaService = {
             id: row.installment_id || 0,
             vencimento: vDate || null,
             valorRegistrado: Number(row.installment_valor) || 0,
-            valorPago: 0, // Negotiated are usually unpaid "promises"
+            valorPago: 0,
             formaPagamento: row.installment_forma_pagamento || 'Outros',
             status: isOverdue ? 'VENCIDO' : 'A VENCER',
             formaCobranca: null,
@@ -206,7 +191,6 @@ export const cobrancaService = {
           }
         })
       } else {
-        // Use RECEBIMENTOS
         installments = paymentInfo.rawInstallments.map((r) => {
           const valReg = Number(r.valor_registrado) || 0
           const valPago = Number(r.valor_pago) || 0
@@ -240,7 +224,6 @@ export const cobrancaService = {
         })
       }
 
-      // Fallback if no installments found at all
       if (installments.length === 0) {
         installments.push({
           id: -pid,
@@ -255,7 +238,6 @@ export const cobrancaService = {
         })
       }
 
-      // Determine Order Status based on installments AND debt logic
       let status: 'VENCIDO' | 'A VENCER' | 'SEM DÉBITO' = 'SEM DÉBITO'
       let oldestOverdue: string | null = null
 
@@ -271,7 +253,6 @@ export const cobrancaService = {
         }
       }
 
-      // Construct Order Object
       const orderObj: OrderDebt = {
         orderId: pid,
         date: dateAcerto,
@@ -287,11 +268,10 @@ export const cobrancaService = {
         oldestOverdueDate: oldestOverdue,
         formaPagamento: 'N/D',
         valorDevido: rawDebt,
-        collectionActionCount: actionRows ? 1 : 0,
+        collectionActionCount: actionRows ? actionRows.length : 0, // Updated to count actual rows
         employeeName: debt.vendedor_nome || null,
       }
 
-      // Add to Client
       if (!clientsMap.has(cid)) {
         const cInfo = clientInfoMap.get(cid)
         clientsMap.set(cid, {
@@ -319,7 +299,6 @@ export const cobrancaService = {
       client.orderCount++
       client.orders.push(orderObj)
 
-      // Update Client Aggregate Status
       if (status === 'VENCIDO') client.status = 'VENCIDO'
       else if (status === 'A VENCER' && client.status !== 'VENCIDO')
         client.status = 'A VENCER'
@@ -327,7 +306,6 @@ export const cobrancaService = {
       if (dateAcerto > client.lastAcertoDate) client.lastAcertoDate = dateAcerto
     })
 
-    // Final sorting
     return Array.from(clientsMap.values()).sort(
       (a, b) => b.totalDebt - a.totalDebt,
     )
@@ -345,8 +323,6 @@ export const cobrancaService = {
     },
   ) {
     if (receivableId < 0) {
-      // Synthetic ID: We need to materialize this into RECEBIMENTOS first
-      // 1. Fetch Order Context
       const { data: orderData, error: orderError } = await supabase
         .from('BANCO_DE_DADOS')
         .select('"CÓDIGO DO CLIENTE", "CODIGO FUNCIONARIO", "NÚMERO DO PEDIDO"')
@@ -360,7 +336,6 @@ export const cobrancaService = {
         )
       }
 
-      // 2. Insert new RECEBIMENTOS row
       const insertPayload = {
         venda_id: orderId,
         cliente_id: orderData['CÓDIGO DO CLIENTE'],
@@ -378,7 +353,6 @@ export const cobrancaService = {
 
       if (insertError) throw insertError
     } else {
-      // Real ID: Direct Update
       const { error } = await supabase
         .from('RECEBIMENTOS')
         .update({ [field]: value } as any)
@@ -430,7 +404,6 @@ export const cobrancaService = {
       cliente_nome: action.clienteNome,
     }
 
-    // Insert Main Action
     const { data: insertedAction, error } = await supabase
       .from('acoes_cobranca')
       .insert(payload)
@@ -439,7 +412,6 @@ export const cobrancaService = {
 
     if (error) throw error
 
-    // Insert Installments if present
     if (action.installments && action.installments.length > 0) {
       const installmentsPayload = action.installments.map((inst) => ({
         acao_cobranca_id: insertedAction.id,
@@ -458,19 +430,15 @@ export const cobrancaService = {
     }
 
     if (action.novaDataCombinada) {
-      const { error: bdError } = await supabase
+      await supabase
         .from('BANCO_DE_DADOS')
         .update({ data_combinada: action.novaDataCombinada } as any)
         .eq('"NÚMERO DO PEDIDO"', action.pedidoId)
 
-      if (bdError) console.error('Error updating BANCO_DE_DADOS:', bdError)
-
-      const { error: recError } = await supabase
+      await supabase
         .from('RECEBIMENTOS')
         .update({ data_combinada: action.novaDataCombinada } as any)
         .eq('venda_id', action.pedidoId)
-
-      if (recError) console.error('Error updating RECEBIMENTOS:', recError)
     }
   },
 

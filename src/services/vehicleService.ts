@@ -59,6 +59,7 @@ export const vehicleService = {
       .eq('veiculo_id', vehicleId)
       .not('hodometro', 'is', null)
       .order('Data', { ascending: false }) // Order by Date descending
+      .order('id', { ascending: false }) // Tie breaker
       .limit(1)
       .maybeSingle()
 
@@ -107,11 +108,8 @@ export const vehicleService = {
     if (filters?.vehicleId && filters.vehicleId !== 'todos') {
       query = query.eq('veiculo_id', filters.vehicleId)
     }
-    if (filters?.search) {
-      query = query.or(
-        `Detalhamento.ilike.%${filters.search}%,prestador_servico.ilike.%${filters.search}%`,
-      )
-    }
+    // Note: Search and value range filtering is handled client-side for flexibility
+    // unless performance becomes an issue with massive datasets
 
     const { data, error } = await query
 

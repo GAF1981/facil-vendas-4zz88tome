@@ -51,7 +51,6 @@ interface DebtTableProps {
   onToggleAll?: (ids: string[]) => void
 }
 
-// Flattened row type for display
 interface FlatRow {
   uniqueId: string
   receivableId: number

@@ -55,7 +55,6 @@ export const rotaService = {
   },
 
   async finishAndStartNewRoute(currentRotaId: number) {
-    // 1. Determine Next ID
     const { data: maxIdData } = await supabase
       .from('ROTA')
       .select('id')
@@ -65,7 +64,6 @@ export const rotaService = {
 
     const nextId = (maxIdData?.id || currentRotaId) + 1
 
-    // 2. Create the New Rota (Opened)
     const { data: newRota, error: startError } = await supabase
       .from('ROTA')
       .insert({
@@ -77,8 +75,6 @@ export const rotaService = {
 
     if (startError) throw startError
 
-    // 3. Transfer Unattended Items from Old to New
-    // Using the NEW SQL function that handles persistence logic (v3) which increments x_na_rota
     const { error: transferError } = await supabase.rpc(
       'transfer_unattended_items_v3',
       {
@@ -91,7 +87,6 @@ export const rotaService = {
       console.error('Error transferring unattended items:', transferError)
     }
 
-    // 4. Close the Old Rota
     const { error: endError } = await supabase
       .from('ROTA')
       .update({
@@ -109,7 +104,7 @@ export const rotaService = {
       .from('ROTA_ITEMS')
       .select('*')
       .eq('rota_id', rotaId)
-      .limit(50000) // Added limit to ensure full fetch for large routes
+      .limit(50000)
 
     if (error) throw error
     return data as RotaItem[]
@@ -147,29 +142,86 @@ export const rotaService = {
     }
   },
 
+  // Robust implementation to prevent full page crash
   async getFullRotaData(rota: Rota | null) {
-    // 1. Fetch all Clients
+    // 1. Fetch all Clients (Critical - must fail if this fails)
     const { data: clients, error: clientsError } = await supabase
       .from('CLIENTES')
       .select('*')
       .in('TIPO DE CLIENTE', ['ATIVO', 'INATIVO - ROTA'])
       .order('CODIGO', { ascending: false })
-      .limit(100000) // Increased limit for full dataset coverage
+      .limit(100000)
 
     if (clientsError) throw clientsError
     if (!clients) return []
 
-    // 2. Optimized Debt Fetching
-    // Explicitly fetching a large number of rows to avoid missing debts (like order #392) due to default 1000 limit
-    const { data: debtData, error: debtError } = await supabase
-      .from('debitos_historico')
-      .select('cliente_codigo, debito, data_acerto, pedido_id')
-      .limit(100000) // Crucial Fix: Increased limit to ensure all debts are fetched
-
-    if (debtError) {
-      console.error('Error fetching debitos_historico:', debtError)
+    // Helper to safely run promises
+    const safeFetch = async <T>(
+      promise: Promise<T>,
+      fallback: T,
+      name: string,
+    ): Promise<T> => {
+      try {
+        return await promise
+      } catch (e) {
+        console.warn(`Failed to fetch ${name}, using fallback.`, e)
+        return fallback
+      }
     }
 
+    // Parallel fetch for non-dependent data
+    const [
+      debtData,
+      allPendencies,
+      rotaItems,
+      projectionsReport,
+      statsData,
+      consignedData,
+    ] = await Promise.all([
+      safeFetch(
+        supabase
+          .from('debitos_historico')
+          .select('cliente_codigo, debito, data_acerto, pedido_id')
+          .limit(100000)
+          .then(({ data, error }) => {
+            if (error) throw error
+            return data
+          }),
+        [],
+        'debts',
+      ),
+      safeFetch(pendenciasService.getAll(false), [], 'pendencies'),
+      rota
+        ? safeFetch(this.getRotaItems(rota.id), [], 'rotaItems')
+        : Promise.resolve([]),
+      safeFetch(reportsService.getProjectionsReport(), [], 'projections'),
+      safeFetch(
+        supabase
+          .from('client_stats_view' as any)
+          .select('client_id, max_pedido, max_data_acerto')
+          .limit(100000)
+          .then(({ data, error }) => {
+            if (error) throw error
+            return data
+          }),
+        [],
+        'stats',
+      ),
+      safeFetch(
+        supabase
+          .from('view_client_latest_consigned_value' as any)
+          .select('*')
+          .limit(100000)
+          .then(({ data, error }) => {
+            if (error) throw error
+            return data
+          }),
+        [],
+        'consigned',
+      ),
+    ])
+
+    // Process Debts
     const debtMap = new Map<
       number,
       { totalDebt: number; orderCount: number; oldestDate: string | null }
@@ -199,7 +251,6 @@ export const rotaService = {
 
         if (val > 0.01) {
           entry.orderCount += 1
-
           if (row.pedido_id) {
             ordersWithDebt.add(row.pedido_id)
             orderDataMap.set(row.pedido_id, {
@@ -207,7 +258,6 @@ export const rotaService = {
               dataAcerto: row.data_acerto || null,
             })
           }
-
           if (row.data_acerto) {
             if (!entry.oldestDate || row.data_acerto < entry.oldestDate) {
               entry.oldestDate = row.data_acerto
@@ -217,25 +267,19 @@ export const rotaService = {
       })
     }
 
-    // 3. Fetch Pendencies
-    const allPendencies = await pendenciasService.getAll(false)
+    // Process Pendencies
     const pendencyMap = new Map<number, string[]>()
-
     allPendencies.forEach((p) => {
       const existing = pendencyMap.get(p.cliente_id) || []
       existing.push(p.descricao_pendencia)
       pendencyMap.set(p.cliente_id, existing)
     })
 
-    // 4. Fetch Rota Items
-    let rotaItemsMap = new Map<number, RotaItem>()
-    if (rota) {
-      const items = await this.getRotaItems(rota.id)
-      items.forEach((i) => rotaItemsMap.set(i.cliente_id, i))
-    }
+    // Process Rota Items
+    const rotaItemsMap = new Map<number, RotaItem>()
+    rotaItems.forEach((i) => rotaItemsMap.set(i.cliente_id, i))
 
-    // 5. Fetch Projections
-    const projectionsReport = await reportsService.getProjectionsReport()
+    // Process Projections
     const orderProjectionMap = new Map<number, number>()
     projectionsReport.forEach((p) => {
       if (p.projection !== null) {
@@ -243,26 +287,12 @@ export const rotaService = {
       }
     })
 
-    // 6. Fetch basic Summary Stats
-    const { data: statsData, error: statsError } = await supabase
-      .from('client_stats_view' as any)
-      .select('client_id, max_pedido, max_data_acerto')
-      .limit(100000) // Increased limit
-
-    if (statsError) {
-      console.error('Error fetching client stats view:', statsError)
-    }
-
+    // Process Stats
     const statsMap = new Map<
       number,
-      {
-        lastDate: string | null
-        lastOrderId: number | null
-      }
+      { lastDate: string | null; lastOrderId: number | null }
     >()
-
     const orderIdsForStock = new Set<number>()
-
     statsData?.forEach((row: any) => {
       const cid = row.client_id
       if (!cid) return
@@ -275,45 +305,7 @@ export const rotaService = {
       }
     })
 
-    // 7. Fetch Stock Values
-    const stockMapByOrder = new Map<
-      number,
-      { value: number; clientId: number }
-    >()
-    const orderIdsArray = Array.from(orderIdsForStock)
-
-    if (orderIdsArray.length > 0) {
-      const chunkSize = 1000
-      for (let i = 0; i < orderIdsArray.length; i += chunkSize) {
-        const chunk = orderIdsArray.slice(i, i + chunkSize)
-        const { data: stockRows, error: stockError } = await supabase
-          .from('QUANTIDADE DE ESTOQUE FINAL')
-          .select(
-            'pedido_id:"NUMERO DO PEDIDO", client_id:"CÓDIGO DO CLIENTE", valor_total:"VALOR ESTOQUE SALDO FINAL"',
-          )
-          .in('"NUMERO DO PEDIDO"', chunk)
-
-        if (!stockError) {
-          stockRows?.forEach((row: any) => {
-            const orderId = Number(row.pedido_id)
-            const clientId = Number(row.client_id)
-            const val = Number(row.valor_total) || 0
-            if (orderId && clientId) {
-              if (!stockMapByOrder.has(orderId)) {
-                stockMapByOrder.set(orderId, { value: val, clientId: clientId })
-              }
-            }
-          })
-        }
-      }
-    }
-
-    // 8. Fetch Consigned Values
-    const { data: consignedData } = await supabase
-      .from('view_client_latest_consigned_value' as any)
-      .select('*')
-      .limit(100000)
-
+    // Process Consigned
     const consignedMap = new Map<number, number>()
     if (consignedData) {
       consignedData.forEach((row: any) => {
@@ -321,7 +313,48 @@ export const rotaService = {
       })
     }
 
-    // 9. Fetch Oldest Unpaid Due Date (Vencimento)
+    // Secondary Fetches (Dependent on primary results)
+    const stockMapByOrder = new Map<
+      number,
+      { value: number; clientId: number }
+    >()
+    const orderIdsArray = Array.from(orderIdsForStock)
+
+    // Stock Fetching (Optimized Chunking + Error Handling)
+    if (orderIdsArray.length > 0) {
+      const chunkSize = 1000
+      for (let i = 0; i < orderIdsArray.length; i += chunkSize) {
+        const chunk = orderIdsArray.slice(i, i + chunkSize)
+        await safeFetch(
+          supabase
+            .from('QUANTIDADE DE ESTOQUE FINAL')
+            .select(
+              'pedido_id:"NUMERO DO PEDIDO", client_id:"CÓDIGO DO CLIENTE", valor_total:"VALOR ESTOQUE SALDO FINAL"',
+            )
+            .in('"NUMERO DO PEDIDO"', chunk)
+            .then(({ data, error }) => {
+              if (error) throw error
+              data?.forEach((row: any) => {
+                const orderId = Number(row.pedido_id)
+                const clientId = Number(row.client_id)
+                const val = Number(row.valor_total) || 0
+                if (orderId && clientId) {
+                  if (!stockMapByOrder.has(orderId)) {
+                    stockMapByOrder.set(orderId, {
+                      value: val,
+                      clientId: clientId,
+                    })
+                  }
+                }
+              })
+            }),
+          null,
+          'stock chunk',
+        )
+      }
+    }
+
+    // Oldest Unpaid Date Fetching
     const clientOldestDueMap = new Map<number, string>()
     const ordersWithDebtArray = Array.from(ordersWithDebt)
     const orderExplicitDateMap = new Map<number, string>()
@@ -332,76 +365,77 @@ export const rotaService = {
       for (let i = 0; i < ordersWithDebtArray.length; i += chunkSize) {
         const chunk = ordersWithDebtArray.slice(i, i + chunkSize)
 
-        // A. Fetch Negotiated Actions
-        const { data: actionsData } = await supabase
-          .from('acoes_cobranca')
-          .select(
-            'pedido_id, acoes_cobranca_vencimentos(vencimento, valor, id)',
-          )
-          .in('pedido_id', chunk)
-
-        if (actionsData) {
-          actionsData.forEach((action: any) => {
-            const pid = action.pedido_id
-            if (!pid) return
-
-            const installments = action.acoes_cobranca_vencimentos
-            if (installments && installments.length > 0) {
-              const dates = installments
-                .map((inst: any) => inst.vencimento)
-                .filter(Boolean)
-                .sort()
-
-              if (dates.length > 0) {
-                orderExplicitDateMap.set(pid, dates[0])
-                ordersWithExplicitDates.add(pid)
-              }
-            }
-          })
-        }
-
-        // B. Fetch Receivables
-        const { data: recData } = await supabase
-          .from('RECEBIMENTOS')
-          .select('venda_id, vencimento, valor_pago, valor_registrado')
-          .in('venda_id', chunk)
-          .gt('valor_registrado', 0)
-
-        if (recData) {
-          const unpaidRecs = recData.filter(
-            (r: any) => (r.valor_pago || 0) < (r.valor_registrado || 0),
-          )
-
-          const recDatesByOrder = new Map<number, string[]>()
-          unpaidRecs.forEach((r: any) => {
-            const pid = r.venda_id
-            if (pid && r.vencimento) {
-              if (!recDatesByOrder.has(pid)) recDatesByOrder.set(pid, [])
-              recDatesByOrder.get(pid)!.push(r.vencimento)
-            }
-          })
-
-          recDatesByOrder.forEach((dates, pid) => {
-            if (!ordersWithExplicitDates.has(pid) && dates.length > 0) {
-              dates.sort()
-              orderExplicitDateMap.set(pid, dates[0])
-              ordersWithExplicitDates.add(pid)
-            }
-          })
-        }
+        await Promise.all([
+          // A. Negotiated Actions
+          safeFetch(
+            supabase
+              .from('acoes_cobranca')
+              .select(
+                'pedido_id, acoes_cobranca_vencimentos(vencimento, valor, id)',
+              )
+              .in('pedido_id', chunk)
+              .then(({ data }) => {
+                data?.forEach((action: any) => {
+                  const pid = action.pedido_id
+                  if (!pid) return
+                  const installments = action.acoes_cobranca_vencimentos
+                  if (installments && installments.length > 0) {
+                    const dates = installments
+                      .map((inst: any) => inst.vencimento)
+                      .filter(Boolean)
+                      .sort()
+                    if (dates.length > 0) {
+                      orderExplicitDateMap.set(pid, dates[0])
+                      ordersWithExplicitDates.add(pid)
+                    }
+                  }
+                })
+              }),
+            null,
+            'collection actions',
+          ),
+          // B. Receivables
+          safeFetch(
+            supabase
+              .from('RECEBIMENTOS')
+              .select('venda_id, vencimento, valor_pago, valor_registrado')
+              .in('venda_id', chunk)
+              .gt('valor_registrado', 0)
+              .then(({ data }) => {
+                if (data) {
+                  const unpaidRecs = data.filter(
+                    (r: any) => (r.valor_pago || 0) < (r.valor_registrado || 0),
+                  )
+                  const recDatesByOrder = new Map<number, string[]>()
+                  unpaidRecs.forEach((r: any) => {
+                    const pid = r.venda_id
+                    if (pid && r.vencimento) {
+                      if (!recDatesByOrder.has(pid))
+                        recDatesByOrder.set(pid, [])
+                      recDatesByOrder.get(pid)!.push(r.vencimento)
+                    }
+                  })
+                  recDatesByOrder.forEach((dates, pid) => {
+                    if (!ordersWithExplicitDates.has(pid) && dates.length > 0) {
+                      dates.sort()
+                      orderExplicitDateMap.set(pid, dates[0])
+                      ordersWithExplicitDates.add(pid)
+                    }
+                  })
+                }
+              }),
+            null,
+            'receivables',
+          ),
+        ])
       }
     }
 
     ordersWithDebtArray.forEach((pid) => {
       const info = orderDataMap.get(pid)
       if (!info) return
-
       let date = orderExplicitDateMap.get(pid)
-
-      if (!date && info.dataAcerto) {
-        date = info.dataAcerto
-      }
-
+      if (!date && info.dataAcerto) date = info.dataAcerto
       if (date) {
         const currentMin = clientOldestDueMap.get(info.clientId)
         if (!currentMin || date < currentMin) {
@@ -410,33 +444,44 @@ export const rotaService = {
       }
     })
 
-    // 10. Check for Completed Status (Activity during Rota)
+    // Completed Status Logic
     const completedSet = new Set<number>()
     if (rota) {
       const startDate = rota.data_inicio
       const endDate = rota.data_fim || new Date().toISOString()
 
-      const { data: visits } = await supabase
-        .from('BANCO_DE_DADOS')
-        .select('"CÓDIGO DO CLIENTE"')
-        .gte('"DATA E HORA"', startDate)
-        .limit(50000) // Increased limit
-
-      visits?.forEach((v) => {
-        const cid = v['CÓDIGO DO CLIENTE']
-        if (cid) completedSet.add(cid)
-      })
-
-      const { data: payments } = await supabase
-        .from('RECEBIMENTOS')
-        .select('cliente_id')
-        .gte('created_at', startDate)
-        .lte('created_at', endDate)
-        .limit(50000) // Increased limit
-
-      payments?.forEach((p) => {
-        if (p.cliente_id) completedSet.add(p.cliente_id)
-      })
+      await Promise.all([
+        safeFetch(
+          supabase
+            .from('BANCO_DE_DADOS')
+            .select('"CÓDIGO DO CLIENTE"')
+            .gte('"DATA E HORA"', startDate)
+            .limit(50000)
+            .then(({ data }) => {
+              data?.forEach((v) => {
+                const cid = v['CÓDIGO DO CLIENTE']
+                if (cid) completedSet.add(cid)
+              })
+            }),
+          null,
+          'completed visits',
+        ),
+        safeFetch(
+          supabase
+            .from('RECEBIMENTOS')
+            .select('cliente_id')
+            .gte('created_at', startDate)
+            .lte('created_at', endDate)
+            .limit(50000)
+            .then(({ data }) => {
+              data?.forEach((p) => {
+                if (p.cliente_id) completedSet.add(p.cliente_id)
+              })
+            }),
+          null,
+          'completed payments',
+        ),
+      ])
     }
 
     const today = startOfDay(new Date())
@@ -460,10 +505,8 @@ export const rotaService = {
           stockValue = stockInfo.value
       }
 
-      // Vencimento Status Logic
       let vencimentoStatus: 'VENCIDO' | 'A VENCER' | 'PAGO' | 'SEM DÉBITO' =
         'SEM DÉBITO'
-
       const oldestDue = clientOldestDueMap.get(cid)
       const effectiveDebt = debtEntry?.totalDebt || 0
 
@@ -515,6 +558,6 @@ export const rotaService = {
   },
 
   async checkAndDecrementXNaRota() {
-    // No-op - DB triggers/logic handle this
+    // Logic handled by DB triggers/transfers
   },
 }

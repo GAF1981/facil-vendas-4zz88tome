@@ -51,23 +51,31 @@ export default function RotaPage() {
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const [active, last, empRes] = await Promise.all([
+      // Fetch core data in parallel but handle independent failures
+      const [active, last] = await Promise.all([
         rotaService.getActiveRota(),
         rotaService.getLastRota(),
-        employeesService.getEmployees(1, 1000),
       ])
       setActiveRota(active)
       setLastRota(last)
 
-      const allEmployees = empRes.data
-      const activeSellers = allEmployees.filter(
-        (e) =>
-          e.situacao === 'ATIVO' &&
-          Array.isArray(e.setor) &&
-          e.setor.includes('Vendedor'),
-      )
-      setSellers(activeSellers)
+      // Employees are secondary but important
+      let allEmployees: Employee[] = []
+      try {
+        const empRes = await employeesService.getEmployees(1, 1000)
+        allEmployees = empRes.data
+        const activeSellers = allEmployees.filter(
+          (e) =>
+            e.situacao === 'ATIVO' &&
+            Array.isArray(e.setor) &&
+            e.setor.includes('Vendedor'),
+        )
+        setSellers(activeSellers)
+      } catch (e) {
+        console.warn('Failed to load employees', e)
+      }
 
+      // Robust full data fetch
       const rotaToFetch = active || last
       const data = await rotaService.getFullRotaData(rotaToFetch)
 
@@ -76,30 +84,33 @@ export default function RotaPage() {
 
       // Check pending closures if there is an active route
       if (active) {
-        const uniqueSellerIds = new Set<number>()
-        fetchedRows.forEach((r) => {
-          if (r.vendedor_id) uniqueSellerIds.add(r.vendedor_id)
-        })
-
-        if (uniqueSellerIds.size > 0) {
-          const closures = await fechamentoService.getByRoute(active.id)
-          // Consider "Fechado" as valid closure
-          const closedSellerIds = new Set(
-            closures
-              .filter((c) => c.status === 'Fechado')
-              .map((c) => c.funcionario_id),
-          )
-
-          const pendingNames: string[] = []
-          uniqueSellerIds.forEach((id) => {
-            if (!closedSellerIds.has(id)) {
-              // Find employee name from all employees, as they might not be 'Vendedor' set but acted as one
-              const emp = allEmployees.find((e) => e.id === id)
-              pendingNames.push(emp?.nome_completo || `Vendedor ${id}`)
-            }
+        try {
+          const uniqueSellerIds = new Set<number>()
+          fetchedRows.forEach((r) => {
+            if (r.vendedor_id) uniqueSellerIds.add(r.vendedor_id)
           })
-          setPendingClosures(pendingNames)
-        } else {
+
+          if (uniqueSellerIds.size > 0) {
+            const closures = await fechamentoService.getByRoute(active.id)
+            const closedSellerIds = new Set(
+              closures
+                .filter((c) => c.status === 'Fechado')
+                .map((c) => c.funcionario_id),
+            )
+
+            const pendingNames: string[] = []
+            uniqueSellerIds.forEach((id) => {
+              if (!closedSellerIds.has(id)) {
+                const emp = allEmployees.find((e) => e.id === id)
+                pendingNames.push(emp?.nome_completo || `Vendedor ${id}`)
+              }
+            })
+            setPendingClosures(pendingNames)
+          } else {
+            setPendingClosures([])
+          }
+        } catch (e) {
+          console.warn('Failed to check closures', e)
           setPendingClosures([])
         }
       } else {
@@ -109,7 +120,7 @@ export default function RotaPage() {
       console.error(error)
       toast({
         title: 'Erro ao carregar',
-        description: 'Falha ao inicializar dados da rota.',
+        description: 'Falha crítica ao inicializar dados da rota.',
         variant: 'destructive',
       })
     } finally {
@@ -145,14 +156,10 @@ export default function RotaPage() {
         { event: '*', schema: 'public', table: 'debitos_historico' },
         () => fetchData(),
       )
-      // Listen to closure updates to refresh button state
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'fechamento_caixa' },
         () => {
-          console.log(
-            'Detected change in fechamento_caixa, refreshing Rota status...',
-          )
           fetchData()
         },
       )
@@ -170,7 +177,7 @@ export default function RotaPage() {
       setActiveRota(newRota)
       const data = await rotaService.getFullRotaData(newRota)
       setRows(Array.isArray(data) ? data : [])
-      setPendingClosures([]) // New route, no closures yet but also no rows/sellers assigned yet theoretically
+      setPendingClosures([])
       toast({ title: 'Rota Iniciada', className: 'bg-green-600 text-white' })
     } catch (error) {
       toast({
@@ -209,7 +216,7 @@ export default function RotaPage() {
       setActiveRota(newRota)
       const data = await rotaService.getFullRotaData(newRota)
       setRows(Array.isArray(data) ? data : [])
-      setPendingClosures([]) // Reset pending closures
+      setPendingClosures([])
 
       toast({
         title: 'Rota Finalizada e Nova Iniciada',
@@ -281,7 +288,6 @@ export default function RotaPage() {
       }
 
       await rotaService.upsertRotaItem(payload)
-      // Note: Updating seller might affect pending closures list, but usually we just refresh via realtime or next fetch
     } catch (error) {
       console.error(error)
       toast({
@@ -541,7 +547,6 @@ export default function RotaPage() {
             <span className="text-sm font-semibold bg-primary/10 text-primary px-3 py-1 rounded-full">
               Total: {filteredRows.length} Clientes
             </span>
-            {/* Filter Toggle */}
             <div className="flex items-center space-x-2">
               <Switch
                 id="show-filters"

@@ -20,6 +20,11 @@ interface Props {
   onOpenChange: (open: boolean) => void
   sessionId: number
   onSuccess: () => void
+  preselectedProduct?: {
+    id: number
+    codigo: number | null
+    produto: string
+  } | null
 }
 
 export function EstoqueCarroCountDialog({
@@ -27,6 +32,7 @@ export function EstoqueCarroCountDialog({
   onOpenChange,
   sessionId,
   onSuccess,
+  preselectedProduct,
 }: Props) {
   const [step, setStep] = useState(1)
   const [searchTerm, setSearchTerm] = useState('')
@@ -40,13 +46,25 @@ export function EstoqueCarroCountDialog({
 
   useEffect(() => {
     if (open) {
-      setStep(1)
-      setSearchTerm('')
-      setProducts([])
-      setSelectedProduct(null)
-      setQuantity('')
+      if (preselectedProduct) {
+        // Adapt preselected simple object to ProductRow structure for local state
+        // We only need ID, CODIGO, PRODUTO for display/logic mostly
+        setSelectedProduct({
+          ID: preselectedProduct.id,
+          CODIGO: preselectedProduct.codigo,
+          PRODUTO: preselectedProduct.produto,
+        } as ProductRow)
+        setStep(2)
+        setQuantity('')
+      } else {
+        setStep(1)
+        setSearchTerm('')
+        setProducts([])
+        setSelectedProduct(null)
+        setQuantity('')
+      }
     }
-  }, [open])
+  }, [open, preselectedProduct])
 
   const handleSearch = async (term: string) => {
     if (!term) return
@@ -77,10 +95,17 @@ export function EstoqueCarroCountDialog({
       onSuccess()
 
       // Reset for next count
-      setStep(1)
-      setQuantity('')
-      setSelectedProduct(null)
-      onOpenChange(false)
+      if (preselectedProduct) {
+        // If we opened for a specific product, close after save
+        onOpenChange(false)
+      } else {
+        // If manual flow, reset to step 1
+        setStep(1)
+        setQuantity('')
+        setSelectedProduct(null)
+        setProducts([])
+        setSearchTerm('')
+      }
     } catch (e) {
       toast({ title: 'Erro ao salvar', variant: 'destructive' })
     } finally {
@@ -150,8 +175,17 @@ export function EstoqueCarroCountDialog({
               />
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setStep(1)}>
-                Voltar
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (preselectedProduct) {
+                    onOpenChange(false)
+                  } else {
+                    setStep(1)
+                  }
+                }}
+              >
+                {preselectedProduct ? 'Cancelar' : 'Voltar'}
               </Button>
               <Button onClick={handleSave} disabled={loading}>
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{' '}

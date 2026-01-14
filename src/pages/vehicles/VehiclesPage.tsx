@@ -150,9 +150,8 @@ export default function VehiclesPage() {
         open={isExpenseDialogOpen}
         onOpenChange={setIsExpenseDialogOpen}
         onSuccess={() => {
-          // Trigger refresh of gallery if we could access it, or just let user refresh
-          // Ideally we would lift state up or use a context/store for refresh trigger
-          // For now, manual refresh on the gallery is enough or page reload
+          // Force refresh of the page to update gallery and lists
+          // In a more complex app we would use a query invalidation or context refresh
           window.location.reload()
         }}
         preselectedVehicleId={selectedVehicleForExpense}

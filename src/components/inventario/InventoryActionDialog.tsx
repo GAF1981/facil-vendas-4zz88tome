@@ -37,6 +37,11 @@ interface Props {
   setPersistedEmployeeId: (id: string) => void
   persistedSupplierId: string
   setPersistedSupplierId: (id: string) => void
+  preselectedProduct?: {
+    ID: number
+    CODIGO: number | null
+    PRODUTO: string | null
+  } | null
 }
 
 export function InventoryActionDialog({
@@ -49,6 +54,7 @@ export function InventoryActionDialog({
   setPersistedEmployeeId,
   persistedSupplierId,
   setPersistedSupplierId,
+  preselectedProduct,
 }: Props) {
   const [step, setStep] = useState(1) // 1: Select, 2: Input Details
   const [products, setProducts] = useState<ProductRow[]>([])
@@ -82,7 +88,7 @@ export function InventoryActionDialog({
     }
   }, [])
 
-  // Initial Data Load for Selectors
+  // Initial Data Load
   useEffect(() => {
     if (open) {
       if (['CARRO_PARA_ESTOQUE', 'ESTOQUE_PARA_CARRO'].includes(type)) {
@@ -105,8 +111,20 @@ export function InventoryActionDialog({
           }))
         }
       }
+
+      // Handle Preselection
+      if (preselectedProduct) {
+        setSelectedProduct(preselectedProduct as ProductRow)
+        setStep(2)
+        setQuantity('')
+      } else {
+        setStep(1)
+        setSearchTerm('')
+        setProducts([])
+        setSelectedProduct(null)
+      }
     }
-  }, [open, type, persistedEmployeeId, persistedSupplierId])
+  }, [open, type, persistedEmployeeId, persistedSupplierId, preselectedProduct])
 
   const searchProducts = async (term: string) => {
     setLoading(true)
@@ -122,7 +140,6 @@ export function InventoryActionDialog({
     setSelectedProduct(p)
     setStep(2)
     setQuantity('')
-    // Keep persisted extraData like funcionarioId/fornecedorId
   }
 
   const handleSave = async () => {
@@ -136,12 +153,8 @@ export function InventoryActionDialog({
         `A tela ficou 30 minutos INATIVA, favor conferir o nome do ${fieldName}!!!`,
       )
 
-      // If inactive, we must reset the persistence regardless of confirmation to proceed
-      // But we should also let user know.
-      // Reset logic:
       setPersistedEmployeeId('')
       setPersistedSupplierId('')
-      // Clear current selection too to force re-selection?
       setExtraData((prev: any) => ({
         ...prev,
         funcionarioId: undefined,
@@ -152,9 +165,6 @@ export function InventoryActionDialog({
         lastActivityRef.current = Date.now()
         return
       }
-
-      // Proceeding after confirmation implies user checked.
-      // But persistence is cleared for future.
       lastActivityRef.current = Date.now()
     }
 
@@ -180,7 +190,6 @@ export function InventoryActionDialog({
         },
       ])
 
-      // Persist selection (re-apply if valid and not cleared by inactivity)
       if (extraData.funcionarioId)
         setPersistedEmployeeId(extraData.funcionarioId)
       if (extraData.fornecedorId) setPersistedSupplierId(extraData.fornecedorId)
@@ -188,18 +197,20 @@ export function InventoryActionDialog({
       toast({ title: 'Movimento Salvo' })
       onSuccess()
 
-      // Reset for next
-      setStep(1)
-      setQuantity('')
-      setSelectedProduct(null)
-      // Do NOT clear extraData fully, keep persisted IDs
-      const keptData: any = {}
-      if (extraData.funcionarioId)
-        keptData.funcionarioId = extraData.funcionarioId
-      if (extraData.fornecedorId) keptData.fornecedorId = extraData.fornecedorId
-      setExtraData(keptData)
-
-      onOpenChange(false)
+      if (preselectedProduct) {
+        onOpenChange(false)
+      } else {
+        setStep(1)
+        setQuantity('')
+        setSelectedProduct(null)
+        // Keep persisted IDs in extraData
+        const keptData: any = {}
+        if (extraData.funcionarioId)
+          keptData.funcionarioId = extraData.funcionarioId
+        if (extraData.fornecedorId)
+          keptData.fornecedorId = extraData.fornecedorId
+        setExtraData(keptData)
+      }
     } catch (e) {
       toast({ title: 'Erro', variant: 'destructive' })
     } finally {
@@ -349,8 +360,14 @@ export function InventoryActionDialog({
             )}
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => setStep(1)}>
-                Voltar
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (preselectedProduct) onOpenChange(false)
+                  else setStep(1)
+                }}
+              >
+                {preselectedProduct ? 'Cancelar' : 'Voltar'}
               </Button>
               <Button onClick={handleSave} disabled={loading}>
                 Salvar
