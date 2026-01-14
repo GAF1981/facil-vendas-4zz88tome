@@ -68,6 +68,14 @@ export default function Index() {
       module: 'Inventário',
     },
     {
+      title: 'Veículos',
+      icon: Car,
+      to: '/veiculos',
+      description: 'Gestão da frota de veículos',
+      color: 'text-blue-700',
+      module: 'Veículos',
+    },
+    {
       title: 'Resumo Acertos',
       icon: FileBarChart,
       to: '/resumo-acertos',
@@ -193,7 +201,6 @@ export default function Index() {
         </p>
       </div>
 
-      {/* Dashboard Stats Section - Robust Implementation */}
       <DashboardStats />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">

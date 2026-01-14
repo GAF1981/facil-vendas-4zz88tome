@@ -82,6 +82,12 @@ export function AppSidebar() {
       module: 'Inventário',
     },
     {
+      title: 'Veículos',
+      url: '/veiculos',
+      icon: Car,
+      module: 'Veículos',
+    },
+    {
       title: 'Resumo Acertos',
       url: '/resumo-acertos',
       icon: FileBarChart,

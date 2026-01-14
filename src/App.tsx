@@ -43,6 +43,7 @@ import ResumoAcertosPage from '@/pages/resumo-acertos/ResumoAcertosPage'
 import PermissionsPage from '@/pages/admin/PermissionsPage'
 import EstoqueCarroPage from '@/pages/estoque-carro/EstoqueCarroPage'
 import InativarClientesPage from '@/pages/inativar-clientes/InativarClientesPage'
+import VehiclesPage from '@/pages/vehicles/VehiclesPage' // New import
 import { AuthProvider } from '@/hooks/use-auth'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { PermissionsProvider } from '@/hooks/use-permissions'
@@ -206,6 +207,10 @@ const App = () => (
                     element={<ContagemPage />}
                   />
                   <Route path="/estoque-carro" element={<EstoqueCarroPage />} />
+                </Route>
+
+                <Route element={<PermissionGuard module="Veículos" />}>
+                  <Route path="/veiculos" element={<VehiclesPage />} />
                 </Route>
 
                 <Route element={<PermissionGuard module="Inativar Clientes" />}>

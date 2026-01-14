@@ -9,11 +9,16 @@ export interface Despesa {
   funcionario_id: number
   saiu_do_caixa: boolean
   hodometro?: number | null
+  veiculo_id?: number | null
   // Joined
   funcionario_nome?: string
+  veiculo_placa?: string
 }
 
-export type DespesaInsert = Omit<Despesa, 'id' | 'funcionario_nome'>
+export type DespesaInsert = Omit<
+  Despesa,
+  'id' | 'funcionario_nome' | 'veiculo_placa'
+>
 
 export const despesaSchema = z.object({
   data: z.string().optional(), // Date string from input type="date"
@@ -25,6 +30,7 @@ export const despesaSchema = z.object({
   funcionario_id: z.string().min(1, 'Selecione um funcionário'),
   saiu_do_caixa: z.boolean().default(true),
   hodometro: z.string().optional(),
+  veiculo_id: z.string().optional(),
 })
 
 export type DespesaFormData = z.infer<typeof despesaSchema>

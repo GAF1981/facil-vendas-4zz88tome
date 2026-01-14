@@ -31,7 +31,9 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/hooks/use-toast'
 import { caixaService } from '@/services/caixaService'
 import { employeesService } from '@/services/employeesService'
+import { vehicleService } from '@/services/vehicleService'
 import { Employee } from '@/types/employee'
+import { Vehicle } from '@/types/vehicle'
 import { Loader2 } from 'lucide-react'
 import { useUserStore } from '@/stores/useUserStore'
 
@@ -50,6 +52,7 @@ export function ExpenseFormDialog({
 }: ExpenseFormDialogProps) {
   const [loading, setLoading] = useState(false)
   const [employees, setEmployees] = useState<Employee[]>([])
+  const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const { toast } = useToast()
   const { employee: loggedInUser } = useUserStore()
 
@@ -72,6 +75,7 @@ export function ExpenseFormDialog({
       funcionario_id: '',
       saiu_do_caixa: true,
       hodometro: '',
+      veiculo_id: '',
     },
   })
 
@@ -82,6 +86,8 @@ export function ExpenseFormDialog({
       employeesService.getEmployees(1, 100).then(({ data }) => {
         setEmployees(data.filter((e) => e.situacao === 'ATIVO'))
       })
+
+      vehicleService.getActive().then(setVehicles).catch(console.error)
 
       const initialValues = {
         data: getLocalDateString(),
@@ -94,6 +100,7 @@ export function ExpenseFormDialog({
           '',
         saiu_do_caixa: true,
         hodometro: '',
+        veiculo_id: '',
       }
       form.reset(initialValues)
     }
@@ -131,9 +138,18 @@ export function ExpenseFormDialog({
       detalhamentoToSave = data.grupo
     }
 
+    const isFuel = data.grupo === 'Gasolina' || data.grupo === 'Combustível'
+
     if (data.grupo === 'Gasolina' && !data.hodometro) {
       form.setError('hodometro', {
         message: 'Hodômetro é obrigatório para Gasolina',
+      })
+      return
+    }
+
+    if (isFuel && !data.veiculo_id) {
+      form.setError('veiculo_id', {
+        message: 'Veículo é obrigatório para Combustível/Gasolina',
       })
       return
     }
@@ -148,6 +164,7 @@ export function ExpenseFormDialog({
         funcionario_id: parseInt(data.funcionario_id),
         saiu_do_caixa: data.saiu_do_caixa,
         hodometro: data.hodometro ? parseFloat(data.hodometro) : null,
+        veiculo_id: data.veiculo_id ? parseInt(data.veiculo_id) : null,
       })
 
       toast({
@@ -251,6 +268,34 @@ export function ExpenseFormDialog({
                 </FormItem>
               )}
             />
+
+            {(selectedGrupo === 'Combustível' ||
+              selectedGrupo === 'Gasolina') && (
+              <FormField
+                control={form.control}
+                name="veiculo_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Veículo *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o veículo" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {vehicles.map((v) => (
+                          <SelectItem key={v.id} value={v.id.toString()}>
+                            {v.placa}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             {selectedGrupo === 'Outros' && (
               <FormField

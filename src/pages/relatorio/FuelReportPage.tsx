@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ArrowLeft, Fuel, Loader2, Filter } from 'lucide-react'
+import { ArrowLeft, Fuel, Loader2, Filter, Car } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { caixaService, FuelReportRow } from '@/services/caixaService'
 import { formatCurrency, safeFormatDate } from '@/lib/formatters'
@@ -61,7 +61,7 @@ export default function FuelReportPage() {
   }, [data, selectedEmployeeId])
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in p-4 sm:p-6 pb-20">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-4">
           <Link to="/relatorio">
@@ -75,7 +75,7 @@ export default function FuelReportPage() {
               Relatório de Combustível
             </h1>
             <p className="text-muted-foreground">
-              Análise de consumo e eficiência por quilômetro.
+              Análise de consumo e eficiência (KM/R$) por veículo.
             </p>
           </div>
         </div>
@@ -106,7 +106,7 @@ export default function FuelReportPage() {
           <CardTitle>Histórico de Abastecimentos (Gasolina)</CardTitle>
           <CardDescription>
             Cálculo de eficiência (Km/R$) baseado na distância percorrida e
-            valor do abastecimento anterior.
+            valor do abastecimento anterior para cada veículo.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -115,73 +115,88 @@ export default function FuelReportPage() {
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Data</TableHead>
-                  <TableHead>Funcionário</TableHead>
-                  <TableHead className="text-right">Valor (R$)</TableHead>
-                  <TableHead className="text-right">
-                    Hodômetro Inicial
-                  </TableHead>
-                  <TableHead className="text-right">Hodômetro Final</TableHead>
-                  <TableHead className="text-right">Km Percorrido</TableHead>
-                  <TableHead
-                    className="text-right font-bold"
-                    title="Km por Real"
-                  >
-                    Km / R$
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredData.length === 0 ? (
+            <div className="rounded-md border overflow-hidden">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell
-                      colSpan={7}
-                      className="text-center text-muted-foreground h-24"
+                    <TableHead>Data</TableHead>
+                    <TableHead>Funcionário</TableHead>
+                    <TableHead>Veículo</TableHead>
+                    <TableHead className="text-right">Valor (R$)</TableHead>
+                    <TableHead className="text-right">
+                      Hodômetro Inicial
+                    </TableHead>
+                    <TableHead className="text-right">
+                      Hodômetro Final
+                    </TableHead>
+                    <TableHead className="text-right">Km Percorrido</TableHead>
+                    <TableHead
+                      className="text-right font-bold"
+                      title="Km por Real"
                     >
-                      Nenhum registro de gasolina encontrado.
-                    </TableCell>
+                      Km / R$
+                    </TableHead>
                   </TableRow>
-                ) : (
-                  filteredData.map((row) => {
-                    const dist =
-                      row.initialOdometer !== null
-                        ? row.finalOdometer - row.initialOdometer
-                        : null
+                </TableHeader>
+                <TableBody>
+                  {filteredData.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={8}
+                        className="text-center text-muted-foreground h-24"
+                      >
+                        Nenhum registro de gasolina encontrado.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredData.map((row) => {
+                      const dist =
+                        row.initialOdometer !== null
+                          ? row.finalOdometer - row.initialOdometer
+                          : null
 
-                    return (
-                      <TableRow key={row.id}>
-                        <TableCell>
-                          {safeFormatDate(row.date, 'dd/MM/yyyy')}
-                        </TableCell>
-                        <TableCell>{row.employeeName}</TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatCurrency(row.gasolineValue)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-muted-foreground">
-                          {row.initialOdometer !== null
-                            ? row.initialOdometer
-                            : '-'}
-                        </TableCell>
-                        <TableCell className="text-right font-mono font-medium">
-                          {row.finalOdometer}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {dist !== null ? `${dist} km` : '-'}
-                        </TableCell>
-                        <TableCell className="text-right font-mono font-bold text-blue-600">
-                          {row.costPerKm !== null
-                            ? `${row.costPerKm.toFixed(2)}`
-                            : '-'}
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })
-                )}
-              </TableBody>
-            </Table>
+                      return (
+                        <TableRow key={row.id}>
+                          <TableCell>
+                            {safeFormatDate(row.date, 'dd/MM/yyyy')}
+                          </TableCell>
+                          <TableCell>{row.employeeName}</TableCell>
+                          <TableCell>
+                            {row.vehiclePlate ? (
+                              <div className="flex items-center gap-1 font-mono text-xs border rounded px-1.5 py-0.5 bg-muted w-fit">
+                                <Car className="w-3 h-3" />
+                                {row.vehiclePlate}
+                              </div>
+                            ) : (
+                              '-'
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-orange-700">
+                            {formatCurrency(row.gasolineValue)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-muted-foreground">
+                            {row.initialOdometer !== null
+                              ? row.initialOdometer
+                              : '-'}
+                          </TableCell>
+                          <TableCell className="text-right font-mono font-medium">
+                            {row.finalOdometer}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {dist !== null ? `${dist} km` : '-'}
+                          </TableCell>
+                          <TableCell className="text-right font-mono font-bold text-blue-600">
+                            {row.costPerKm !== null
+                              ? `${row.costPerKm.toFixed(2)}`
+                              : '-'}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

@@ -50,6 +50,8 @@ export interface FuelReportRow {
   initialOdometer: number | null
   finalOdometer: number
   costPerKm: number | null
+  vehiclePlate: string | null // New Field
+  vehicleId: number | null // New Field
 }
 
 export const caixaService = {
@@ -76,6 +78,7 @@ export const caixaService = {
       Data: dataToSave,
       saiu_do_caixa: despesa.saiu_do_caixa,
       hodometro: despesa.hodometro,
+      veiculo_id: despesa.veiculo_id,
     })
 
     if (error) throw error
@@ -398,26 +401,34 @@ export const caixaService = {
         Valor,
         hodometro,
         funcionario_id,
-        FUNCIONARIOS ( nome_completo )
+        veiculo_id,
+        FUNCIONARIOS ( nome_completo ),
+        VEICULOS ( placa )
       `,
       )
-      .eq('Grupo de Despesas', 'Gasolina')
+      .or('Grupo de Despesas.eq.Gasolina,Grupo de Despesas.eq.Combustível')
       .order('Data', { ascending: true }) // Sorted by date to calculate distances
 
     if (error) throw error
 
-    // Group by Employee to calculate odometer differences per car/person
-    const groupedByEmployee = new Map<number, any[]>()
+    // Group by Vehicle (Plate) for efficiency calc
+    // Fallback to Employee grouping if vehicle not present (legacy data support)
+    const groupedData = new Map<string, any[]>()
+
     data?.forEach((row: any) => {
-      const eid = row.funcionario_id
-      if (!groupedByEmployee.has(eid)) groupedByEmployee.set(eid, [])
-      groupedByEmployee.get(eid)?.push(row)
+      // Key is Vehicle ID if present, else Employee ID as fallback
+      const key = row.veiculo_id
+        ? `V-${row.veiculo_id}`
+        : `E-${row.funcionario_id}`
+
+      if (!groupedData.has(key)) groupedData.set(key, [])
+      groupedData.get(key)?.push(row)
     })
 
     const reportRows: FuelReportRow[] = []
 
-    groupedByEmployee.forEach((entries) => {
-      // Sort each employee's entries by Date ascending (just to be safe)
+    groupedData.forEach((entries) => {
+      // Sort entries by Date ascending within group
       entries.sort(
         (a, b) => new Date(a.Data).getTime() - new Date(b.Data).getTime(),
       )
@@ -433,12 +444,8 @@ export const caixaService = {
           initialOdo = previous.hodometro
           const distance = current.hodometro - initialOdo
           if (distance > 0 && previous.Valor > 0) {
-            // Updated Logic based on User Story:
-            // "Calculated as the result of the current row's 'Km percorrido' (distance)
-            // divided by the 'Valor (R$)' of the record immediately preceding it."
-            // Formula: Distance / PreviousValue
-            // Note: This results in Km per R$ (Efficiency), but requirement says "R$/km calculation" logic update.
-            // Strict adherence to text: Distance / PrevValue.
+            // Formula: Distance (km) / Previous Value (R$)
+            // This yields KM per R$ (Efficiency)
             costPerKm = distance / previous.Valor
           }
         }
@@ -452,6 +459,8 @@ export const caixaService = {
           initialOdometer: initialOdo,
           finalOdometer: Number(current.hodometro),
           costPerKm: costPerKm,
+          vehiclePlate: current.VEICULOS?.placa || null,
+          vehicleId: current.veiculo_id || null,
         })
       }
     })
