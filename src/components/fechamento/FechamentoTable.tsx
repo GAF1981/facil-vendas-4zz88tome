@@ -23,7 +23,6 @@ import {
   CalendarClock,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { supabase } from '@/lib/supabase/client'
 import {
   Tooltip,
   TooltipContent,
@@ -40,6 +39,9 @@ export function FechamentoTable({ data, onRefresh }: FechamentoTableProps) {
   const { employee } = useUserStore()
   const { toast } = useToast()
   const [loadingIds, setLoadingIds] = useState<Set<number>>(new Set())
+  const [generatingPdfIds, setGeneratingPdfIds] = useState<Set<number>>(
+    new Set(),
+  )
   const [pixStatusMap, setPixStatusMap] = useState<Map<number, boolean>>(
     new Map(),
   )
@@ -111,7 +113,8 @@ export function FechamentoTable({ data, onRefresh }: FechamentoTableProps) {
         className: 'bg-green-600 text-white',
       })
 
-      await generatePdf(item, true)
+      // Pass true for forceClosed to simulate the just-closed state
+      await handleGeneratePdf(item, true)
       onRefresh()
     } catch (error) {
       console.error(error)
@@ -130,7 +133,7 @@ export function FechamentoTable({ data, onRefresh }: FechamentoTableProps) {
     }
   }
 
-  const generatePdf = async (
+  const handleGeneratePdf = async (
     item: FechamentoCaixa,
     forceClosed: boolean = false,
   ) => {
@@ -142,26 +145,25 @@ export function FechamentoTable({ data, onRefresh }: FechamentoTableProps) {
         : item.responsavel,
     }
 
-    const { data: pdfBlob, error } = await supabase.functions.invoke(
-      'generate-pdf',
-      {
-        body: {
-          reportType: 'closing-confirmation',
-          data: pdfData,
-          date: new Date().toISOString(),
-        },
-      },
-    )
-
-    if (error) throw error
-
-    if (pdfBlob) {
-      const blob = new Blob([pdfBlob], { type: 'application/pdf' })
-      const url = window.URL.createObjectURL(blob)
-      window.open(url, '_blank')
-      setTimeout(() => {
-        window.URL.revokeObjectURL(url)
-      }, 1000)
+    setGeneratingPdfIds((prev) => new Set(prev).add(item.id))
+    try {
+      await fechamentoService.generateClosingPdf(
+        pdfData as FechamentoCaixa,
+        'A4',
+      )
+    } catch (error: any) {
+      console.error(error)
+      toast({
+        title: 'Erro no PDF',
+        description: error.message || 'Falha ao gerar o relatório.',
+        variant: 'destructive',
+      })
+    } finally {
+      setGeneratingPdfIds((prev) => {
+        const next = new Set(prev)
+        next.delete(item.id)
+        return next
+      })
     }
   }
 
@@ -224,6 +226,7 @@ export function FechamentoTable({ data, onRefresh }: FechamentoTableProps) {
                 !isClosed
 
               const isLoading = loadingIds.has(item.id)
+              const isGeneratingPdf = generatingPdfIds.has(item.id)
 
               return (
                 <TableRow
@@ -354,10 +357,15 @@ export function FechamentoTable({ data, onRefresh }: FechamentoTableProps) {
                             <Button
                               variant="ghost"
                               size="icon"
+                              disabled={isGeneratingPdf}
                               className="h-8 w-8 text-muted-foreground hover:text-blue-600"
-                              onClick={() => generatePdf(item)}
+                              onClick={() => handleGeneratePdf(item)}
                             >
-                              <FileText className="h-4 w-4" />
+                              {isGeneratingPdf ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <FileText className="h-4 w-4" />
+                              )}
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>

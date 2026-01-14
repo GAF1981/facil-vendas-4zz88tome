@@ -143,13 +143,35 @@ export const fechamentoService = {
     return data?.status || null
   },
 
-  async generateClosingPdf(fechamento: FechamentoCaixa, format: 'A4' | '80mm') {
+  async generateClosingPdf(
+    fechamento: FechamentoCaixa,
+    format: 'A4' | '80mm' = 'A4',
+  ) {
+    // 1. Fetch Route to get dates for receipts/expenses
+    const rota = await resumoAcertosService.getRouteById(fechamento.rota_id)
+    if (!rota) throw new Error('Rota não encontrada para gerar o PDF')
+
+    // 2. Fetch Receipts (Detailed)
+    const receipts = await caixaService.getEmployeeReceipts(
+      fechamento.funcionario_id,
+      rota,
+    )
+
+    // 3. Fetch Expenses (Detailed)
+    const expenses = await caixaService.getEmployeeExpenses(
+      fechamento.funcionario_id,
+      rota,
+    )
+
+    // 4. Invoke Edge Function with Full Payload
     const { data: blob, error } = await supabase.functions.invoke(
       'generate-pdf',
       {
         body: {
           reportType: 'closing-confirmation',
           fechamento,
+          receipts,
+          expenses,
           format,
           date: new Date().toISOString(),
         },

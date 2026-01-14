@@ -75,6 +75,10 @@ Deno.serve(async (req) => {
         // Increase estimate for detailed lists
         estimatedHeight =
           600 + summaryCount * 50 + expensesCount * 40 + receiptsCount * 40
+      } else if (reportType === 'closing-confirmation') {
+        const expensesCount = body.expenses ? body.expenses.length : 0
+        const receiptsCount = body.receipts ? body.receipts.length : 0
+        estimatedHeight = 600 + expensesCount * 40 + receiptsCount * 40
       }
 
       page = pdfDoc.addPage([226, Math.max(842, estimatedHeight)])
@@ -166,7 +170,7 @@ Deno.serve(async (req) => {
         totalRecebido,
         totalDespesas,
         totalSaldo,
-        saldoDeAcerto, // New field
+        saldoDeAcerto,
         periodo,
         employee,
         date,
@@ -376,8 +380,15 @@ Deno.serve(async (req) => {
         }
       }
     } else if (reportType === 'closing-confirmation') {
-      const { fechamento, date } = body
-      const empName = fechamento.funcionario?.nome_completo || 'N/D'
+      const { fechamento, receipts, expenses, date } = body
+      // Handle fallback if data comes in 'data' instead of 'fechamento'
+      const closingData = fechamento || body.data
+
+      if (!closingData) {
+        throw new Error('No closing data provided')
+      }
+
+      const empName = closingData.funcionario?.nome_completo || 'N/D'
 
       drawText('FACIL VENDAS', width / 2, y, {
         size: isThermal ? 14 : 18,
@@ -408,42 +419,114 @@ Deno.serve(async (req) => {
         font: fontBold,
       })
       y -= 15
-      drawText(`Rota ID: ${fechamento.rota_id}`, margins.left, y, { size: 10 })
+      drawText(`Rota ID: ${closingData.rota_id}`, margins.left, y, { size: 10 })
       y -= 20
       drawLine(y)
       y -= 20
 
       // Totals
       const rows = [
-        { l: 'Venda Total', v: fechamento.venda_total },
-        { l: 'Desconto Total', v: fechamento.desconto_total },
-        { l: 'Valor a Receber', v: fechamento.valor_a_receber, bold: true },
-        { l: 'Dinheiro', v: fechamento.valor_dinheiro },
-        { l: 'Pix', v: fechamento.valor_pix },
-        { l: 'Cheque', v: fechamento.valor_cheque },
-        { l: 'Despesas', v: fechamento.valor_despesas, color: rgb(1, 0, 0) },
+        { l: 'Venda Total', v: closingData.venda_total },
+        { l: 'Desconto Total', v: closingData.desconto_total },
+        // Added Saldo do Acerto as an alias/extra field if needed, but Valor a Receber is the main Debt field
+        {
+          l: 'Saldo do Acerto (Dívida)',
+          v: closingData.valor_a_receber,
+          bold: true,
+          color: rgb(0, 0, 0.8),
+        },
+        { l: 'Dinheiro', v: closingData.valor_dinheiro },
+        { l: 'Pix', v: closingData.valor_pix },
+        { l: 'Cheque', v: closingData.valor_cheque },
+        { l: 'Despesas', v: closingData.valor_despesas, color: rgb(1, 0, 0) },
       ]
 
       for (const row of rows) {
         drawText(row.l, margins.left, y, {
           size: 10,
           font: row.bold ? fontBold : fontRegular,
+          color: row.color || rgb(0, 0, 0),
         })
         drawText(`R$ ${formatCurrency(row.v)}`, width - margins.right, y, {
           size: 10,
           align: 'right',
           font: row.bold ? fontBold : fontRegular,
-          color: row.color,
+          color: row.color || rgb(0, 0, 0),
         })
         y -= 15
       }
 
       y -= 10
       drawLine(y)
+      y -= 20
+
+      // PAYMENT METHODS SUMMARY
+      if (receipts && receipts.length > 0) {
+        checkPageBreak(100)
+        drawText('FORMAS DE PAGAMENTO (Detalhado)', width / 2, y, {
+          size: 10,
+          font: fontBold,
+          align: 'center',
+        })
+        y -= 15
+
+        // Group by Payment Method
+        const grouped = {}
+        for (const r of receipts) {
+          const type = r.forma || 'Outros'
+          if (!grouped[type]) grouped[type] = 0
+          grouped[type] += r.valor
+        }
+
+        for (const [type, val] of Object.entries(grouped)) {
+          if (checkPageBreak(20)) y -= 10
+          drawText(type, margins.left, y, { size: 9 })
+          drawText(
+            `R$ ${formatCurrency(val as number)}`,
+            width - margins.right,
+            y,
+            { size: 9, align: 'right', font: fontBold },
+          )
+          y -= 12
+        }
+        y -= 10
+        drawLine(y)
+        y -= 15
+      }
+
+      // EXPENSES LIST
+      if (expenses && expenses.length > 0) {
+        checkPageBreak(100)
+        drawText('DETALHAMENTO DE SAIDAS', width / 2, y, {
+          size: 10,
+          font: fontBold,
+          align: 'center',
+        })
+        y -= 15
+
+        for (const exp of expenses) {
+          if (checkPageBreak(40)) y -= 10
+          const desc = exp.detalhamento || exp.grupo
+          const line = `${safeFormatDate(exp.data)} - ${desc.substring(0, 20)}`
+
+          drawText(line, margins.left, y, { size: 8 })
+          drawText(formatCurrency(exp.valor), width - margins.right, y, {
+            size: 8,
+            align: 'right',
+            color: exp.saiuDoCaixa ? rgb(0.8, 0, 0) : rgb(0.5, 0.5, 0.5),
+          })
+          y -= 10
+        }
+        y -= 10
+        drawLine(y)
+        y -= 15
+      }
+
       y -= 30
 
       // Signature area
       if (!isThermal) {
+        checkPageBreak(100)
         y -= 50
       }
 

@@ -45,6 +45,17 @@ export const resumoAcertosService = {
     return data as Rota | null
   },
 
+  async getRouteById(id: number) {
+    const { data, error } = await supabase
+      .from('ROTA')
+      .select('*')
+      .eq('id', id)
+      .single()
+
+    if (error) throw error
+    return data as Rota
+  },
+
   async finishAndStartNewRoute(currentRouteId: number) {
     const now = new Date().toISOString()
 
