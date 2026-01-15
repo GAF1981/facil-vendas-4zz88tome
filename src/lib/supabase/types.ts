@@ -2435,22 +2435,6 @@ export type Database = {
         }[]
       }
       parse_currency_sql: { Args: { price: string }; Returns: number }
-      process_and_save_stock_snapshot: {
-        Args: never
-        Returns: {
-          cliente_nome: string
-          codigo_cliente: number
-          created_at: string
-          data_hora_acerto: string
-          estoque_final: number
-          estoque_por_produto: number
-          id: number
-          numero_pedido: number
-          preco_vendido: number
-          produto_nome: string
-          saldo_final: number
-        }[]
-      }
       process_inventory_batch: {
         Args: { p_funcionario_id: number; p_items: Json; p_session_id: number }
         Returns: undefined

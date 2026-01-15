@@ -546,18 +546,7 @@ export default function AcertoPage() {
       }
     } catch (err: any) {
       console.error(err)
-      let errorMessage = err.message || 'Falha ao processar o acerto.'
-
-      // Robust Error Handling for deleted table issue
-      if (
-        errorMessage.includes('QUANTIDADE DE ESTOQUE FINAL') ||
-        errorMessage.includes(
-          'relation "QUANTIDADE DE ESTOQUE FINAL" does not exist',
-        )
-      ) {
-        errorMessage =
-          'Erro de banco de dados: Tabela de estoque depreciada ainda referenciada. Contate o suporte.'
-      }
+      const errorMessage = err.message || 'Falha ao processar o acerto.'
 
       toast({
         title: 'Erro ao salvar',

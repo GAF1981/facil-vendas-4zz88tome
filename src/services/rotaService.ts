@@ -292,7 +292,7 @@ export const rotaService = {
       number,
       { lastDate: string | null; lastOrderId: number | null }
     >()
-    const orderIdsForStock = new Set<number>()
+
     statsData?.forEach((row: any) => {
       const cid = row.client_id
       if (!cid) return
@@ -300,9 +300,6 @@ export const rotaService = {
         lastDate: row.max_data_acerto || null,
         lastOrderId: row.max_pedido || null,
       })
-      if (row.max_pedido) {
-        orderIdsForStock.add(row.max_pedido)
-      }
     })
 
     // Process Consigned
