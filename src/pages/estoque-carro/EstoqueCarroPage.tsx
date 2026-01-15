@@ -4,6 +4,7 @@ import { EstoqueCarroControlBar } from '@/components/estoque-carro/EstoqueCarroC
 import { EstoqueCarroTable } from '@/components/estoque-carro/EstoqueCarroTable'
 import { EstoqueCarroCountDialog } from '@/components/estoque-carro/EstoqueCarroCountDialog'
 import { EstoqueCarroAcertoTab } from '@/components/estoque-carro/EstoqueCarroAcertoTab'
+import { EstoqueCarroDeliveryHistory } from '@/components/estoque-carro/EstoqueCarroDeliveryHistory'
 import { estoqueCarroService } from '@/services/estoqueCarroService'
 import { useUserStore } from '@/stores/useUserStore'
 import { useToast } from '@/hooks/use-toast'
@@ -147,10 +148,13 @@ export default function EstoqueCarroPage() {
 
   return (
     <div className="space-y-6 animate-fade-in p-4 sm:p-6 pb-20">
-      <EstoqueCarroHeader />
+      <EstoqueCarroHeader
+        session={session}
+        employeeName={employee?.nome_completo || ''}
+      />
 
       <Tabs defaultValue="produtos" className="w-full">
-        <TabsList className="w-full justify-start border-b rounded-none p-0 h-auto bg-transparent">
+        <TabsList className="w-full justify-start border-b rounded-none p-0 h-auto bg-transparent overflow-x-auto">
           <TabsTrigger
             value="produtos"
             className="rounded-t-md data-[state=active]:bg-background data-[state=active]:border-b-0 border border-transparent px-4 py-2"
@@ -162,6 +166,12 @@ export default function EstoqueCarroPage() {
             className="rounded-t-md data-[state=active]:bg-background data-[state=active]:border-b-0 border border-transparent px-4 py-2"
           >
             Acerto Carro
+          </TabsTrigger>
+          <TabsTrigger
+            value="historico"
+            className="rounded-t-md data-[state=active]:bg-background data-[state=active]:border-b-0 border border-transparent px-4 py-2"
+          >
+            Histórico de Entregas
           </TabsTrigger>
         </TabsList>
 
@@ -196,12 +206,12 @@ export default function EstoqueCarroPage() {
 
         <TabsContent value="acerto" className="pt-4">
           {session && (
-            <EstoqueCarroAcertoTab
-              sessionId={session.id}
-              employeeId={session.funcionario_id}
-              onUpdate={() => loadSessionData(session)}
-            />
+            <EstoqueCarroAcertoTab employee={employee || undefined} />
           )}
+        </TabsContent>
+
+        <TabsContent value="historico" className="pt-4">
+          <EstoqueCarroDeliveryHistory />
         </TabsContent>
       </Tabs>
 

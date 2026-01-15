@@ -3,6 +3,10 @@ import { EstoqueCarroItem, EstoqueCarroSession } from '@/types/estoque_carro'
 import { productsService } from './productsService'
 import { parseCurrency } from '@/lib/formatters'
 import { parseISO, isAfter, isBefore } from 'date-fns'
+import {
+  DeliveryHistoryRow,
+  DeliveryHistoryFilter,
+} from '@/types/delivery_history'
 
 export const estoqueCarroService = {
   async getActiveSession(funcionarioId: number) {
@@ -601,5 +605,71 @@ export const estoqueCarroService = {
 
     // 4. Start New Session immediately
     await this.startSession(session.funcionario_id)
+  },
+
+  async getDeliveryHistory(
+    page: number = 1,
+    pageSize: number = 20,
+    filters: DeliveryHistoryFilter,
+  ) {
+    // Cast to any because the view is created in migration and might not be in types yet
+    let query = supabase
+      .from('view_delivery_history' as any)
+      .select('*', { count: 'exact' })
+
+    if (filters.startDate) {
+      query = query.gte('data_movimento', filters.startDate)
+    }
+
+    if (filters.endDate) {
+      // Assuming endDate is inclusive for the day, append time to cover the day
+      const endDateTime = `${filters.endDate}T23:59:59`
+      query = query.lte('data_movimento', endDateTime)
+    }
+
+    if (filters.search) {
+      const s = filters.search
+      // Filter by client name or product name
+      query = query.or(`nome_cliente.ilike.%${s}%,produto.ilike.%${s}%`)
+    }
+
+    const from = (page - 1) * pageSize
+    const to = from + pageSize - 1
+
+    const { data, error, count } = await query
+      .order('data_movimento', { ascending: false })
+      .range(from, to)
+
+    if (error) throw error
+
+    return {
+      data: (data as DeliveryHistoryRow[]) || [],
+      count: count || 0,
+    }
+  },
+
+  async getAllDeliveryHistoryForExport(filters: DeliveryHistoryFilter) {
+    let query = supabase.from('view_delivery_history' as any).select('*')
+
+    if (filters.startDate) {
+      query = query.gte('data_movimento', filters.startDate)
+    }
+
+    if (filters.endDate) {
+      const endDateTime = `${filters.endDate}T23:59:59`
+      query = query.lte('data_movimento', endDateTime)
+    }
+
+    if (filters.search) {
+      const s = filters.search
+      query = query.or(`nome_cliente.ilike.%${s}%,produto.ilike.%${s}%`)
+    }
+
+    const { data, error } = await query.order('data_movimento', {
+      ascending: false,
+    })
+
+    if (error) throw error
+    return (data as DeliveryHistoryRow[]) || []
   },
 }
