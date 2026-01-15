@@ -313,9 +313,6 @@ export const rotaService = {
       })
     }
 
-    // Deprecated: Stock Fetching from deleted table removed
-    // We no longer populate stockMapByOrder from QUANTIDADE DE ESTOQUE FINAL
-
     // Oldest Unpaid Date Fetching
     const clientOldestDueMap = new Map<number, string>()
     const ordersWithDebtArray = Array.from(ordersWithDebt)
