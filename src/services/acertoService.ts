@@ -211,4 +211,40 @@ export const acertoService = {
 
     return this.generatePdf(data, { format })
   },
+
+  async reversePayment(
+    paymentId: number,
+    orderId: number,
+    userId: number,
+    userName: string,
+  ) {
+    // 1. Update RECEBIMENTOS to set valor_pago = 0
+    const { error: updateError } = await supabase
+      .from('RECEBIMENTOS')
+      .update({ valor_pago: 0 })
+      .eq('id', paymentId)
+
+    if (updateError) throw updateError
+
+    // 2. Log action to system_logs
+    const { error: logError } = await supabase.from('system_logs').insert({
+      type: 'PAYMENT_REVERSAL',
+      description: `Estorno de pagamento (ID: ${paymentId}) do pedido #${orderId}`,
+      user_id: userId,
+      meta: { paymentId, orderId, reversedBy: userName },
+      created_at: new Date().toISOString(),
+    })
+
+    if (logError) console.error('Error logging reversal:', logError)
+
+    // 3. Update debt history to reflect the change
+    const { error: rpcError } = await supabase.rpc(
+      'update_debito_historico_order',
+      {
+        p_pedido_id: orderId,
+      },
+    )
+
+    if (rpcError) throw rpcError
+  },
 }

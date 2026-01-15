@@ -260,7 +260,7 @@ export const bancoDeDadosService = {
       const { data: paymentsData, error: paymentsError } = await supabase
         .from('RECEBIMENTOS')
         .select(
-          'venda_id, valor_pago, valor_registrado, forma_pagamento, vencimento, created_at, FUNCIONARIOS(nome_completo)',
+          'id, venda_id, valor_pago, valor_registrado, forma_pagamento, vencimento, created_at, FUNCIONARIOS(nome_completo)',
         )
         .in('venda_id', orderIds)
 
@@ -278,6 +278,7 @@ export const bancoDeDadosService = {
           if (p.forma_pagamento) existing.methods.add(p.forma_pagamento)
 
           existing.details.push({
+            id: p.id,
             method: p.forma_pagamento,
             value: p.valor_pago || 0,
             registeredValue: p.valor_registrado || 0,

@@ -28,10 +28,21 @@ import {
   Search,
   FileText,
   FileCheck,
+  RotateCcw,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useUserStore } from '@/stores/useUserStore'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 export interface HistoryRow {
   id: number
@@ -45,6 +56,7 @@ export interface HistoryRow {
   mediaMensal: number | null
   methods?: string
   paymentDetails?: {
+    id: number
     method: string
     value: number
     registeredValue?: number
@@ -87,6 +99,7 @@ export function AcertoHistoryTable({
   // State for Payment Details Modal
   const [selectedPaymentDetails, setSelectedPaymentDetails] = useState<
     | {
+        id: number
         method: string
         value: number
         registeredValue?: number
@@ -99,35 +112,36 @@ export function AcertoHistoryTable({
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [selectedOrderRef, setSelectedOrderRef] = useState<number | null>(null)
 
+  // Reversal State
+  const [reversing, setReversing] = useState(false)
+  const [reverseConfirmOpen, setReverseConfirmOpen] = useState(false)
+  const [paymentToReverse, setPaymentToReverse] = useState<{
+    id: number
+    value: number
+  } | null>(null)
+
+  const loadHistory = async () => {
+    setLoading(true)
+    try {
+      const data = await bancoDeDadosService.getAcertoHistory(clientId)
+      setHistory(data)
+      setError(false)
+    } catch (err) {
+      console.error('Failed to fetch history', err)
+      setError(true)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
     if (externalData) {
       setHistory(externalData)
       return
     }
 
-    let mounted = true
-    const fetchHistory = async () => {
-      setLoading(true)
-      try {
-        const data = await bancoDeDadosService.getAcertoHistory(clientId)
-        if (mounted) {
-          setHistory(data)
-          setError(false)
-        }
-      } catch (err) {
-        console.error('Failed to fetch history', err)
-        if (mounted) setError(true)
-      } finally {
-        if (mounted) setLoading(false)
-      }
-    }
-
     if (clientId) {
-      fetchHistory()
-    }
-
-    return () => {
-      mounted = false
+      loadHistory()
     }
   }, [clientId, externalData])
 
@@ -204,8 +218,63 @@ export function AcertoHistoryTable({
     })
   }
 
+  const handleReverseClick = (payment: { id: number; value: number }) => {
+    setPaymentToReverse(payment)
+    setReverseConfirmOpen(true)
+  }
+
+  const confirmReverse = async () => {
+    if (!paymentToReverse || !selectedOrderRef || !loggedInUser || !clientId) {
+      return
+    }
+
+    setReversing(true)
+    try {
+      await acertoService.reversePayment(
+        paymentToReverse.id,
+        selectedOrderRef,
+        loggedInUser.id,
+        loggedInUser.nome_completo,
+      )
+
+      toast({
+        title: 'Estorno Realizado',
+        description:
+          'O pagamento foi estornado e o débito reaberto para cobrança.',
+        className: 'bg-green-600 text-white',
+      })
+
+      setDetailsOpen(false)
+      setReverseConfirmOpen(false)
+      setPaymentToReverse(null)
+      loadHistory() // Refresh history to show updated values
+    } catch (error) {
+      console.error(error)
+      toast({
+        title: 'Erro ao Estornar',
+        description: 'Não foi possível realizar o estorno. Tente novamente.',
+        variant: 'destructive',
+      })
+    } finally {
+      setReversing(false)
+    }
+  }
+
   const isAnyOrderSelected =
     selectedOrderId !== null && selectedOrderId !== undefined
+
+  // Permission Check
+  const canReverse =
+    loggedInUser &&
+    (Array.isArray(loggedInUser.setor)
+      ? loggedInUser.setor.some((s) =>
+          ['Financeiro', 'Administrador', 'Gerente', 'Administrativo'].includes(
+            s,
+          ),
+        )
+      : ['Financeiro', 'Administrador', 'Gerente', 'Administrativo'].includes(
+          loggedInUser.setor || '',
+        ))
 
   if (loading && !externalData) {
     return (
@@ -447,6 +516,11 @@ export function AcertoHistoryTable({
                     <TableHead className="text-right text-green-700">
                       V. Pago
                     </TableHead>
+                    {canReverse && (
+                      <TableHead className="w-[80px] text-center">
+                        Ação
+                      </TableHead>
+                    )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -454,7 +528,7 @@ export function AcertoHistoryTable({
                   selectedPaymentDetails.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={6}
+                        colSpan={canReverse ? 7 : 6}
                         className="text-center text-muted-foreground"
                       >
                         Nenhum detalhe encontrado.
@@ -488,6 +562,27 @@ export function AcertoHistoryTable({
                         <TableCell className="text-right font-mono font-bold text-green-700">
                           R$ {formatCurrency(detail.value)}
                         </TableCell>
+                        {canReverse && (
+                          <TableCell className="text-center">
+                            {detail.value > 0 && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                onClick={() =>
+                                  handleReverseClick({
+                                    id: detail.id,
+                                    value: detail.value,
+                                  })
+                                }
+                                title="Estornar Pagamento"
+                              >
+                                <RotateCcw className="h-4 w-4 mr-1" />
+                                Estornar
+                              </Button>
+                            )}
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))
                   )}
@@ -502,6 +597,45 @@ export function AcertoHistoryTable({
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={reverseConfirmOpen}
+        onOpenChange={setReverseConfirmOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-red-600">
+              Confirmar Estorno
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Você está prestes a estornar um pagamento de{' '}
+              <span className="font-bold text-foreground">
+                R$ {formatCurrency(paymentToReverse?.value || 0)}
+              </span>
+              .
+            </AlertDialogDescription>
+            <AlertDialogDescription>
+              Isso irá anular o pagamento e reabrir a dívida para o cliente na
+              Central de Cobrança. Esta ação será registrada.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={reversing}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmReverse}
+              disabled={reversing}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {reversing ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RotateCcw className="mr-2 h-4 w-4" />
+              )}
+              Confirmar Estorno
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }
