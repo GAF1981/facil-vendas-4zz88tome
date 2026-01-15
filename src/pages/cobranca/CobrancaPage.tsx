@@ -17,6 +17,8 @@ import { useToast } from '@/hooks/use-toast'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { formatCurrency } from '@/lib/formatters'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
 
 export default function CobrancaPage() {
   const [loading, setLoading] = useState(true)
@@ -27,6 +29,7 @@ export default function CobrancaPage() {
   const [cityFilter, setCityFilter] = useState<string>('todos')
   const [routeFilter, setRouteFilter] = useState<string>('todos') // Rota Motoqueiro Filter
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
+  const [isSimplified, setIsSimplified] = useState(false) // Toggle State
   const { toast } = useToast()
 
   const loadDebts = async () => {
@@ -132,12 +135,24 @@ export default function CobrancaPage() {
             Gerenciamento de inadimplência e acordos.
           </p>
         </div>
-        <Button variant="outline" onClick={loadDebts} disabled={loading}>
-          <RefreshCw
-            className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`}
-          />
-          Atualizar
-        </Button>
+
+        <div className="flex items-center gap-4">
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="simplified-mode"
+              checked={isSimplified}
+              onCheckedChange={setIsSimplified}
+            />
+            <Label htmlFor="simplified-mode">Cobrança simplificado</Label>
+          </div>
+
+          <Button variant="outline" onClick={loadDebts} disabled={loading}>
+            <RefreshCw
+              className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`}
+            />
+            Atualizar
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -227,6 +242,7 @@ export default function CobrancaPage() {
                 onToggleItem={handleToggleItem}
                 isCobrancaMode={false}
                 onToggleAll={handleToggleAll}
+                isSimplified={isSimplified} // Pass simplified state
               />
             </TabsContent>
 
@@ -256,6 +272,7 @@ export default function CobrancaPage() {
                 onToggleItem={handleToggleItem}
                 isCobrancaMode={true}
                 onToggleAll={handleToggleAll}
+                isSimplified={isSimplified} // Pass simplified state
               />
             </TabsContent>
           </Tabs>

@@ -53,6 +53,7 @@ export const cobrancaService = {
       }
     >()
 
+    // Fetch Client Details
     if (clientIds.length > 0) {
       const chunkSize = 1000
       for (let i = 0; i < clientIds.length; i += chunkSize) {
@@ -78,6 +79,32 @@ export const cobrancaService = {
               city: (c as any)['MUNICÍPIO'] || null,
               situacao: (c as any)['situacao'] || 'ATIVO',
             })
+          })
+        }
+      }
+    }
+
+    // Fetch Action Counts Per Client
+    const clientActionCounts = new Map<number, number>()
+    if (clientIds.length > 0) {
+      const chunkSize = 1000
+      for (let i = 0; i < clientIds.length; i += chunkSize) {
+        const chunk = clientIds.slice(i, i + chunkSize)
+        // Since we can't do a simple count(*) group by with simple client, we fetch IDs and count in memory
+        // Optimizing by selecting only necessary column
+        const { data: actionsData, error: actionsError } = await supabase
+          .from('acoes_cobranca')
+          .select('cliente_id')
+          .in('cliente_id', chunk)
+
+        if (!actionsError && actionsData) {
+          actionsData.forEach((a) => {
+            if (a.cliente_id) {
+              clientActionCounts.set(
+                a.cliente_id,
+                (clientActionCounts.get(a.cliente_id) || 0) + 1,
+              )
+            }
           })
         }
       }
@@ -291,6 +318,7 @@ export const cobrancaService = {
           oldestOverdueDate: null,
           earliestUnpaidDate: null,
           orders: [],
+          totalActionCount: clientActionCounts.get(cid) || 0, // NEW field
         })
       }
 

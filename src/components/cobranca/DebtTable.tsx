@@ -49,6 +49,7 @@ interface DebtTableProps {
   onToggleItem: (id: string) => void
   isCobrancaMode: boolean
   onToggleAll?: (ids: string[]) => void
+  isSimplified?: boolean // New prop for Simplified View
 }
 
 interface FlatRow {
@@ -61,6 +62,7 @@ interface FlatRow {
   neighborhood: string | null
   city: string | null
   clientOrderCount: number
+  clientTotalActions: number // New field
   orderId: number
   orderDate: string
   vencimento: string | null
@@ -89,6 +91,7 @@ export function DebtTable({
   onToggleItem,
   isCobrancaMode,
   onToggleAll,
+  isSimplified = false, // Default to false
 }: DebtTableProps) {
   const [selectedClient, setSelectedClient] = useState<ClientDebt | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -155,6 +158,7 @@ export function DebtTable({
             neighborhood: client.neighborhood,
             city: client.city,
             clientOrderCount: client.orderCount,
+            clientTotalActions: client.totalActionCount, // Added
             orderId: order.orderId,
             orderDate: order.date,
             vencimento: inst.vencimento,
@@ -279,18 +283,19 @@ export function DebtTable({
           <TableHeader className="bg-background sticky top-0 z-10 shadow-sm">
             <TableRow>
               <TableHead className="w-[70px] bg-background">Código</TableHead>
-              {!isCobrancaMode && (
+              {/* Conditionally hide columns based on isSimplified and isCobrancaMode */}
+              {!isCobrancaMode && !isSimplified && (
                 <TableHead className="w-[90px] bg-background">Tipo</TableHead>
               )}
               <TableHead className="min-w-[150px] bg-background">
                 Nome Cliente
               </TableHead>
-              {!isCobrancaMode && (
+              {!isCobrancaMode && !isSimplified && (
                 <TableHead className="min-w-[150px] bg-background">
                   Endereço
                 </TableHead>
               )}
-              {!isCobrancaMode && (
+              {!isCobrancaMode && !isSimplified && (
                 <TableHead
                   className="min-w-[100px] cursor-pointer hover:bg-muted bg-background"
                   onClick={() => requestSort('neighborhood')}
@@ -301,15 +306,22 @@ export function DebtTable({
                   </div>
                 </TableHead>
               )}
-              <TableHead
-                className="min-w-[100px] cursor-pointer hover:bg-muted bg-background"
-                onClick={() => requestSort('city')}
-              >
-                <div className="flex items-center gap-1">
-                  Município
-                  {getSortIcon('city')}
-                </div>
+              {!isSimplified && (
+                <TableHead
+                  className="min-w-[100px] cursor-pointer hover:bg-muted bg-background"
+                  onClick={() => requestSort('city')}
+                >
+                  <div className="flex items-center gap-1">
+                    Município
+                    {getSortIcon('city')}
+                  </div>
+                </TableHead>
+              )}
+              {/* New Counter Column */}
+              <TableHead className="min-w-[80px] text-center bg-background">
+                Contador
               </TableHead>
+
               {!isCobrancaMode && (
                 <TableHead className="w-[80px] bg-background">Pedido</TableHead>
               )}
@@ -346,15 +358,8 @@ export function DebtTable({
               >
                 <div className="flex flex-col items-center gap-1">
                   <span>Rota</span>
-                  {onToggleAll && (
-                    <Checkbox
-                      checked={allVisibleSelected}
-                      onCheckedChange={(c) =>
-                        handleToggleAllVisible(c as boolean)
-                      }
-                      className="h-3 w-3 border-muted-foreground/50"
-                    />
-                  )}
+                  {/* Removed checkbox logic for bulk selection in Rota header as requested */}
+                  {/* {onToggleAll && ( ... ) } - Removed */}
                 </div>
               </TableHead>
             </TableRow>
@@ -363,7 +368,7 @@ export function DebtTable({
             {flattenedData.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={isCobrancaMode ? 13 : 17}
+                  colSpan={isCobrancaMode ? 14 : 18} // Adjusted colspan estimation
                   className="h-24 text-center text-muted-foreground"
                 >
                   Nenhum registro encontrado.
@@ -383,7 +388,7 @@ export function DebtTable({
                     <TableCell className="font-mono text-xs font-medium">
                       {row.clientId}
                     </TableCell>
-                    {!isCobrancaMode && (
+                    {!isCobrancaMode && !isSimplified && (
                       <TableCell className="text-xs text-muted-foreground">
                         {row.clientType}
                       </TableCell>
@@ -391,7 +396,7 @@ export function DebtTable({
                     <TableCell className="font-medium text-sm">
                       {row.clientName}
                     </TableCell>
-                    {!isCobrancaMode && (
+                    {!isCobrancaMode && !isSimplified && (
                       <TableCell
                         className="text-xs text-muted-foreground truncate max-w-[150px]"
                         title={row.address || ''}
@@ -399,7 +404,7 @@ export function DebtTable({
                         {row.address || '-'}
                       </TableCell>
                     )}
-                    {!isCobrancaMode && (
+                    {!isCobrancaMode && !isSimplified && (
                       <TableCell
                         className="text-xs text-muted-foreground truncate max-w-[100px]"
                         title={row.neighborhood || ''}
@@ -407,12 +412,20 @@ export function DebtTable({
                         {row.neighborhood || '-'}
                       </TableCell>
                     )}
-                    <TableCell
-                      className="text-xs text-muted-foreground truncate max-w-[100px]"
-                      title={row.city || ''}
-                    >
-                      {row.city || '-'}
+                    {!isSimplified && (
+                      <TableCell
+                        className="text-xs text-muted-foreground truncate max-w-[100px]"
+                        title={row.city || ''}
+                      >
+                        {row.city || '-'}
+                      </TableCell>
+                    )}
+
+                    {/* New Counter Cell */}
+                    <TableCell className="text-center font-mono text-xs text-muted-foreground">
+                      {row.clientTotalActions}
                     </TableCell>
+
                     {!isCobrancaMode && (
                       <TableCell className="font-mono text-xs">
                         {row.orderId}

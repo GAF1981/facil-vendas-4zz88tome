@@ -9,6 +9,7 @@ interface Props {
   onCount: () => void
   onFinalize: () => void
   loading: boolean
+  disableFinalize?: boolean // Added prop for conditional disabling
 }
 
 export function EstoqueCarroControlBar({
@@ -18,6 +19,7 @@ export function EstoqueCarroControlBar({
   onCount,
   onFinalize,
   loading,
+  disableFinalize = false,
 }: Props) {
   return (
     <Card>
@@ -45,8 +47,13 @@ export function EstoqueCarroControlBar({
 
             <Button
               onClick={onFinalize}
-              disabled={loading}
-              className="bg-blue-600 hover:bg-blue-700"
+              disabled={loading || disableFinalize} // Updated disabled logic
+              className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              title={
+                disableFinalize
+                  ? 'Realize todas as contagens pendentes antes de finalizar.'
+                  : ''
+              }
             >
               <CheckCircle2 className="mr-2 h-4 w-4" /> Finalizar Ajustes e
               Abrir Novo

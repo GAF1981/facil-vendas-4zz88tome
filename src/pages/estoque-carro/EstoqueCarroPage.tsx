@@ -105,15 +105,15 @@ export default function EstoqueCarroPage() {
     }
   }
 
+  // Calculate pending items state
+  const hasPendingItems = items.some(
+    (item) => item.saldo_final !== 0 && !item.has_count_record,
+  )
+
   const handleFinalize = async () => {
     if (!session) return
 
-    // Check for pending items based on updated logic: Saldo Final != 0 AND No Count
-    const pendingItems = items.some(
-      (item) => item.saldo_final !== 0 && !item.has_count_record,
-    )
-
-    if (pendingItems) {
+    if (hasPendingItems) {
       toast({
         title: 'Ação Bloqueada',
         description:
@@ -173,6 +173,7 @@ export default function EstoqueCarroPage() {
             onCount={() => setIsCountDialogOpen(true)}
             onFinalize={handleFinalize}
             loading={loading}
+            disableFinalize={hasPendingItems} // Pass calculated state
           />
 
           {session && (

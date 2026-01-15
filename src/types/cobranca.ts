@@ -86,6 +86,8 @@ export interface ClientDebt {
   city: string | null
   // New situation field
   situacao: string | null
+  // New field for Total Action Count
+  totalActionCount: number
 }
 
 export interface LatestCollectionActionView {
