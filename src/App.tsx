@@ -34,6 +34,7 @@ import DebitosReportPage from '@/pages/relatorio/DebitosReportPage'
 import GeneralInventoryReportPage from '@/pages/relatorio/GeneralInventoryReportPage'
 import FuelReportPage from '@/pages/relatorio/FuelReportPage'
 import ImportSaldoPage from '@/pages/relatorio/ImportSaldoPage'
+import BrindeReportPage from '@/pages/relatorio/BrindeReportPage'
 import CaixaPage from '@/pages/caixa/CaixaPage'
 import FechamentosPage from '@/pages/fechamento/FechamentosPage'
 import PagamentosPage from '@/pages/pagamentos/PagamentosPage'
@@ -198,6 +199,10 @@ const App = () => (
                   <Route
                     path="/relatorio/inativar-clientes"
                     element={<InativarClientesPage />}
+                  />
+                  <Route
+                    path="/relatorio/brinde"
+                    element={<BrindeReportPage />}
                   />
                 </Route>
 

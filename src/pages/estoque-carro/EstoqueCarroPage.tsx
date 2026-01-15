@@ -5,6 +5,7 @@ import { EstoqueCarroTable } from '@/components/estoque-carro/EstoqueCarroTable'
 import { EstoqueCarroCountDialog } from '@/components/estoque-carro/EstoqueCarroCountDialog'
 import { EstoqueCarroAcertoTab } from '@/components/estoque-carro/EstoqueCarroAcertoTab'
 import { EstoqueCarroDeliveryHistory } from '@/components/estoque-carro/EstoqueCarroDeliveryHistory'
+import { BrindeDialog } from '@/components/estoque-carro/BrindeDialog'
 import { estoqueCarroService } from '@/services/estoqueCarroService'
 import { useUserStore } from '@/stores/useUserStore'
 import { useToast } from '@/hooks/use-toast'
@@ -30,6 +31,7 @@ export default function EstoqueCarroPage() {
   const [items, setItems] = useState<EstoqueCarroItem[]>([])
   const [isCountDialogOpen, setIsCountDialogOpen] = useState(false)
   const [isFinalizeDialogOpen, setIsFinalizeDialogOpen] = useState(false)
+  const [isBrindeDialogOpen, setIsBrindeDialogOpen] = useState(false)
 
   // Initialization
   useEffect(() => {
@@ -182,8 +184,9 @@ export default function EstoqueCarroPage() {
             onReset={handleReset}
             onCount={() => setIsCountDialogOpen(true)}
             onFinalize={handleFinalize}
+            onBrinde={() => setIsBrindeDialogOpen(true)}
             loading={loading}
-            disableFinalize={hasPendingItems} // Pass calculated state
+            disableFinalize={hasPendingItems}
           />
 
           {session && (
@@ -199,6 +202,17 @@ export default function EstoqueCarroPage() {
                   if (!open && session) loadSessionData(session)
                 }}
                 sessionId={session.id}
+              />
+              <BrindeDialog
+                open={isBrindeDialogOpen}
+                onOpenChange={(open) => {
+                  setIsBrindeDialogOpen(open)
+                  if (!open && session) loadSessionData(session)
+                }}
+                sessionId={session.id}
+                onSuccess={() => {
+                  if (session) loadSessionData(session)
+                }}
               />
             </>
           )}

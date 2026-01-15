@@ -17,6 +17,7 @@ import {
   UserX,
   Fuel,
   Upload,
+  Gift,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useUserStore } from '@/stores/useUserStore'
@@ -164,6 +165,14 @@ const RelatorioDashboard = () => {
       to: '/inativar-clientes',
       color: 'text-red-700',
       bg: 'bg-red-100',
+    },
+    {
+      title: 'Brinde',
+      description: 'Histórico de brindes entregues aos clientes.',
+      icon: Gift,
+      to: '/relatorio/brinde',
+      color: 'text-purple-600',
+      bg: 'bg-purple-100',
     },
   ]
 

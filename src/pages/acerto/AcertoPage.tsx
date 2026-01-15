@@ -33,7 +33,7 @@ import {
 } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
-import { Save, Printer, Loader2 } from 'lucide-react'
+import { Save, Printer, Loader2, Copy } from 'lucide-react'
 import { parseCurrency } from '@/lib/formatters'
 import { fechamentoService } from '@/services/fechamentoService'
 import { rotaService } from '@/services/rotaService'
@@ -257,6 +257,26 @@ export default function AcertoPage() {
       title: 'Produtos Adicionados',
       description: `${newProducts.length} produto(s) incluído(s) na lista.`,
     })
+  }
+
+  const handleRepeatCount = () => {
+    if (items.length === 0) return
+    if (
+      confirm(
+        'Tem certeza que deseja copiar a CONTAGEM para o SALDO FINAL de todos os itens?',
+      )
+    ) {
+      setItems((prev) =>
+        prev.map((item) => ({
+          ...item,
+          saldoFinal: item.contagem,
+        })),
+      )
+      toast({
+        title: 'Atualizado',
+        description: 'Saldo Final atualizado com valores da Contagem.',
+      })
+    }
   }
 
   const handleGeneratePreview = async () => {
@@ -582,7 +602,15 @@ export default function AcertoPage() {
             loading={loadingAcerto}
           />
 
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={handleRepeatCount}
+              title="Copiar Contagem para Saldo Final em todos os itens"
+            >
+              <Copy className="mr-2 h-4 w-4" />
+              Repetir Contagem
+            </Button>
             <ProductSelector onSelect={handleAddProducts} />
           </div>
 

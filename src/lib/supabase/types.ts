@@ -2266,6 +2266,29 @@ export type Database = {
         }
         Relationships: []
       }
+      view_delivery_history: {
+        Row: {
+          codigo_cliente: number | null
+          codigo_produto: number | null
+          data_movimento: string | null
+          funcionario: string | null
+          id: number | null
+          id_estoque_carro: number | null
+          nome_cliente: string | null
+          pedido: number | null
+          produto: string | null
+          quantidade: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'ESTOQUE CARRO: CARRO PARA O CLIENTE_id_estoque_carro_fkey'
+            columns: ['id_estoque_carro']
+            isOneToOne: false
+            referencedRelation: 'ID ESTOQUE CARRO'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       view_latest_collection_actions: {
         Row: {
           acao: string | null

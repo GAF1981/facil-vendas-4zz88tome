@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { RotateCcw, Play, Calculator, CheckCircle2 } from 'lucide-react'
+import { RotateCcw, Play, Calculator, CheckCircle2, Gift } from 'lucide-react'
 
 interface Props {
   hasActiveSession: boolean
@@ -8,8 +8,9 @@ interface Props {
   onReset: () => void
   onCount: () => void
   onFinalize: () => void
+  onBrinde: () => void // New prop
   loading: boolean
-  disableFinalize?: boolean // Added prop for conditional disabling
+  disableFinalize?: boolean
 }
 
 export function EstoqueCarroControlBar({
@@ -18,6 +19,7 @@ export function EstoqueCarroControlBar({
   onReset,
   onCount,
   onFinalize,
+  onBrinde,
   loading,
   disableFinalize = false,
 }: Props) {
@@ -43,11 +45,20 @@ export function EstoqueCarroControlBar({
               <Calculator className="mr-2 h-4 w-4" /> Contagem Carro
             </Button>
 
+            <Button
+              variant="outline"
+              onClick={onBrinde}
+              disabled={loading}
+              className="border-purple-200 text-purple-700 hover:bg-purple-50"
+            >
+              <Gift className="mr-2 h-4 w-4" /> Brinde
+            </Button>
+
             <div className="flex-1" />
 
             <Button
               onClick={onFinalize}
-              disabled={loading || disableFinalize} // Updated disabled logic
+              disabled={loading || disableFinalize}
               className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               title={
                 disableFinalize
