@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
   Card,
   CardContent,
@@ -7,7 +8,6 @@ import {
   CardTitle,
   CardDescription,
 } from '@/components/ui/card'
-import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import {
   ArrowLeft,
   Upload,
