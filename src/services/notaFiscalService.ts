@@ -157,7 +157,10 @@ export const notaFiscalService = {
     // Map data to expected format for PDF
     // We send raw values mostly, but structure object properties nicely
     const items = data.map((item) => ({
-      codProduto: item['COD. PRODUTO'],
+      // Cast to String to ensure large numbers/EANs are preserved accurately
+      codProduto: item['COD. PRODUTO']
+        ? String(item['COD. PRODUTO'])
+        : item['COD. PRODUTO'],
       produto: item['MERCADORIA'],
       tipo: item['TIPO'],
       saldoInicial: item['SALDO INICIAL'],

@@ -1,5 +1,10 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
-import { PDFDocument, StandardFonts, rgb } from 'https://esm.sh/pdf-lib@1.17.1'
+import {
+  PDFDocument,
+  StandardFonts,
+  rgb,
+  degrees,
+} from 'https://esm.sh/pdf-lib@1.17.1'
 import { corsHeaders } from '../_shared/cors.ts'
 
 const removeAccents = (str: string) => {
@@ -204,34 +209,69 @@ Deno.serve(async (req) => {
       }
       y -= 10
       drawLine(y)
-      y -= 15
 
-      // Table Header
-      // Cols: Cod(30), Produto(140), Tipo(40), SI(40), Cont(40), QtdV(40), ValV(50), SF(40), NovCons(50), Dev(40)
-      // Total approx: 510 width (A4 available ~515)
+      // Table Header - Vertical with updated columns
       const cols = [
-        { label: 'Cod', x: margins.left, width: 30, align: 'left' },
-        { label: 'Produto', x: margins.left + 35, width: 130, align: 'left' },
-        { label: 'Tipo', x: margins.left + 170, width: 35, align: 'left' },
-        { label: 'S.Ini', x: margins.left + 210, width: 35, align: 'right' },
-        { label: 'Cont', x: margins.left + 250, width: 35, align: 'right' },
-        { label: 'Qtd.V', x: margins.left + 290, width: 35, align: 'right' },
-        { label: 'Val.V', x: margins.left + 330, width: 50, align: 'right' },
-        { label: 'S.Fim', x: margins.left + 385, width: 35, align: 'right' },
-        { label: 'N.Cons', x: margins.left + 425, width: 50, align: 'right' },
-        { label: 'Dev', x: margins.left + 480, width: 35, align: 'right' },
+        { label: 'CODIGO', width: 60, align: 'left', key: 'codProduto' },
+        { label: 'MERCADORIA', width: 150, align: 'left', key: 'produto' },
+        { label: 'TIPO', width: 30, align: 'center', key: 'tipo' },
+        {
+          label: 'SALDO INICIAL',
+          width: 35,
+          align: 'right',
+          key: 'saldoInicial',
+        },
+        { label: 'CONTAGEM', width: 35, align: 'right', key: 'contagem' },
+        {
+          label: 'QUANTIDADE VENDIDA',
+          width: 35,
+          align: 'right',
+          key: 'quantidadeVendida',
+        },
+        {
+          label: 'VALOR VENDIDO',
+          width: 55,
+          align: 'right',
+          key: 'valorVendido',
+        },
+        { label: 'SALDO FINAL', width: 35, align: 'right', key: 'saldoFinal' },
+        {
+          label: 'NOVAS CONSIGNACOES',
+          width: 45,
+          align: 'right',
+          key: 'novasConsignacoes',
+        },
+        { label: 'RECOLHIDO', width: 35, align: 'right', key: 'devolucoes' },
       ]
 
-      // Draw Header Row
-      cols.forEach((col: any) => {
-        const xPos = col.align === 'right' ? col.x + col.width : col.x
-        drawText(col.label, xPos, y, {
+      // Determine X positions
+      let currentX = margins.left
+      const columns = cols.map((col) => {
+        const c = { ...col, x: currentX }
+        currentX += col.width
+        return c
+      })
+
+      const headerHeight = 110 // Height reserved for vertical headers
+      y -= 10 // Padding before headers
+
+      // Draw Headers (Vertical)
+      columns.forEach((col) => {
+        // Calculate center of column
+        const xCenter = col.x + col.width / 2 - 3 // Adjust for font height centering (approx)
+        const yStart = y - headerHeight
+
+        page.drawText(col.label, {
+          x: xCenter,
+          y: yStart,
           size: 8,
           font: fontBold,
-          align: col.align,
+          rotate: degrees(90),
+          color: rgb(0, 0, 0),
         })
       })
-      y -= 5
+
+      y -= headerHeight + 5 // Move cursor below headers
       drawLine(y)
       y -= 12
 
@@ -239,31 +279,23 @@ Deno.serve(async (req) => {
       for (const item of items) {
         checkPageBreak(15)
 
-        const formatVal = (v: any) => {
-          if (v === null || v === undefined) return '-'
-          return String(v)
-        }
+        columns.forEach((col) => {
+          let val = item[col.key]
+          if (val === null || val === undefined) val = '-'
+          val = String(val)
 
-        const rowData = [
-          { val: item.codProduto, colIdx: 0 },
-          { val: item.produto, colIdx: 1 },
-          { val: item.tipo, colIdx: 2 },
-          { val: item.saldoInicial, colIdx: 3 },
-          { val: item.contagem, colIdx: 4 },
-          { val: item.quantidadeVendida, colIdx: 5 },
-          { val: item.valorVendido, colIdx: 6 },
-          { val: item.saldoFinal, colIdx: 7 },
-          { val: item.novasConsignacoes, colIdx: 8 },
-          { val: item.devolucoes, colIdx: 9 }, // RECOLHIDO -> Devoluções
-        ]
+          // Determine draw X based on alignment
+          let drawX = col.x
+          if (col.align === 'right') drawX = col.x + col.width
+          if (col.align === 'center') drawX = col.x + col.width / 2
 
-        rowData.forEach((cell) => {
-          const col: any = cols[cell.colIdx]
-          const xPos = col.align === 'right' ? col.x + col.width : col.x
-          drawText(formatVal(cell.val), xPos, y, {
+          // Specific handling for Code to not truncate
+          const maxWidth = col.key === 'codProduto' ? undefined : col.width
+
+          drawText(val, drawX, y, {
             size: 8,
-            align: col.align,
-            maxWidth: col.width,
+            align: col.align as any,
+            maxWidth: maxWidth,
           })
         })
         y -= 12
