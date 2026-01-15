@@ -31,9 +31,10 @@ import {
 
 interface Props {
   items: EstoqueCarroItem[]
+  onRefresh?: () => void
 }
 
-export function EstoqueCarroTable({ items }: Props) {
+export function EstoqueCarroTable({ items, onRefresh }: Props) {
   const [selectedItem, setSelectedItem] = useState<EstoqueCarroItem | null>(
     null,
   )
@@ -281,7 +282,10 @@ export function EstoqueCarroTable({ items }: Props) {
           open={!!countItem}
           onOpenChange={(o) => !o && setCountItem(null)}
           sessionId={countItem.id_estoque_carro}
-          onSuccess={() => window.location.reload()}
+          onSuccess={() => {
+            if (onRefresh) onRefresh()
+            else window.location.reload()
+          }}
           preselectedProduct={{
             id: countItem.produto_id,
             codigo: countItem.codigo,

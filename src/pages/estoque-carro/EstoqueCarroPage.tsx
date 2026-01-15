@@ -177,7 +177,10 @@ export default function EstoqueCarroPage() {
 
           {session && (
             <>
-              <EstoqueCarroTable items={items} />
+              <EstoqueCarroTable
+                items={items}
+                onRefresh={() => loadSessionData(session)}
+              />
               <EstoqueCarroCountDialog
                 open={isCountDialogOpen}
                 onOpenChange={(open) => {
@@ -185,10 +188,6 @@ export default function EstoqueCarroPage() {
                   if (!open && session) loadSessionData(session)
                 }}
                 sessionId={session.id}
-                products={items.map((i) => ({
-                  id: i.produto_id,
-                  name: i.produto,
-                }))}
               />
             </>
           )}

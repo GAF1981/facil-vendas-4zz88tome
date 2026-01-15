@@ -14,12 +14,13 @@ import { ProductRow } from '@/types/product'
 import { Loader2, Search, Camera } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { ProductSelectorTable } from '@/components/acerto/ProductSelectorTable'
+import { useUserStore } from '@/stores/useUserStore'
 
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   sessionId: number
-  onSuccess: () => void
+  onSuccess?: () => void
   preselectedProduct?: {
     id: number
     codigo: number | null
@@ -43,6 +44,7 @@ export function EstoqueCarroCountDialog({
   const [quantity, setQuantity] = useState('')
   const [loading, setLoading] = useState(false)
   const { toast } = useToast()
+  const { employee } = useUserStore()
 
   useEffect(() => {
     if (open) {
@@ -90,9 +92,12 @@ export function EstoqueCarroCountDialog({
         sessionId,
         selectedProduct.ID,
         parseInt(quantity),
+        employee?.id,
+        employee?.nome_completo,
       )
       toast({ title: 'Contagem Salva' })
-      onSuccess()
+
+      if (onSuccess) onSuccess()
 
       // Reset for next count
       if (preselectedProduct) {
@@ -106,8 +111,13 @@ export function EstoqueCarroCountDialog({
         setProducts([])
         setSearchTerm('')
       }
-    } catch (e) {
-      toast({ title: 'Erro ao salvar', variant: 'destructive' })
+    } catch (e: any) {
+      console.error(e)
+      toast({
+        title: 'Erro ao salvar',
+        description: e.message || 'Falha ao salvar contagem.',
+        variant: 'destructive',
+      })
     } finally {
       setLoading(false)
     }

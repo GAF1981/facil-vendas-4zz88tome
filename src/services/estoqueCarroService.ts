@@ -516,16 +516,25 @@ export const estoqueCarroService = {
     if (error) throw error
   },
 
-  async saveCount(sessionId: number, productId: number, quantity: number) {
+  async saveCount(
+    sessionId: number,
+    productId: number,
+    quantity: number,
+    employeeId?: number | null,
+    employeeName?: string | null,
+  ) {
+    const payload = {
+      id_estoque_carro: sessionId,
+      produto_id: productId,
+      quantidade: quantity,
+      funcionario_id: employeeId,
+      funcionario_nome: employeeName,
+    }
+
     // Upsert count
-    const { error } = await supabase.from('ESTOQUE CARRO CONTAGEM').upsert(
-      {
-        id_estoque_carro: sessionId,
-        produto_id: productId,
-        quantidade: quantity,
-      },
-      { onConflict: 'id_estoque_carro, produto_id' },
-    )
+    const { error } = await supabase
+      .from('ESTOQUE CARRO CONTAGEM')
+      .upsert(payload, { onConflict: 'id_estoque_carro, produto_id' })
 
     if (error) {
       await supabase
@@ -533,11 +542,7 @@ export const estoqueCarroService = {
         .delete()
         .eq('id_estoque_carro', sessionId)
         .eq('produto_id', productId)
-      await supabase.from('ESTOQUE CARRO CONTAGEM').insert({
-        id_estoque_carro: sessionId,
-        produto_id: productId,
-        quantidade: quantity,
-      })
+      await supabase.from('ESTOQUE CARRO CONTAGEM').insert(payload)
     }
   },
 
