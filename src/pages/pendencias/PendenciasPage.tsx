@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import {
   Card,
   CardContent,
@@ -31,7 +31,9 @@ import {
   Loader2,
   Search,
   CheckCircle2,
-  Filter,
+  RefreshCw,
+  User,
+  Users,
 } from 'lucide-react'
 import { PendenciaFormDialog } from '@/components/pendencias/PendenciaFormDialog'
 import { ResolvePendenciaDialog } from '@/components/pendencias/ResolvePendenciaDialog'
@@ -47,10 +49,13 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import { useSearchParams } from 'react-router-dom'
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
+import { Skeleton } from '@/components/ui/skeleton'
 
 export default function PendenciasPage() {
   const [pendencias, setPendencias] = useState<Pendencia[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [openCreate, setOpenCreate] = useState(false)
   const [openResolve, setOpenResolve] = useState(false)
@@ -78,15 +83,17 @@ export default function PendenciasPage() {
     }
   }, [searchParams])
 
-  const fetchPendencias = async () => {
+  const fetchPendencias = useCallback(async () => {
     // Logic for "Existe Pendências?": If NÃO, show nothing (or empty list)
     if (filterExiste === 'NÃO') {
       setPendencias([])
       setLoading(false)
+      setError(null)
       return
     }
 
     setLoading(true)
+    setError(null)
     try {
       // Map "Pendência Resolvida" filter
       let resolvedFilter: boolean | undefined = undefined
@@ -95,21 +102,22 @@ export default function PendenciasPage() {
 
       const data = await pendenciasService.getAll(resolvedFilter)
       setPendencias(data)
-    } catch (error) {
+    } catch (error: any) {
       console.error(error)
+      setError('Não foi possível carregar a lista de pendências.')
       toast({
         title: 'Erro ao carregar',
-        description: 'Não foi possível listar as pendências.',
+        description: 'Verifique sua conexão e tente novamente.',
         variant: 'destructive',
       })
     } finally {
       setLoading(false)
     }
-  }
+  }, [filterExiste, filterResolvida, toast])
 
   useEffect(() => {
     fetchPendencias()
-  }, [filterExiste, filterResolvida])
+  }, [fetchPendencias])
 
   const filteredPendencias = pendencias.filter((p) => {
     if (!searchTerm) return true
@@ -117,7 +125,8 @@ export default function PendenciasPage() {
     return (
       p.CLIENTES?.['NOME CLIENTE']?.toLowerCase().includes(searchLower) ||
       p.CLIENTES?.CODIGO?.toString().includes(searchLower) ||
-      p.FUNCIONARIOS?.nome_completo?.toLowerCase().includes(searchLower) ||
+      p.creator?.nome_completo?.toLowerCase().includes(searchLower) ||
+      p.responsible?.nome_completo?.toLowerCase().includes(searchLower) ||
       p.descricao_pendencia.toLowerCase().includes(searchLower)
     )
   })
@@ -125,6 +134,10 @@ export default function PendenciasPage() {
   const handleResolveClick = (pendencia: Pendencia) => {
     setSelectedPendencia(pendencia)
     setOpenResolve(true)
+  }
+
+  const handleRefresh = () => {
+    fetchPendencias()
   }
 
   return (
@@ -141,10 +154,18 @@ export default function PendenciasPage() {
             </p>
           </div>
         </div>
-        <Button onClick={() => setOpenCreate(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Incluir Pendência
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleRefresh} disabled={loading}>
+            <RefreshCw
+              className={cn('mr-2 h-4 w-4', loading && 'animate-spin')}
+            />
+            Atualizar
+          </Button>
+          <Button onClick={() => setOpenCreate(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Incluir Pendência
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -202,131 +223,170 @@ export default function PendenciasPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="flex justify-center items-center h-64">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          ) : (
-            <div className="rounded-md border overflow-hidden">
-              <Table>
-                <TableHeader className="bg-muted/50">
-                  <TableRow>
-                    <TableHead className="w-[80px]">CÓDIGO</TableHead>
-                    <TableHead>NOME CLIENTE</TableHead>
-                    <TableHead className="hidden md:table-cell">
-                      STATUS
-                    </TableHead>
-                    <TableHead className="hidden sm:table-cell">
-                      Funcionário
-                    </TableHead>
-                    <TableHead className="min-w-[200px]">PENDENCIA</TableHead>
-                    <TableHead className="text-center w-[150px]">
-                      PENDENCIA RESOLVIDA?
-                    </TableHead>
-                    <TableHead className="text-right w-[150px]">
-                      Ações
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredPendencias.length === 0 ? (
+      {error ? (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Erro</AlertTitle>
+          <AlertDescription className="flex flex-col gap-2">
+            {error}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              className="w-fit"
+            >
+              Tentar Novamente
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : (
+        <Card>
+          <CardContent className="p-0">
+            {loading ? (
+              <div className="p-4 space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="flex items-center space-x-4">
+                    <Skeleton className="h-12 w-full rounded-md" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-md border overflow-hidden">
+                <Table>
+                  <TableHeader className="bg-muted/50">
                     <TableRow>
-                      <TableCell
-                        colSpan={7}
-                        className="h-24 text-center text-muted-foreground"
-                      >
-                        {filterExiste === 'NÃO'
-                          ? 'Filtro "Existe Pendências" está definido como NÃO.'
-                          : 'Nenhuma pendência encontrada.'}
-                      </TableCell>
+                      <TableHead className="w-[80px]">CÓDIGO</TableHead>
+                      <TableHead>NOME CLIENTE</TableHead>
+                      <TableHead className="hidden md:table-cell">
+                        STATUS
+                      </TableHead>
+                      <TableHead className="hidden sm:table-cell">
+                        Criado Por
+                      </TableHead>
+                      <TableHead className="hidden sm:table-cell">
+                        Responsável
+                      </TableHead>
+                      <TableHead className="min-w-[200px]">PENDENCIA</TableHead>
+                      <TableHead className="text-center w-[150px]">
+                        RESOLVIDA?
+                      </TableHead>
+                      <TableHead className="text-right w-[150px]">
+                        Ações
+                      </TableHead>
                     </TableRow>
-                  ) : (
-                    filteredPendencias.map((pendencia) => (
-                      <TableRow
-                        key={pendencia.id}
-                        className={cn(
-                          'hover:bg-muted/50 transition-colors',
-                          pendencia.resolvida ? 'bg-green-50/30' : '',
-                        )}
-                      >
-                        <TableCell className="font-mono">
-                          {pendencia.CLIENTES?.CODIGO}
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          {pendencia.CLIENTES?.['NOME CLIENTE']}
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          <Badge variant="outline">
-                            {pendencia.CLIENTES?.['TIPO DE CLIENTE'] || 'N/D'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
-                          {pendencia.FUNCIONARIOS?.nome_completo || '-'}
-                        </TableCell>
-                        <TableCell>
-                          <div
-                            className="max-w-[300px] truncate"
-                            title={pendencia.descricao_pendencia}
-                          >
-                            {pendencia.descricao_pendencia}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <div className="flex justify-center">
-                            <Checkbox
-                              checked={pendencia.resolvida}
-                              onCheckedChange={() => {
-                                if (pendencia.resolvida) {
-                                  setViewResolution(pendencia)
-                                }
-                              }}
-                              className={cn(
-                                'cursor-default',
-                                pendencia.resolvida &&
-                                  'cursor-pointer data-[state=checked]:bg-green-600 border-green-600',
-                              )}
-                              title={
-                                pendencia.resolvida
-                                  ? 'Clique para ver a resolução'
-                                  : 'Pendente'
-                              }
-                            />
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {!pendencia.resolvida && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 border-green-200 text-green-700 hover:bg-green-50 hover:text-green-800"
-                              onClick={() => handleResolveClick(pendencia)}
-                            >
-                              <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                              Resolver
-                            </Button>
-                          )}
-                          {pendencia.resolvida && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-8 text-muted-foreground"
-                              onClick={() => setViewResolution(pendencia)}
-                            >
-                              Ver Detalhes
-                            </Button>
-                          )}
+                  </TableHeader>
+                  <TableBody>
+                    {filteredPendencias.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={8}
+                          className="h-24 text-center text-muted-foreground"
+                        >
+                          {filterExiste === 'NÃO'
+                            ? 'Filtro "Existe Pendências" está definido como NÃO.'
+                            : 'Nenhuma pendência encontrada.'}
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                    ) : (
+                      filteredPendencias.map((pendencia) => (
+                        <TableRow
+                          key={pendencia.id}
+                          className={cn(
+                            'hover:bg-muted/50 transition-colors',
+                            pendencia.resolvida ? 'bg-green-50/30' : '',
+                          )}
+                        >
+                          <TableCell className="font-mono">
+                            {pendencia.CLIENTES?.CODIGO || 'N/A'}
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {pendencia.CLIENTES?.['NOME CLIENTE'] ||
+                              'Cliente não encontrado'}
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell">
+                            <Badge variant="outline">
+                              {pendencia.CLIENTES?.['TIPO DE CLIENTE'] || 'N/D'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
+                            <div className="flex items-center gap-1">
+                              <User className="w-3 h-3" />
+                              {pendencia.creator?.nome_completo || 'N/A'}
+                            </div>
+                          </TableCell>
+                          <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
+                            {pendencia.responsible ? (
+                              <div className="flex items-center gap-1 text-green-700">
+                                <Users className="w-3 h-3" />
+                                {pendencia.responsible.nome_completo}
+                              </div>
+                            ) : (
+                              '-'
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div
+                              className="max-w-[300px] truncate"
+                              title={pendencia.descricao_pendencia}
+                            >
+                              {pendencia.descricao_pendencia}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <div className="flex justify-center">
+                              <Checkbox
+                                checked={pendencia.resolvida}
+                                onCheckedChange={() => {
+                                  if (pendencia.resolvida) {
+                                    setViewResolution(pendencia)
+                                  }
+                                }}
+                                className={cn(
+                                  'cursor-default',
+                                  pendencia.resolvida &&
+                                    'cursor-pointer data-[state=checked]:bg-green-600 border-green-600',
+                                )}
+                                title={
+                                  pendencia.resolvida
+                                    ? 'Clique para ver a resolução'
+                                    : 'Pendente'
+                                }
+                              />
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {!pendencia.resolvida && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 border-green-200 text-green-700 hover:bg-green-50 hover:text-green-800"
+                                onClick={() => handleResolveClick(pendencia)}
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                                Resolver
+                              </Button>
+                            )}
+                            {pendencia.resolvida && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 text-muted-foreground"
+                                onClick={() => setViewResolution(pendencia)}
+                              >
+                                Ver Detalhes
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <PendenciaFormDialog
         open={openCreate}
@@ -363,6 +423,9 @@ export default function PendenciasPage() {
                 Problema Original
               </p>
               <p className="text-sm">{viewResolution?.descricao_pendencia}</p>
+              <p className="text-xs text-muted-foreground mt-2">
+                Criado por: {viewResolution?.creator?.nome_completo || 'N/A'}
+              </p>
             </div>
             <div className="bg-green-50 p-3 rounded border border-green-100 text-green-900">
               <p className="text-xs font-bold uppercase mb-1 text-green-700">
@@ -370,6 +433,10 @@ export default function PendenciasPage() {
               </p>
               <p className="text-sm">
                 {viewResolution?.descricao_resolucao || 'Sem descrição.'}
+              </p>
+              <p className="text-xs text-green-800 mt-2">
+                Resolvido por:{' '}
+                {viewResolution?.responsible?.nome_completo || 'N/A'}
               </p>
             </div>
           </div>

@@ -27,6 +27,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Loader2, CheckCircle2 } from 'lucide-react'
 import { pendenciasService } from '@/services/pendenciasService'
 import { useToast } from '@/hooks/use-toast'
+import { useUserStore } from '@/stores/useUserStore'
 
 interface ResolvePendenciaDialogProps {
   open: boolean
@@ -43,6 +44,7 @@ export function ResolvePendenciaDialog({
 }: ResolvePendenciaDialogProps) {
   const [loading, setLoading] = useState(false)
   const { toast } = useToast()
+  const { employee } = useUserStore()
 
   const form = useForm<ResolucaoFormData>({
     resolver: zodResolver(resolucaoSchema),
@@ -52,10 +54,22 @@ export function ResolvePendenciaDialog({
   })
 
   const onSubmit = async (data: ResolucaoFormData) => {
-    if (!pendencia) return
+    if (!pendencia || !employee) {
+      toast({
+        title: 'Erro',
+        description: 'Funcionário não identificado. Faça login novamente.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     setLoading(true)
     try {
-      await pendenciasService.resolve(pendencia.id, data.descricao_resolucao)
+      await pendenciasService.resolve(
+        pendencia.id,
+        data.descricao_resolucao,
+        employee.id,
+      )
       toast({
         title: 'Pendência Resolvida!',
         description: 'A resolução foi registrada com sucesso.',

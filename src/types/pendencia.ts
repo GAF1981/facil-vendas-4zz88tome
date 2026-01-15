@@ -7,6 +7,7 @@ export interface Pendencia {
   descricao_pendencia: string
   resolvida: boolean
   descricao_resolucao: string | null
+  responsavel_id: number | null
   created_at: string
   // Joined fields
   CLIENTES?: {
@@ -14,15 +15,20 @@ export interface Pendencia {
     'NOME CLIENTE': string
     'TIPO DE CLIENTE': string | null
   }
-  FUNCIONARIOS?: {
+  // Aliased joins
+  creator?: {
     id: number
     nome_completo: string
   }
+  responsible?: {
+    id: number
+    nome_completo: string
+  } | null
 }
 
 export type PendenciaInsert = Omit<
   Pendencia,
-  'id' | 'created_at' | 'CLIENTES' | 'FUNCIONARIOS'
+  'id' | 'created_at' | 'CLIENTES' | 'creator' | 'responsible'
 >
 export type PendenciaUpdate = Partial<PendenciaInsert>
 

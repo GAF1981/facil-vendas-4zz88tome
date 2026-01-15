@@ -13,7 +13,11 @@ export const pendenciasService = {
           "NOME CLIENTE",
           "TIPO DE CLIENTE"
         ),
-        FUNCIONARIOS (
+        creator:FUNCIONARIOS!PENDENCIAS_funcionario_id_fkey (
+          id,
+          nome_completo
+        ),
+        responsible:FUNCIONARIOS!PENDENCIAS_responsavel_id_fkey (
           id,
           nome_completo
         )
@@ -54,12 +58,17 @@ export const pendenciasService = {
     return data as Pendencia
   },
 
-  async resolve(id: number, descricao_resolucao: string) {
+  async resolve(
+    id: number,
+    descricao_resolucao: string,
+    responsavel_id: number,
+  ) {
     const { data, error } = await supabase
       .from('PENDENCIAS')
       .update({
         resolvida: true,
         descricao_resolucao,
+        responsavel_id,
       })
       .eq('id', id)
       .select()
