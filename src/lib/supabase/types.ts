@@ -296,6 +296,53 @@ export type Database = {
           },
         ]
       }
+      brinde: {
+        Row: {
+          cliente_codigo: number | null
+          cliente_nome: string | null
+          created_at: string | null
+          data: string | null
+          funcionario_id: number | null
+          funcionario_nome: string | null
+          id: number
+          produto_codigo: number | null
+          produto_nome: string | null
+          quantidade: number | null
+        }
+        Insert: {
+          cliente_codigo?: number | null
+          cliente_nome?: string | null
+          created_at?: string | null
+          data?: string | null
+          funcionario_id?: number | null
+          funcionario_nome?: string | null
+          id?: number
+          produto_codigo?: number | null
+          produto_nome?: string | null
+          quantidade?: number | null
+        }
+        Update: {
+          cliente_codigo?: number | null
+          cliente_nome?: string | null
+          created_at?: string | null
+          data?: string | null
+          funcionario_id?: number | null
+          funcionario_nome?: string | null
+          id?: number
+          produto_codigo?: number | null
+          produto_nome?: string | null
+          quantidade?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'brinde_funcionario_id_fkey'
+            columns: ['funcionario_id']
+            isOneToOne: false
+            referencedRelation: 'FUNCIONARIOS'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       CLIENTES: {
         Row: {
           'ALTERAÇÃO CLIENTE': string | null
