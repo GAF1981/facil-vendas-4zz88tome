@@ -176,6 +176,9 @@ export function AppSidebar() {
   const visibleItems = items.filter((item) => {
     if (item.module === 'Menu') return true
     if (item.module === 'Permissões') {
+      if (Array.isArray(employee?.setor)) {
+        return employee?.setor.includes('Administrador')
+      }
       return employee?.setor === 'Administrador'
     }
     return canAccess(item.module)

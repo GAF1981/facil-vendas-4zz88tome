@@ -27,7 +27,11 @@ export function PermissionGuard({ module, children }: PermissionGuardProps) {
 
   // Special case: Only Administrador has access to Permissões
   if (module === 'Permissões') {
-    if (employee.setor !== 'Administrador') {
+    const isAdministrador = Array.isArray(employee.setor)
+      ? employee.setor.includes('Administrador')
+      : employee.setor === 'Administrador'
+
+    if (!isAdministrador) {
       return <Navigate to="/" replace />
     }
     return children ? <>{children}</> : <Outlet />

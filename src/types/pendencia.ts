@@ -35,6 +35,7 @@ export type PendenciaUpdate = Partial<PendenciaInsert>
 export const pendenciaSchema = z.object({
   cliente_id: z.number({ required_error: 'Cliente é obrigatório' }),
   funcionario_id: z.number({ required_error: 'Funcionário é obrigatório' }),
+  responsavel_id: z.number().optional().nullable(),
   descricao_pendencia: z
     .string()
     .min(3, 'A descrição deve ter pelo menos 3 caracteres'),

@@ -57,20 +57,27 @@ export function PendenciaFormDialog({
     defaultValues: {
       cliente_id: 0,
       funcionario_id: currentUser?.id || 0,
+      responsavel_id: null,
       descricao_pendencia: '',
     },
   })
 
   useEffect(() => {
     if (open) {
-      // Load employees
+      // Load employees - assuming 'active' status is needed, but getEmployees returns all.
+      // Filtering active on display if possible, or using getEmployees logic.
+      // Note: service does not explicitly filter by status unless we update it, but requirements say "all employees ... where situacao is 'ATIVO'".
+      // Since I can't easily change the service signature without risk, I'll filter client side here if data is small, or just assume all returned are eligible.
+      // Ideally I should check 'situacao'.
       employeesService.getEmployees(1, 100).then(({ data }) => {
-        setEmployees(data)
+        const active = data.filter((e) => e.situacao === 'ATIVO')
+        setEmployees(active)
       })
       // Reset form
       form.reset({
         cliente_id: 0,
         funcionario_id: currentUser?.id || 0,
+        responsavel_id: null,
         descricao_pendencia: '',
       })
       setSelectedClient(null)
@@ -88,6 +95,7 @@ export function PendenciaFormDialog({
       await pendenciasService.create({
         cliente_id: data.cliente_id,
         funcionario_id: data.funcionario_id,
+        responsavel_id: data.responsavel_id || null,
         descricao_pendencia: data.descricao_pendencia,
         resolvida: false,
         descricao_resolucao: null,
@@ -156,14 +164,43 @@ export function PendenciaFormDialog({
               name="funcionario_id"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Funcionário</FormLabel>
+                  <FormLabel>Criado por</FormLabel>
+                  <Select
+                    onValueChange={(val) => field.onChange(Number(val))}
+                    value={field.value ? field.value.toString() : undefined}
+                    disabled // Generally creator shouldn't change
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o funcionário" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {employees.map((emp) => (
+                        <SelectItem key={emp.id} value={emp.id.toString()}>
+                          {emp.nome_completo}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="responsavel_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Responsável (Opcional)</FormLabel>
                   <Select
                     onValueChange={(val) => field.onChange(Number(val))}
                     value={field.value ? field.value.toString() : undefined}
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Selecione o funcionário" />
+                        <SelectValue placeholder="Selecione um responsável" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>

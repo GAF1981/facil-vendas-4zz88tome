@@ -39,6 +39,7 @@ import { PendenciaFormDialog } from '@/components/pendencias/PendenciaFormDialog
 import { ResolvePendenciaDialog } from '@/components/pendencias/ResolvePendenciaDialog'
 import { Pendencia } from '@/types/pendencia'
 import { pendenciasService } from '@/services/pendenciasService'
+import { employeesService } from '@/services/employeesService'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 import {
@@ -51,6 +52,7 @@ import {
 import { useSearchParams } from 'react-router-dom'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Employee } from '@/types/employee'
 
 export default function PendenciasPage() {
   const [pendencias, setPendencias] = useState<Pendencia[]>([])
@@ -67,6 +69,9 @@ export default function PendenciasPage() {
   // Filters
   const [filterExiste, setFilterExiste] = useState('SIM')
   const [filterResolvida, setFilterResolvida] = useState('NÃO')
+  const [filterResponsavel, setFilterResponsavel] = useState('TODOS')
+
+  const [employees, setEmployees] = useState<Employee[]>([])
 
   const { toast } = useToast()
   const [searchParams] = useSearchParams()
@@ -82,6 +87,13 @@ export default function PendenciasPage() {
       setSearchTerm(searchParam)
     }
   }, [searchParams])
+
+  // Load Employees for Filter
+  useEffect(() => {
+    employeesService.getEmployees(1, 100).then(({ data }) => {
+      setEmployees(data.filter((e) => e.situacao === 'ATIVO'))
+    })
+  }, [])
 
   const fetchPendencias = useCallback(async () => {
     // Logic for "Existe Pendências?": If NÃO, show nothing (or empty list)
@@ -120,6 +132,12 @@ export default function PendenciasPage() {
   }, [fetchPendencias])
 
   const filteredPendencias = pendencias.filter((p) => {
+    // Filter by Responsible
+    if (filterResponsavel !== 'TODOS') {
+      const respId = Number(filterResponsavel)
+      if (p.responsavel_id !== respId) return false
+    }
+
     if (!searchTerm) return true
     const searchLower = searchTerm.toLowerCase()
     return (
@@ -176,8 +194,8 @@ export default function PendenciasPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col md:flex-row gap-4 items-end">
-            <div className="w-full md:w-1/4 space-y-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+            <div className="space-y-2">
               <label className="text-sm font-medium">Existe Pendências?</label>
               <Select value={filterExiste} onValueChange={setFilterExiste}>
                 <SelectTrigger>
@@ -190,7 +208,7 @@ export default function PendenciasPage() {
               </Select>
             </div>
 
-            <div className="w-full md:w-1/4 space-y-2">
+            <div className="space-y-2">
               <label className="text-sm font-medium">Pendência Resolvida</label>
               <Select
                 value={filterResolvida}
@@ -207,12 +225,32 @@ export default function PendenciasPage() {
               </Select>
             </div>
 
-            <div className="w-full md:flex-1 space-y-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Responsável</label>
+              <Select
+                value={filterResponsavel}
+                onValueChange={setFilterResponsavel}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="TODOS">Todos</SelectItem>
+                  {employees.map((e) => (
+                    <SelectItem key={e.id} value={e.id.toString()}>
+                      {e.nome_completo}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
               <label className="text-sm font-medium">Busca Rápida</label>
               <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Nome do cliente, código, funcionário ou descrição..."
+                  placeholder="Buscar..."
                   className="pl-8"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -261,9 +299,6 @@ export default function PendenciasPage() {
                         STATUS
                       </TableHead>
                       <TableHead className="hidden sm:table-cell">
-                        Criado Por
-                      </TableHead>
-                      <TableHead className="hidden sm:table-cell">
                         Responsável
                       </TableHead>
                       <TableHead className="min-w-[200px]">PENDENCIA</TableHead>
@@ -279,7 +314,7 @@ export default function PendenciasPage() {
                     {filteredPendencias.length === 0 ? (
                       <TableRow>
                         <TableCell
-                          colSpan={8}
+                          colSpan={7}
                           className="h-24 text-center text-muted-foreground"
                         >
                           {filterExiste === 'NÃO'
@@ -309,19 +344,18 @@ export default function PendenciasPage() {
                             </Badge>
                           </TableCell>
                           <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
-                            <div className="flex items-center gap-1">
-                              <User className="w-3 h-3" />
-                              {pendencia.creator?.nome_completo || 'N/A'}
-                            </div>
-                          </TableCell>
-                          <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
-                            {pendencia.responsible ? (
-                              <div className="flex items-center gap-1 text-green-700">
+                            {pendencia.responsavel_id ? (
+                              <div className="flex items-center gap-1 text-blue-700 font-medium">
                                 <Users className="w-3 h-3" />
-                                {pendencia.responsible.nome_completo}
+                                {employees.find(
+                                  (e) => e.id === pendencia.responsavel_id,
+                                )?.nome_completo ||
+                                  `ID: ${pendencia.responsavel_id}`}
                               </div>
                             ) : (
-                              '-'
+                              <span className="text-muted-foreground italic">
+                                Todos
+                              </span>
                             )}
                           </TableCell>
                           <TableCell>

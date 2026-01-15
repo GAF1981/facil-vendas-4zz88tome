@@ -49,7 +49,8 @@ export function EstoqueCarroTable({ items, onRefresh }: Props) {
       // Contagem Filter
       if (contagemFilter !== 'todos') {
         if (contagemFilter === 'Pendente') {
-          const isPendente = item.diferenca_qtd !== 0 && !item.has_count_record
+          // New Logic: If Saldo Final != 0 AND count not recorded -> Pendente
+          const isPendente = item.saldo_final !== 0 && !item.has_count_record
           if (!isPendente) return false
         }
       }
@@ -173,8 +174,9 @@ export function EstoqueCarroTable({ items, onRefresh }: Props) {
           </TableHeader>
           <TableBody>
             {filteredItems.map((item) => {
+              // Status Indicator Logic: if Saldo final != 0 AND !has_count_record -> Pendente
               const isPendente =
-                item.diferenca_qtd !== 0 && !item.has_count_record
+                item.saldo_final !== 0 && !item.has_count_record
 
               return (
                 <TableRow key={item.produto_id} className="hover:bg-muted/30">

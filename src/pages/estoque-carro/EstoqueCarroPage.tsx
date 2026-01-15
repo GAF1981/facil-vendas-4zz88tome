@@ -108,16 +108,16 @@ export default function EstoqueCarroPage() {
   const handleFinalize = async () => {
     if (!session) return
 
-    // Check for pending items
+    // Check for pending items based on updated logic: Saldo Final != 0 AND No Count
     const pendingItems = items.some(
-      (item) => item.diferenca_qtd !== 0 && !item.has_count_record,
+      (item) => item.saldo_final !== 0 && !item.has_count_record,
     )
 
     if (pendingItems) {
       toast({
         title: 'Ação Bloqueada',
         description:
-          'Existem itens com status Pendente. Realize a contagem antes de finalizar.',
+          'Existem itens com saldo final pendente de contagem. Realize a contagem antes de finalizar.',
         variant: 'destructive',
       })
       return
