@@ -225,8 +225,6 @@ Deno.serve(async (req) => {
 
       // Row 3
       drawText(`Endereco: ${header.endereco || '-'}`, colLeftX, y, { size: 10 })
-      // If address is long, it might overlap, but typical layouts allow simple overlap or truncate handled by drawText manually if we added maxWidth logic, but standard drawText just prints.
-      // We'll trust the space or wrap. Since we don't have wrap, we'll assume it fits or text overruns slightly.
       drawText(`CEP: ${header.cep || '-'}`, colRightX, y, { size: 10 })
       y -= 15
 
@@ -346,9 +344,11 @@ Deno.serve(async (req) => {
       // Footer Financial Summary
       if (financials) {
         y -= 20
-        checkPageBreak(60)
+        checkPageBreak(80)
 
-        const financialLabelX = width - margins.right - 150
+        // Expanded width for financial summary to prevent overlapping
+        const summaryWidth = 280
+        const financialLabelX = width - margins.right - summaryWidth
         const financialValueX = width - margins.right
 
         drawText('RESUMO FINANCEIRO', width - margins.right, y, {
@@ -356,7 +356,7 @@ Deno.serve(async (req) => {
           font: fontBold,
           align: 'right',
         })
-        y -= 15
+        y -= 20
 
         drawText('Total Vendido:', financialLabelX, y, { size: 10 })
         drawText(
@@ -374,7 +374,7 @@ Deno.serve(async (req) => {
           y,
           { size: 10, align: 'right', color: rgb(1, 0, 0) },
         )
-        y -= 15
+        y -= 20 // More spacing before total
 
         drawText('TOTAL A PAGAR:', financialLabelX, y, {
           size: 12,
