@@ -168,6 +168,36 @@ export const notaFiscalService = {
       console.error('Error fetching client details:', clientError)
     }
 
+    // --- NEW: Fetch Product Types Fallback ---
+    // Extract unique product codes (exclude nulls)
+    const productCodes = Array.from(
+      new Set(
+        itemsData
+          .map((item) => item['COD. PRODUTO'])
+          .filter((code) => code !== null && code !== undefined),
+      ),
+    ) as number[]
+
+    // Fetch TIPO from PRODUTOS table for these codes
+    const productTypeMap = new Map<number, string>()
+    if (productCodes.length > 0) {
+      const { data: productsData, error: productsError } = await supabase
+        .from('PRODUTOS')
+        .select('CODIGO, TIPO')
+        .in('CODIGO', productCodes)
+
+      if (productsError) {
+        console.error('Error fetching product types:', productsError)
+      } else if (productsData) {
+        productsData.forEach((p) => {
+          if (p.CODIGO !== null) {
+            productTypeMap.set(p.CODIGO, p.TIPO || '')
+          }
+        })
+      }
+    }
+    // -----------------------------------------
+
     // Calculate Financials
     let totalVendido = 0
     itemsData.forEach((item) => {
@@ -203,21 +233,34 @@ export const notaFiscalService = {
     }
 
     // Map data to expected format for PDF
-    const items = itemsData.map((item) => ({
-      // Cast to String to ensure large numbers/EANs are preserved accurately
-      codProduto: item['COD. PRODUTO']
-        ? String(item['COD. PRODUTO'])
-        : item['COD. PRODUTO'],
-      produto: item['MERCADORIA'],
-      tipo: item['TIPO'],
-      saldoInicial: item['SALDO INICIAL'],
-      contagem: item['CONTAGEM'],
-      quantidadeVendida: item['QUANTIDADE VENDIDA'],
-      valorVendido: item['VALOR VENDIDO'],
-      saldoFinal: item['SALDO FINAL'],
-      novasConsignacoes: item['NOVAS CONSIGNAÇÕES'],
-      devolucoes: item['RECOLHIDO'],
-    }))
+    const items = itemsData.map((item) => {
+      let tipo = item['TIPO']
+      // Fallback logic for TIPO
+      if (!tipo || tipo.trim() === '') {
+        const code = item['COD. PRODUTO']
+        if (code !== null && code !== undefined) {
+          tipo = productTypeMap.get(code) || '-'
+        } else {
+          tipo = '-'
+        }
+      }
+
+      return {
+        // Cast to String to ensure large numbers/EANs are preserved accurately
+        codProduto: item['COD. PRODUTO']
+          ? String(item['COD. PRODUTO'])
+          : item['COD. PRODUTO'],
+        produto: item['MERCADORIA'],
+        tipo: tipo,
+        saldoInicial: item['SALDO INICIAL'],
+        contagem: item['CONTAGEM'],
+        quantidadeVendida: item['QUANTIDADE VENDIDA'],
+        valorVendido: item['VALOR VENDIDO'],
+        saldoFinal: item['SALDO FINAL'],
+        novasConsignacoes: item['NOVAS CONSIGNAÇÕES'],
+        devolucoes: item['RECOLHIDO'],
+      }
+    })
 
     const { data: pdfBlob, error: pdfError } = await supabase.functions.invoke(
       'generate-pdf',
