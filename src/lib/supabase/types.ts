@@ -1419,6 +1419,8 @@ export type Database = {
           pix_aprovado: boolean | null
           responsavel_id: number | null
           rota_id: number
+          saldo_acerto: number | null
+          saldo_acerto_aprovado: boolean | null
           status: string | null
           valor_a_receber: number | null
           valor_cheque: number | null
@@ -1438,6 +1440,8 @@ export type Database = {
           pix_aprovado?: boolean | null
           responsavel_id?: number | null
           rota_id: number
+          saldo_acerto?: number | null
+          saldo_acerto_aprovado?: boolean | null
           status?: string | null
           valor_a_receber?: number | null
           valor_cheque?: number | null
@@ -1457,6 +1461,8 @@ export type Database = {
           pix_aprovado?: boolean | null
           responsavel_id?: number | null
           rota_id?: number
+          saldo_acerto?: number | null
+          saldo_acerto_aprovado?: boolean | null
           status?: string | null
           valor_a_receber?: number | null
           valor_cheque?: number | null
