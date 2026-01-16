@@ -1,6 +1,6 @@
 import { ReceiptDetail } from '@/services/caixaService'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { formatCurrency, safeFormatDate } from '@/lib/formatters'
 import {
   ArrowDownCircle,
@@ -11,6 +11,14 @@ import {
 } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useMemo } from 'react'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 
 interface RevenueGalleryProps {
   items: ReceiptDetail[]
@@ -35,54 +43,61 @@ export function RevenueGallery({ items }: RevenueGalleryProps) {
   const totalCash = cashItems.reduce((acc, item) => acc + item.valor, 0)
   const totalCheck = checkItems.reduce((acc, item) => acc + item.valor, 0)
 
-  const renderList = (
+  const renderTable = (
     listItems: ReceiptDetail[],
     emptyMsg: string,
     listTotal: number,
   ) => (
     <div className="flex flex-col h-full">
       <ScrollArea className="flex-1 h-[500px]">
-        <div className="divide-y">
-          {listItems.length === 0 ? (
-            <div className="p-8 text-center text-muted-foreground text-sm">
-              {emptyMsg}
-            </div>
-          ) : (
-            listItems.map((item) => (
-              <div
-                key={item.id}
-                className="p-3 hover:bg-muted/50 transition-colors flex justify-between items-center text-sm"
-              >
-                <div className="flex flex-col gap-1 overflow-hidden">
-                  <span
-                    className="font-medium truncate"
-                    title={item.clienteNome}
+        <div className="min-w-[600px]">
+          <Table>
+            <TableHeader className="bg-muted/50 sticky top-0 z-10">
+              <TableRow>
+                <TableHead className="w-[120px]">Data</TableHead>
+                <TableHead>Cliente</TableHead>
+                <TableHead>Funcionário</TableHead>
+                <TableHead>Forma</TableHead>
+                <TableHead className="text-right">Valor</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {listItems.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={5}
+                    className="text-center h-24 text-muted-foreground"
                   >
-                    {item.clienteNome}
-                  </span>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>{safeFormatDate(item.data, 'dd/MM/yy HH:mm')}</span>
-                    <span>•</span>
-                    <span
-                      className="truncate max-w-[100px]"
-                      title={item.funcionarioNome}
-                    >
+                    {emptyMsg}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                listItems.map((item) => (
+                  <TableRow key={item.id} className="hover:bg-muted/30">
+                    <TableCell className="text-xs whitespace-nowrap">
+                      {safeFormatDate(item.data, 'dd/MM/yy HH:mm')}
+                    </TableCell>
+                    <TableCell className="font-medium text-sm">
+                      {item.clienteNome}
+                    </TableCell>
+                    <TableCell className="text-xs">
                       {item.funcionarioNome || 'N/D'}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex flex-col items-end gap-0.5">
-                  <span className="font-semibold text-green-700 whitespace-nowrap">
-                    R$ {formatCurrency(item.valor)}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                    {item.forma}
-                  </span>
-                </div>
-              </div>
-            ))
-          )}
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded whitespace-nowrap">
+                        {item.forma}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right font-semibold text-green-700 whitespace-nowrap">
+                      R$ {formatCurrency(item.valor)}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
         </div>
+        <ScrollBar orientation="horizontal" />
       </ScrollArea>
       <div className="p-3 bg-muted/20 border-t mt-auto">
         <div className="flex justify-between items-center">
@@ -134,16 +149,16 @@ export function RevenueGallery({ items }: RevenueGalleryProps) {
           </div>
 
           <TabsContent value="todos" className="flex-1 m-0 p-0">
-            {renderList(items, 'Nenhuma entrada registrada.', total)}
+            {renderTable(items, 'Nenhuma entrada registrada.', total)}
           </TabsContent>
           <TabsContent value="pix" className="flex-1 m-0 p-0">
-            {renderList(pixItems, 'Nenhum PIX registrado.', totalPix)}
+            {renderTable(pixItems, 'Nenhum PIX registrado.', totalPix)}
           </TabsContent>
           <TabsContent value="dinheiro" className="flex-1 m-0 p-0">
-            {renderList(cashItems, 'Nenhum pagamento em Dinheiro.', totalCash)}
+            {renderTable(cashItems, 'Nenhum pagamento em Dinheiro.', totalCash)}
           </TabsContent>
           <TabsContent value="cheque" className="flex-1 m-0 p-0">
-            {renderList(checkItems, 'Nenhum Cheque registrado.', totalCheck)}
+            {renderTable(checkItems, 'Nenhum Cheque registrado.', totalCheck)}
           </TabsContent>
         </Tabs>
       </CardContent>
