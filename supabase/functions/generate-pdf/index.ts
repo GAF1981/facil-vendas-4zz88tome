@@ -183,7 +183,7 @@ Deno.serve(async (req) => {
     // --- REPORT TYPES LOGIC ---
 
     if (reportType === 'detailed-order-report') {
-      const { header, items } = body
+      const { header, items, financials } = body
 
       drawText('RELATORIO DETALHADO DE PEDIDO', width / 2, y, {
         size: 14,
@@ -194,20 +194,60 @@ Deno.serve(async (req) => {
       drawLine(y)
       y -= 20
 
-      // Header Info
-      const headerLabels = [
-        { l: 'Numero do Pedido:', v: header.orderId },
-        { l: 'Cliente:', v: `${header.codigoCliente} - ${header.cliente}` },
-        { l: 'Funcionario:', v: header.funcionario },
-        { l: 'Data do Acerto:', v: safeFormatDate(header.dataAcerto) },
-      ]
+      // Detailed Header Info with 2 Columns
+      const colLeftX = margins.left
+      const colRightX = width / 2 + 20
 
-      for (const h of headerLabels) {
-        drawText(h.l, margins.left, y, { size: 10, font: fontBold })
-        drawText(String(h.v || '-'), margins.left + 120, y, { size: 10 })
-        y -= 15
-      }
-      y -= 10
+      // Row 1
+      drawText(`Numero do Pedido: ${header.orderId}`, colLeftX, y, {
+        size: 10,
+        font: fontBold,
+      })
+      drawText(
+        `Data do Acerto: ${safeFormatDate(header.dataAcerto)}`,
+        colRightX,
+        y,
+        {
+          size: 10,
+        },
+      )
+      y -= 15
+
+      // Row 2
+      drawText(
+        `Cliente: ${header.codigoCliente} - ${header.cliente}`,
+        colLeftX,
+        y,
+        { size: 10, font: fontBold },
+      )
+      drawText(`CNPJ/CPF: ${header.cnpj || '-'}`, colRightX, y, { size: 10 })
+      y -= 15
+
+      // Row 3
+      drawText(`Endereco: ${header.endereco || '-'}`, colLeftX, y, { size: 10 })
+      // If address is long, it might overlap, but typical layouts allow simple overlap or truncate handled by drawText manually if we added maxWidth logic, but standard drawText just prints.
+      // We'll trust the space or wrap. Since we don't have wrap, we'll assume it fits or text overruns slightly.
+      drawText(`CEP: ${header.cep || '-'}`, colRightX, y, { size: 10 })
+      y -= 15
+
+      // Row 4
+      drawText(`Municipio: ${header.municipio || '-'}`, colLeftX, y, {
+        size: 10,
+      })
+      drawText(`Telefone: ${header.telefone || '-'}`, colRightX, y, {
+        size: 10,
+      })
+      y -= 15
+
+      // Row 5
+      drawText(`Contato: ${header.contato || '-'}`, colLeftX, y, { size: 10 })
+      y -= 15
+
+      // Row 6
+      drawText(`Funcionario: ${header.funcionario}`, colLeftX, y, { size: 10 })
+      y -= 15
+
+      y -= 5
       drawLine(y)
 
       // Table Header - Vertical with updated columns
@@ -302,6 +342,51 @@ Deno.serve(async (req) => {
       }
 
       drawLine(y)
+
+      // Footer Financial Summary
+      if (financials) {
+        y -= 20
+        checkPageBreak(60)
+
+        const financialLabelX = width - margins.right - 150
+        const financialValueX = width - margins.right
+
+        drawText('RESUMO FINANCEIRO', width - margins.right, y, {
+          size: 10,
+          font: fontBold,
+          align: 'right',
+        })
+        y -= 15
+
+        drawText('Total Vendido:', financialLabelX, y, { size: 10 })
+        drawText(
+          `R$ ${formatCurrency(financials.totalVendido)}`,
+          financialValueX,
+          y,
+          { size: 10, align: 'right' },
+        )
+        y -= 15
+
+        drawText('Desconto:', financialLabelX, y, { size: 10 })
+        drawText(
+          `R$ ${formatCurrency(financials.valorDesconto)}`,
+          financialValueX,
+          y,
+          { size: 10, align: 'right', color: rgb(1, 0, 0) },
+        )
+        y -= 15
+
+        drawText('TOTAL A PAGAR:', financialLabelX, y, {
+          size: 12,
+          font: fontBold,
+        })
+        drawText(
+          `R$ ${formatCurrency(financials.totalAPagar)}`,
+          financialValueX,
+          y,
+          { size: 12, align: 'right', font: fontBold },
+        )
+      }
     } else if (
       reportType === 'cash-summary' ||
       reportType === 'employee-cash-summary'

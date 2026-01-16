@@ -146,17 +146,64 @@ export const notaFiscalService = {
 
   async generateDetailedReport(orderId: number) {
     // Fetch all items for this order from BANCO_DE_DADOS
-    const { data, error } = await supabase
+    const { data: itemsData, error: itemsError } = await supabase
       .from('BANCO_DE_DADOS')
       .select('*')
       .eq('"NÚMERO DO PEDIDO"', orderId)
 
-    if (error) throw error
-    if (!data || data.length === 0) throw new Error('Pedido não encontrado')
+    if (itemsError) throw itemsError
+    if (!itemsData || itemsData.length === 0)
+      throw new Error('Pedido não encontrado')
+
+    const first = itemsData[0]
+
+    // Fetch Client Details for Header
+    const { data: clientData, error: clientError } = await supabase
+      .from('CLIENTES')
+      .select('*')
+      .eq('CODIGO', first['CÓDIGO DO CLIENTE'])
+      .single()
+
+    if (clientError) {
+      console.error('Error fetching client details:', clientError)
+    }
+
+    // Calculate Financials
+    let totalVendido = 0
+    itemsData.forEach((item) => {
+      totalVendido += parseCurrency(item['VALOR VENDIDO'])
+    })
+
+    const discountStr = first['DESCONTO POR GRUPO'] || '0'
+    const discountVal = parseCurrency(discountStr.replace('%', ''))
+    const discountFactor = discountVal > 1 ? discountVal / 100 : discountVal
+
+    const valorDesconto = totalVendido * discountFactor
+    const totalAPagar = totalVendido - valorDesconto
+
+    const header = {
+      orderId: first['NÚMERO DO PEDIDO'],
+      cliente: first['CLIENTE'],
+      codigoCliente: first['CÓDIGO DO CLIENTE'],
+      funcionario: first['FUNCIONÁRIO'],
+      dataAcerto: first['DATA DO ACERTO'],
+      // Extra info
+      cnpj: clientData?.CNPJ || '',
+      endereco: clientData?.['ENDEREÇO'] || '',
+      municipio: clientData?.['MUNICÍPIO'] || '',
+      cep: clientData?.['CEP OFICIO'] || '',
+      contato: clientData?.['CONTATO 1'] || '',
+      telefone: clientData?.['FONE 1'] || '',
+    }
+
+    const financials = {
+      totalVendido,
+      valorDesconto,
+      totalAPagar,
+    }
 
     // Map data to expected format for PDF
-    // We send raw values mostly, but structure object properties nicely
-    const items = data.map((item) => ({
+    const items = itemsData.map((item) => ({
       // Cast to String to ensure large numbers/EANs are preserved accurately
       codProduto: item['COD. PRODUTO']
         ? String(item['COD. PRODUTO'])
@@ -172,16 +219,6 @@ export const notaFiscalService = {
       devolucoes: item['RECOLHIDO'],
     }))
 
-    // Header info from first record
-    const first = data[0]
-    const header = {
-      orderId: first['NÚMERO DO PEDIDO'],
-      cliente: first['CLIENTE'],
-      codigoCliente: first['CÓDIGO DO CLIENTE'],
-      funcionario: first['FUNCIONÁRIO'],
-      dataAcerto: first['DATA DO ACERTO'],
-    }
-
     const { data: pdfBlob, error: pdfError } = await supabase.functions.invoke(
       'generate-pdf',
       {
@@ -190,6 +227,7 @@ export const notaFiscalService = {
           format: 'A4',
           header,
           items,
+          financials,
         },
         responseType: 'blob',
       },
