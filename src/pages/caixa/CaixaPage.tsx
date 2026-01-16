@@ -337,6 +337,18 @@ export default function CaixaPage() {
     }
   }
 
+  // Permission check for Close Cashier
+  const canCloseCashier = useMemo(() => {
+    if (!loggedInUser) return false
+    const allowedSectors = ['Administrador', 'Gerente', 'Financeiro']
+    const userSectors = Array.isArray(loggedInUser.setor)
+      ? loggedInUser.setor
+      : loggedInUser.setor
+        ? [loggedInUser.setor]
+        : []
+    return userSectors.some((s) => allowedSectors.includes(s))
+  }, [loggedInUser])
+
   return (
     <div className="space-y-6 animate-fade-in p-2 pb-20 sm:p-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -354,14 +366,16 @@ export default function CaixaPage() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-          <Button
-            onClick={() => setIsCloseCashierDialogOpen(true)}
-            className="bg-purple-600 hover:bg-purple-700 flex-1 sm:flex-none text-white"
-            disabled={!selectedRoute}
-          >
-            <Lock className="mr-2 h-4 w-4" />
-            Fechar Caixa
-          </Button>
+          {canCloseCashier && (
+            <Button
+              onClick={() => setIsCloseCashierDialogOpen(true)}
+              className="bg-purple-600 hover:bg-purple-700 flex-1 sm:flex-none text-white"
+              disabled={!selectedRoute}
+            >
+              <Lock className="mr-2 h-4 w-4" />
+              Fechar Caixa
+            </Button>
+          )}
           <div className="flex flex-col sm:flex-row gap-2 border p-1 rounded-md bg-background">
             <div className="flex items-center gap-2 px-2">
               <Label className="text-xs">Formato:</Label>

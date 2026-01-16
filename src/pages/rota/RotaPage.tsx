@@ -13,6 +13,7 @@ import { supabase } from '@/lib/supabase/client'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { useUserStore } from '@/stores/useUserStore'
+import { useRotaFilterStore } from '@/stores/useRotaFilterStore'
 
 export default function RotaPage() {
   const [activeRota, setActiveRota] = useState<Rota | null>(null)
@@ -25,6 +26,9 @@ export default function RotaPage() {
   const { toast } = useToast()
   const { employee } = useUserStore()
 
+  // Use persistent store for employee filter
+  const { selectedEmployeeIds, setSelectedEmployeeIds } = useRotaFilterStore()
+
   const [isSelectionMode, setIsSelectionMode] = useState(false)
   const [showFilters, setShowFilters] = useState(true)
 
@@ -32,7 +36,7 @@ export default function RotaPage() {
     search: '',
     x_na_rota: 'todos',
     agregado: 'todos',
-    vendedor: [],
+    vendedor: selectedEmployeeIds, // Initialize with persisted value
     municipio: 'todos',
     grupo_rota: 'todos',
     debito_min: '',
@@ -44,6 +48,11 @@ export default function RotaPage() {
     estoque_max: '',
     vencimento_status: 'todos',
   })
+
+  // Update persistent store when filter changes
+  useEffect(() => {
+    setSelectedEmployeeIds(filters.vendedor)
+  }, [filters.vendedor, setSelectedEmployeeIds])
 
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     key: 'projecao',
@@ -479,14 +488,14 @@ export default function RotaPage() {
     }
 
     const headers = [
+      'Código',
+      'Cliente',
       'Débito',
       'Vencimento',
       'Projeção',
       'Vendedor',
       'Rota/Grupo Rota',
       'Consignado',
-      '#',
-      'Cliente',
       'Município',
       'Endereço',
       'Tipo de Cliente',
@@ -512,14 +521,14 @@ export default function RotaPage() {
             : ''
 
         return [
+          row.client.CODIGO,
+          `"${(row.client['NOME CLIENTE'] || '').replace(/"/g, '""')}"`,
           row.debito.toFixed(2).replace('.', ','),
           vencimentoStr,
           (row.projecao || 0).toFixed(2).replace('.', ','),
           `"${sellerName}"`,
           `"${(row.client['GRUPO ROTA'] || '').replace(/"/g, '""')}"`,
           (row.valor_consignado || 0).toFixed(2).replace('.', ','),
-          row.rowNumber,
-          `"${(row.client['NOME CLIENTE'] || '').replace(/"/g, '""')}"`,
           `"${(row.client.MUNICÍPIO || '').replace(/"/g, '""')}"`,
           `"${(row.client.ENDEREÇO || '').replace(/"/g, '""')}"`,
           `"${(row.client['TIPO DE CLIENTE'] || '').replace(/"/g, '""')}"`,

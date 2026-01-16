@@ -48,11 +48,9 @@ export function CloseCashierDialog({
       employeesService.getEmployees(1, 100).then(({ data }) => {
         setEmployees(data.filter((e) => e.situacao === 'ATIVO'))
       })
-      // Default to logged-in user if available
+      // Auto-populate with logged-in user and force selection
       if (loggedInUser) {
         setSelectedEmployeeId(loggedInUser.id.toString())
-      } else {
-        setSelectedEmployeeId('')
       }
     }
   }, [open, loggedInUser])
@@ -70,7 +68,7 @@ export function CloseCashierDialog({
     if (!selectedEmployeeId) {
       toast({
         title: 'Atenção',
-        description: 'Selecione um funcionário.',
+        description: 'Funcionário não identificado.',
         variant: 'destructive',
       })
       return
@@ -145,7 +143,7 @@ export function CloseCashierDialog({
         <DialogHeader>
           <DialogTitle>Fechar Caixa</DialogTitle>
           <DialogDescription>
-            Inicie o processo de conferência e fechamento para um funcionário na{' '}
+            Inicie o processo de conferência e fechamento para seu caixa na{' '}
             <strong>Rota #{currentRoute?.id}</strong>.
             <br />
             <span className="text-xs text-muted-foreground mt-2 block">
@@ -156,12 +154,13 @@ export function CloseCashierDialog({
 
         <div className="py-4 space-y-4">
           <div className="space-y-2">
-            <Label>Funcionário</Label>
+            <Label>Funcionário (Você)</Label>
             <Select
               value={selectedEmployeeId}
               onValueChange={setSelectedEmployeeId}
+              disabled={true} // Restricted as requested
             >
-              <SelectTrigger>
+              <SelectTrigger className="bg-muted opacity-100 font-medium">
                 <SelectValue placeholder="Selecione..." />
               </SelectTrigger>
               <SelectContent>

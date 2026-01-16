@@ -72,8 +72,11 @@ export function ClientForm({
   const [loading, setLoading] = useState(false)
   const [routes, setRoutes] = useState<string[]>([])
   const [clientTypes, setClientTypes] = useState<string[]>([])
+  const [groups, setGroups] = useState<string[]>([])
   const [openRoute, setOpenRoute] = useState(false)
+  const [openGroup, setOpenGroup] = useState(false)
   const [searchValue, setSearchValue] = useState('')
+  const [searchGroupValue, setSearchGroupValue] = useState('')
   const [searchingCep, setSearchingCep] = useState(false)
   const [newGroupOpen, setNewGroupOpen] = useState(false)
   const [newGroupName, setNewGroupName] = useState('')
@@ -137,11 +140,12 @@ export function ClientForm({
   useEffect(() => {
     clientsService.getRoutes().then((data) => setRoutes(data))
     clientsService.getUniqueClientTypes().then((data) => {
-      // Added "INATIVO-COBRANÇA" to default types as requested
       const defaultTypes = ['ATIVO', 'INATIVO - ROTA', 'INATIVO-COBRANÇA']
       const mergedTypes = Array.from(new Set([...defaultTypes, ...data]))
       setClientTypes(mergedTypes)
     })
+    // Fetch Groups
+    clientsService.getUniqueGroups().then((data) => setGroups(data))
 
     if (!initialData) {
       clientsService
@@ -183,7 +187,6 @@ export function ClientForm({
   const checkDuplicate = async (
     cpfCnpj: string,
   ): Promise<'proceed' | 'cancel'> => {
-    // Don't check empty
     if (!cpfCnpj) return 'proceed'
 
     try {
@@ -193,7 +196,6 @@ export function ClientForm({
       )
 
       if (duplicate) {
-        // Fetch debt info (optional for warning, but good to have)
         let debt = 0
         try {
           debt = await cobrancaService.getClientDebtSummary(duplicate.CODIGO)
@@ -224,7 +226,6 @@ export function ClientForm({
   const onSubmit = async (data: ClientFormData) => {
     setLoading(true)
     try {
-      // Duplicate Check
       const proceed = await checkDuplicate(data.CNPJ)
       if (proceed === 'cancel') {
         setLoading(false)
@@ -273,7 +274,9 @@ export function ClientForm({
 
   const handleAddNewGroup = () => {
     if (newGroupName.trim()) {
-      form.setValue('GRUPO', newGroupName.trim())
+      const newG = newGroupName.trim()
+      setGroups((prev) => [...prev, newG]) // Update local list immediately
+      form.setValue('GRUPO', newG)
       setNewGroupOpen(false)
       setNewGroupName('')
     }
@@ -296,6 +299,7 @@ export function ClientForm({
     <>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          {/* Identificação Fields Omitted for Brevity - Keeping Structure */}
           <div className="space-y-4">
             <h3 className="text-lg font-medium">Identificação</h3>
             <Separator />
@@ -471,7 +475,6 @@ export function ClientForm({
             </div>
           </div>
 
-          {/* Contato */}
           <div className="space-y-4">
             <h3 className="text-lg font-medium">Contato</h3>
             <Separator />
@@ -584,7 +587,6 @@ export function ClientForm({
             </div>
           </div>
 
-          {/* Endereço */}
           <div className="space-y-4">
             <h3 className="text-lg font-medium">Endereço</h3>
             <Separator />
@@ -839,7 +841,7 @@ export function ClientForm({
                 />
               </div>
 
-              {/* Classification Fields */}
+              {/* Dynamic Group Dropdown */}
               <div className="md:col-span-6">
                 <div className="flex items-end gap-2">
                   <div className="flex-1">
@@ -847,15 +849,75 @@ export function ClientForm({
                       control={form.control}
                       name="GRUPO"
                       render={({ field }) => (
-                        <FormItem>
+                        <FormItem className="flex flex-col">
                           <FormLabel>Grupo</FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder="Grupo de clientes"
-                              {...field}
-                              value={field.value || ''}
-                            />
-                          </FormControl>
+                          <Popover open={openGroup} onOpenChange={setOpenGroup}>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  aria-expanded={openGroup}
+                                  className={cn(
+                                    'w-full justify-between',
+                                    !field.value && 'text-muted-foreground',
+                                  )}
+                                >
+                                  {field.value || 'Selecione ou crie'}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[300px] p-0">
+                              <Command>
+                                <CommandInput
+                                  placeholder="Buscar grupo..."
+                                  onValueChange={setSearchGroupValue}
+                                />
+                                <CommandList>
+                                  <CommandEmpty>
+                                    <div className="p-2">
+                                      <p className="text-sm text-muted-foreground mb-2">
+                                        Nenhum grupo encontrado.
+                                      </p>
+                                      <Button
+                                        variant="secondary"
+                                        className="w-full justify-start"
+                                        onClick={() => {
+                                          field.onChange(searchGroupValue)
+                                          setOpenGroup(false)
+                                        }}
+                                      >
+                                        Usar "{searchGroupValue}"
+                                      </Button>
+                                    </div>
+                                  </CommandEmpty>
+                                  <CommandGroup heading="Grupos Existentes">
+                                    {groups.map((grupo) => (
+                                      <CommandItem
+                                        key={grupo}
+                                        value={grupo}
+                                        onSelect={(currentValue) => {
+                                          field.onChange(currentValue)
+                                          setOpenGroup(false)
+                                        }}
+                                      >
+                                        <Check
+                                          className={cn(
+                                            'mr-2 h-4 w-4',
+                                            field.value === grupo
+                                              ? 'opacity-100'
+                                              : 'opacity-0',
+                                          )}
+                                        />
+                                        {grupo}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
                           <FormMessage />
                         </FormItem>
                       )}

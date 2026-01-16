@@ -90,7 +90,7 @@ export function EmployeeForm({
           'Motoqueiro',
           'Financeiro',
           'Administrador',
-          'Gerente', // Added per requirement
+          'Gerente',
           'Outros',
         ]
         const merged = Array.from(new Set([...defaults, ...sectorList])).sort()

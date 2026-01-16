@@ -66,7 +66,14 @@ export const fechamentoService = {
     const expenses = await caixaService.getEmployeeExpenses(funcionarioId, rota)
     const valorDespesas = expenses.reduce((acc, e) => acc + e.valor, 0)
 
-    // 4. Insert Record
+    // 4. Calculate Saldo do Acerto
+    // Saldo = (Dinheiro + Cheque) - Despesas. Pix is usually separate or considered already "in bank"
+    // Based on CaixaPage logic: Saldo De Acerto = (Total Saldo - Total Pix)
+    // Where Total Saldo = (Din + Pix + Cheque) - Despesas
+    // So: (Din + Pix + Cheque - Despesas) - Pix = Din + Cheque - Despesas
+    const saldoAcerto = valorDinheiro + valorCheque - valorDespesas
+
+    // 5. Insert Record
     const payload: FechamentoInsert = {
       rota_id: rota.id,
       funcionario_id: funcionarioId,
@@ -77,6 +84,7 @@ export const fechamentoService = {
       valor_pix: valorPix,
       valor_cheque: valorCheque,
       valor_despesas: valorDespesas,
+      saldo_acerto: saldoAcerto,
       status: 'Aberto',
     }
 
@@ -96,7 +104,8 @@ export const fechamentoService = {
       | 'dinheiro_aprovado'
       | 'pix_aprovado'
       | 'cheque_aprovado'
-      | 'despesas_aprovadas',
+      | 'despesas_aprovadas'
+      | 'saldo_acerto_aprovado',
     value: boolean,
   ) {
     const { error } = await supabase

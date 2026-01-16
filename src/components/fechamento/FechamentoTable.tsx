@@ -83,7 +83,8 @@ export function FechamentoTable({ data, onRefresh }: FechamentoTableProps) {
       | 'dinheiro_aprovado'
       | 'pix_aprovado'
       | 'cheque_aprovado'
-      | 'despesas_aprovadas',
+      | 'despesas_aprovadas'
+      | 'saldo_acerto_aprovado',
     value: boolean,
   ) => {
     if (item.status === 'Fechado') return
@@ -200,6 +201,9 @@ export function FechamentoTable({ data, onRefresh }: FechamentoTableProps) {
             <TableHead className="text-center w-[100px] bg-red-50/50 text-red-700 font-bold border-r">
               Despesas
             </TableHead>
+            <TableHead className="text-center w-[120px] bg-yellow-50/50 text-yellow-800 font-bold border-r">
+              Saldo Acerto
+            </TableHead>
             <TableHead className="text-center">Responsável</TableHead>
             <TableHead className="text-right">Ação</TableHead>
           </TableRow>
@@ -208,7 +212,7 @@ export function FechamentoTable({ data, onRefresh }: FechamentoTableProps) {
           {data.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={11}
+                colSpan={12}
                 className="h-24 text-center text-muted-foreground"
               >
                 Nenhum fechamento iniciado para esta rota.
@@ -226,12 +230,13 @@ export function FechamentoTable({ data, onRefresh }: FechamentoTableProps) {
 
               const isPixCheckboxDisabled = isClosed || allPixConfirmed
 
-              // Validation Logic: Stricter - REQUIRE ALL CHECKBOXES
+              // Validation Logic: Stricter - REQUIRE ALL CHECKBOXES including Saldo Acerto
               const canConfirm =
                 item.dinheiro_aprovado &&
                 (isPixCheckboxChecked || item.pix_aprovado) &&
                 item.cheque_aprovado &&
-                item.despesas_aprovadas && // Explicitly require expense approval even if 0
+                item.despesas_aprovadas &&
+                item.saldo_acerto_aprovado && // NEW Mandatory Check
                 !isClosed
 
               const isLoading = loadingIds.has(item.id)
@@ -350,6 +355,26 @@ export function FechamentoTable({ data, onRefresh }: FechamentoTableProps) {
                           )
                         }
                         className="data-[state=checked]:bg-red-600 data-[state=checked]:border-red-600"
+                      />
+                    </div>
+                  </TableCell>
+
+                  <TableCell className="border-r bg-yellow-50/20 text-center p-2">
+                    <div className="flex flex-col items-center gap-1">
+                      <span className="text-xs font-semibold text-yellow-800">
+                        R$ {formatCurrency(item.saldo_acerto || 0)}
+                      </span>
+                      <Checkbox
+                        checked={item.saldo_acerto_aprovado}
+                        disabled={isClosed}
+                        onCheckedChange={(c) =>
+                          handleToggleApproval(
+                            item,
+                            'saldo_acerto_aprovado',
+                            c as boolean,
+                          )
+                        }
+                        className="data-[state=checked]:bg-yellow-600 data-[state=checked]:border-yellow-600 border-yellow-400"
                       />
                     </div>
                   </TableCell>

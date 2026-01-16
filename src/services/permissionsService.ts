@@ -28,7 +28,7 @@ const MODULES_LIST = [
   'Pagamentos',
   'Controle',
   'Inativar Clientes',
-  'Veículos', // Added
+  'Veículos',
 ]
 
 export const permissionsService = {
