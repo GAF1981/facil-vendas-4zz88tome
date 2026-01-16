@@ -9,7 +9,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { AlertTriangle } from 'lucide-react'
-import { formatCurrency } from '@/lib/formatters'
 
 interface DuplicateWarningDialogProps {
   open: boolean
@@ -39,16 +38,12 @@ export function DuplicateWarningDialog({
           </AlertDialogTitle>
           <AlertDialogDescription className="space-y-2 text-foreground">
             <p>
-              Esse CNPJ/CPF já está cadastrado no cliente{' '}
+              Já existe um cliente com este CNPJ:{' '}
               <strong>{duplicateData.name}</strong>.
             </p>
-            {duplicateData.debt !== undefined && duplicateData.debt > 0 && (
-              <p className="font-semibold text-red-600">
-                Atenção: Este cliente possui um débito pendente de R${' '}
-                {formatCurrency(duplicateData.debt)}.
-              </p>
-            )}
-            <p className="pt-2 font-medium">Deseja prosseguir?</p>
+            <p className="pt-2 font-medium">
+              Deseja realmente fazer o cadastro?
+            </p>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

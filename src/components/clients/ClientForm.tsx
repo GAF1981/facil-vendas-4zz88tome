@@ -11,6 +11,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
+import { Label } from '@/components/ui/label' // Added Label import
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Loader2, ChevronsUpDown, Check, Plus } from 'lucide-react'
@@ -181,10 +182,13 @@ export function ClientForm({
       )
 
       if (duplicate) {
-        // Fetch debt info
-        const debt = await cobrancaService.getClientDebtSummary(
-          duplicate.CODIGO,
-        )
+        // Fetch debt info (optional for warning, but good to have)
+        let debt = 0
+        try {
+          debt = await cobrancaService.getClientDebtSummary(duplicate.CODIGO)
+        } catch (e) {
+          console.error('Error fetching duplicate debt info', e)
+        }
 
         return new Promise((resolve) => {
           setDuplicateWarning({
@@ -1077,7 +1081,7 @@ export function ClientForm({
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <FormLabel>Nome do Grupo</FormLabel>
+              <Label>Nome do Grupo</Label>
               <Input
                 value={newGroupName}
                 onChange={(e) => setNewGroupName(e.target.value)}

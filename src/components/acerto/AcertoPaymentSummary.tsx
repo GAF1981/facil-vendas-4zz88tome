@@ -276,7 +276,12 @@ export function AcertoPaymentSummary({
   }
 
   return (
-    <Card className="border-muted bg-muted/10 h-full">
+    <Card
+      className={cn(
+        'border-muted bg-muted/10 h-full',
+        disabled && 'opacity-70',
+      )}
+    >
       <CardHeader className="pb-2">
         <CardTitle className="text-xl font-semibold flex items-center gap-2">
           <Wallet className="h-6 w-6 text-primary" />

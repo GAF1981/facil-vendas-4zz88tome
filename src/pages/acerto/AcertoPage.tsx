@@ -381,8 +381,20 @@ export default function AcertoPage() {
       return
     }
 
-    // Financial Validation: Paid Amount > Due Amount Check
     const totalPaid = payments.reduce((acc, p) => acc + p.paidValue, 0)
+
+    // Feature 4: Zero Balance Validation for Captação
+    if (isCaptacao && totalPaid !== 0) {
+      toast({
+        title: 'Erro de Validação',
+        description:
+          'Para finalizar é necessário que o total selecionado de pagamento seja igual a 0',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    // Financial Validation: Paid Amount > Due Amount Check
     // Use a small epsilon for floating point comparison safety
     if (totalPaid > amountToPay + 0.01) {
       toast({
@@ -393,7 +405,7 @@ export default function AcertoPage() {
       return
     }
 
-    if (payments.length === 0 && amountToPay > 0.01) {
+    if (payments.length === 0 && amountToPay > 0.01 && !isCaptacao) {
       toast({
         title: 'Pagamento Obrigatório',
         description:
@@ -643,7 +655,7 @@ export default function AcertoPage() {
                   saldoAPagar={amountToPay}
                   payments={payments}
                   onPaymentsChange={setPayments}
-                  disabled={saving}
+                  disabled={saving || isCaptacao} // Feature 3: Disable payment fields in Captacao
                 />
               </div>
               <div className="lg:col-span-1 flex flex-col gap-6">
