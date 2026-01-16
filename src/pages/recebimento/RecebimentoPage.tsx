@@ -12,7 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { formatCurrency, safeFormatDate } from '@/lib/formatters'
-import { Loader2, Search, Wallet } from 'lucide-react'
+import { Loader2, Search, Printer, CheckSquare } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { OrderDebt } from '@/types/cobranca'
@@ -20,8 +20,8 @@ import { RecebimentoPaymentDialog } from '@/components/recebimento/RecebimentoPa
 import { PaymentEntry } from '@/types/payment'
 import { useAuth } from '@/hooks/use-auth'
 import { ClientRow } from '@/types/client'
+import { Checkbox } from '@/components/ui/checkbox'
 
-// Extended Order type for UI that includes Client Info flattened
 interface FlattenedOrder extends OrderDebt {
   clientName: string
   clientId: number
@@ -31,10 +31,12 @@ export default function RecebimentoPage() {
   const [loading, setLoading] = useState(true)
   const [orders, setOrders] = useState<FlattenedOrder[]>([])
   const [searchTerm, setSearchTerm] = useState('')
-  const [selectedOrder, setSelectedOrder] = useState<FlattenedOrder | null>(
-    null,
-  )
+
+  // Single selection state
+  const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null)
+
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [generatingPdf, setGeneratingPdf] = useState<number | null>(null)
 
   const { toast } = useToast()
   const { user } = useAuth()
@@ -43,11 +45,10 @@ export default function RecebimentoPage() {
     setLoading(true)
     try {
       const result = await cobrancaService.getDebts()
-      // Flatten ClientDebt[] to OrderDebt[]
       const flatOrders: FlattenedOrder[] = result
         .flatMap((client) =>
           client.orders
-            .filter((o) => o.remainingValue > 0.05) // Only debts > 0.05
+            .filter((o) => o.remainingValue > 0.05)
             .map((order) => ({
               ...order,
               clientName: client.clientName,
@@ -57,6 +58,8 @@ export default function RecebimentoPage() {
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
       setOrders(flatOrders)
+      // Reset selection on reload
+      setSelectedOrderId(null)
     } catch (error) {
       console.error(error)
       toast({
@@ -84,36 +87,61 @@ export default function RecebimentoPage() {
     )
   }, [orders, searchTerm])
 
-  const handleOpenPayment = (order: FlattenedOrder) => {
-    setSelectedOrder(order)
-    setDialogOpen(true)
+  const handleSelectOrder = (orderId: number) => {
+    if (selectedOrderId === orderId) {
+      setSelectedOrderId(null) // Deselect
+    } else {
+      setSelectedOrderId(orderId) // Select new (auto deselects others)
+    }
+  }
+
+  const selectedOrderData = useMemo(() => {
+    return orders.find((o) => o.orderId === selectedOrderId) || null
+  }, [orders, selectedOrderId])
+
+  const handleOpenPayment = () => {
+    if (selectedOrderData) {
+      setDialogOpen(true)
+    }
+  }
+
+  const handleGeneratePdf = async (orderId: number, e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent row selection logic interference
+    setGeneratingPdf(orderId)
+    try {
+      const blob = await cobrancaService.generateOrderReceipt(orderId)
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `recibo_pedido_${orderId}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      toast({
+        title: 'Sucesso',
+        description: 'PDF gerado com sucesso.',
+      })
+    } catch (error) {
+      console.error(error)
+      toast({
+        title: 'Erro',
+        description: 'Erro ao gerar PDF.',
+        variant: 'destructive',
+      })
+    } finally {
+      setGeneratingPdf(null)
+    }
   }
 
   const handleConfirmPayment = async (payments: PaymentEntry[]) => {
-    if (!selectedOrder || !user) return
+    if (!selectedOrderData || !user) return
 
     try {
-      // Create minimal client row for service (it only needs CODIGO usually)
-      const clientMock = { CODIGO: selectedOrder.clientId } as ClientRow
+      const clientMock = { CODIGO: selectedOrderData.clientId } as ClientRow
 
-      // Create minimal employee object
-      // We use current user as the employee processing the payment
       const employeeMock = {
-        id: selectedOrder.employeeName ? 0 : 0, // Ideally we would have the ID, but service uses user ID if passed differently or logic within service needs checking.
-        // Checking recebimentoService: it uses employee.id.
-        // We need the ACTUAL employee ID.
-        // User context has 'id' which is string (Supabase Auth ID) or we need the functional ID.
-        // The project usually uses numeric IDs for employees in tables.
-        // For now, we'll try to use a placeholder or 0 if we can't map it.
-        // In a real scenario we should map auth user to employee table.
-        // We will assume 1 for Admin or similar if not found, but let's try to be safer.
-        // Actually, the user object from useAuth is Supabase User.
-        // The app seems to use numeric IDs for foreign keys.
-        // Let's rely on the service potentially handling it or pass a dummy if it's just for record keeping of who processed it.
-        // BETTER: Use the logged in user if mapped, or 0.
-        // However, `selectedOrder` does not have employee ID, only name.
-        // We will use a safe default 0 or 1, assuming system user.
-        id: 1,
+        id: 1, // Fallback ID
         nome_completo: user.email || 'Sistema',
         email: user.email || '',
         situacao: 'ATIVO',
@@ -124,7 +152,7 @@ export default function RecebimentoPage() {
         clientMock,
         employeeMock,
         payments,
-        selectedOrder.orderId,
+        selectedOrderData.orderId,
       )
 
       toast({
@@ -141,7 +169,7 @@ export default function RecebimentoPage() {
         description: 'Falha ao registrar recebimento.',
         variant: 'destructive',
       })
-      throw error // Re-throw to keep dialog open/handle loading in dialog
+      throw error
     }
   }
 
@@ -153,21 +181,32 @@ export default function RecebimentoPage() {
             Recebimentos
           </h1>
           <p className="text-muted-foreground">
-            Registre pagamentos para pedidos com saldo devedor.
+            Registre pagamentos e gerencie débitos históricos.
           </p>
         </div>
-        <Button variant="outline" onClick={loadData} disabled={loading}>
-          <Loader2
-            className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`}
-          />
-          Atualizar
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={loadData} disabled={loading}>
+            <Loader2
+              className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`}
+            />
+            Atualizar
+          </Button>
+          <Button
+            onClick={handleOpenPayment}
+            disabled={!selectedOrderId}
+            variant="default"
+            className="bg-green-600 hover:bg-green-700"
+          >
+            <CheckSquare className="mr-2 h-4 w-4" />
+            Processar Pagamento
+          </Button>
+        </div>
       </div>
 
       <Card>
         <CardHeader className="pb-3">
           <div className="flex justify-between items-center">
-            <CardTitle className="text-lg">Débitos em Aberto</CardTitle>
+            <CardTitle className="text-lg">Resumo Acerto (Histórico)</CardTitle>
             <div className="relative w-64">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -183,26 +222,27 @@ export default function RecebimentoPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[50px] text-center">#</TableHead>
                 <TableHead>Pedido</TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Data</TableHead>
                 <TableHead>Vendedor</TableHead>
                 <TableHead className="text-right">Valor Venda</TableHead>
                 <TableHead className="text-right">Saldo a Pagar</TableHead>
-                <TableHead className="w-[100px]"></TableHead>
+                <TableHead className="w-[80px] text-center">PDF</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center">
+                  <TableCell colSpan={8} className="h-24 text-center">
                     <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                   </TableCell>
                 </TableRow>
               ) : filteredOrders.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={7}
+                    colSpan={8}
                     className="h-24 text-center text-muted-foreground"
                   >
                     Nenhum débito encontrado.
@@ -210,7 +250,20 @@ export default function RecebimentoPage() {
                 </TableRow>
               ) : (
                 filteredOrders.map((order) => (
-                  <TableRow key={order.orderId}>
+                  <TableRow
+                    key={order.orderId}
+                    className={
+                      selectedOrderId === order.orderId ? 'bg-muted/50' : ''
+                    }
+                    onClick={() => handleSelectOrder(order.orderId)}
+                  >
+                    <TableCell className="text-center">
+                      <Checkbox
+                        checked={selectedOrderId === order.orderId}
+                        onCheckedChange={() => handleSelectOrder(order.orderId)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </TableCell>
                     <TableCell className="font-mono">
                       #{order.orderId}
                     </TableCell>
@@ -231,17 +284,21 @@ export default function RecebimentoPage() {
                     <TableCell className="text-right text-muted-foreground">
                       {formatCurrency(order.totalValue)}
                     </TableCell>
-                    <TableCell className="text-right font-bold">
+                    <TableCell className="text-right font-bold text-red-600">
                       {formatCurrency(order.remainingValue)}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-center">
                       <Button
                         size="sm"
-                        variant="default"
-                        className="bg-green-600 hover:bg-green-700"
-                        onClick={() => handleOpenPayment(order)}
+                        variant="ghost"
+                        onClick={(e) => handleGeneratePdf(order.orderId, e)}
+                        disabled={generatingPdf === order.orderId}
                       >
-                        <Wallet className="w-4 h-4 mr-2" /> Pagar
+                        {generatingPdf === order.orderId ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Printer className="h-4 w-4" />
+                        )}
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -255,8 +312,8 @@ export default function RecebimentoPage() {
       <RecebimentoPaymentDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        order={selectedOrder}
-        clientName={selectedOrder?.clientName || ''}
+        order={selectedOrderData}
+        clientName={selectedOrderData?.clientName || ''}
         onConfirm={handleConfirmPayment}
       />
     </div>

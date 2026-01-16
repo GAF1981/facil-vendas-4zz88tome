@@ -11,19 +11,17 @@ export const recebimentoService = {
     payments: PaymentEntry[],
     linkedOrderId: number,
   ) {
-    // 1. Validation: We now require a linked order ID because we are only inserting into RECEBIMENTOS
-    // and must link the payment to an existing sale (venda_id).
+    // 1. Validation
     if (!linkedOrderId) {
       throw new Error(
         'É necessário selecionar um pedido para vincular o pagamento.',
       )
     }
 
-    // 2. Prepare inserts for RECEBIMENTOS table
-    // These records are the SOURCE OF TRUTH for calculations.
-    const recebimentosToInsert: RecebimentoInsert[] = []
+    // 2. Process payments one by one to ensure we capture IDs for Pix
+    for (const payment of payments) {
+      const inserts: RecebimentoInsert[] = []
 
-    payments.forEach((payment) => {
       // Handle installments
       if (
         payment.installments > 1 &&
@@ -31,45 +29,63 @@ export const recebimentoService = {
         payment.details.length > 0
       ) {
         payment.details.forEach((detail) => {
-          recebimentosToInsert.push({
+          inserts.push({
             venda_id: linkedOrderId,
             cliente_id: client.CODIGO,
             funcionario_id: employee.id,
             forma_pagamento: payment.method,
-            valor_registrado: detail.value, // Captured Separately
-            valor_pago: 0, // Installments assumed as debts unless specified otherwise
-            // Ensure 12:00 to avoid timezone shifts
-            // Renamed data_pagamento to vencimento
+            valor_registrado: detail.value,
+            valor_pago: 0,
             vencimento: new Date(`${detail.dueDate}T12:00:00`).toISOString(),
-            ID_da_fêmea: linkedOrderId, // Backfill with order number
+            ID_da_fêmea: linkedOrderId,
           })
         })
       } else {
         // Single payment
-        recebimentosToInsert.push({
+        inserts.push({
           venda_id: linkedOrderId,
           cliente_id: client.CODIGO,
           funcionario_id: employee.id,
           forma_pagamento: payment.method,
-          valor_registrado: payment.value, // Captured Separately
+          valor_registrado: payment.value,
           valor_pago: payment.paidValue,
-          // Renamed data_pagamento to vencimento
           vencimento: payment.dueDate
             ? new Date(`${payment.dueDate}T12:00:00`).toISOString()
             : new Date().toISOString(),
-          ID_da_fêmea: linkedOrderId, // Backfill with order number
+          ID_da_fêmea: linkedOrderId,
         })
       }
-    })
 
-    // 3. Insert into RECEBIMENTOS
-    // We do NOT insert into BANCO_DE_DADOS anymore.
-    if (recebimentosToInsert.length > 0) {
-      const { error: recError } = await supabase
-        .from('RECEBIMENTOS')
-        .insert(recebimentosToInsert)
+      if (inserts.length > 0) {
+        const { data: insertedData, error: recError } = await supabase
+          .from('RECEBIMENTOS')
+          .insert(inserts)
+          .select()
 
-      if (recError) throw recError
+        if (recError) throw recError
+
+        // 3. If Pix, insert into PIX table
+        if (payment.method === 'Pix' && payment.pixDetails && insertedData) {
+          // Pix is always single payment in this context (no installments allowed)
+          // We take the first inserted record
+          const insertedRecord = insertedData[0]
+          if (insertedRecord) {
+            const { error: pixError } = await supabase.from('PIX').insert({
+              recebimento_id: insertedRecord.id,
+              nome_no_pix: payment.pixDetails.nome,
+              banco_pix: payment.pixDetails.banco,
+              data_pix_realizado: new Date().toISOString(),
+              confirmado_por: employee.nome_completo,
+              venda_id: linkedOrderId,
+            })
+
+            if (pixError) {
+              console.error('Error creating PIX record:', pixError)
+              // We don't rollback the receipt, but we log the error
+            }
+          }
+        }
+      }
     }
 
     return linkedOrderId

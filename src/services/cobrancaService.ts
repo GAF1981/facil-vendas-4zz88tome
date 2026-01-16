@@ -18,7 +18,7 @@ export const cobrancaService = {
       .select(
         'pedido_id, cliente_codigo, cliente_nome, valor_venda, valor_pago, debito, data_acerto, vendedor_nome, rota_id, saldo_a_pagar',
       )
-      .gt('debito', 0) // Updated to 0 as per requirements
+      .gt('debito', 0)
       .order('pedido_id', { ascending: false })
       .limit(50000)
 
@@ -54,7 +54,6 @@ export const cobrancaService = {
       }
     >()
 
-    // Fetch Client Details
     if (clientIds.length > 0) {
       const chunkSize = 1000
       for (let i = 0; i < clientIds.length; i += chunkSize) {
@@ -86,7 +85,6 @@ export const cobrancaService = {
       }
     }
 
-    // Fetch Action Counts Per Client
     const clientActionCounts = new Map<number, number>()
     if (clientIds.length > 0) {
       const chunkSize = 1000
@@ -481,5 +479,95 @@ export const cobrancaService = {
 
     if (error) return 0
     return data?.debito_total || 0
+  },
+
+  async generateOrderReceipt(orderId: number): Promise<Blob> {
+    // 1. Fetch Order Data
+    const { data: orderData, error: orderError } = await supabase
+      .from('BANCO_DE_DADOS')
+      .select('*')
+      .eq('"NÚMERO DO PEDIDO"', orderId)
+
+    if (orderError) throw orderError
+    if (!orderData || orderData.length === 0)
+      throw new Error('Pedido não encontrado.')
+
+    const firstItem = orderData[0]
+    const clientId = firstItem['CÓDIGO DO CLIENTE']
+    const employeeId = firstItem['CODIGO FUNCIONARIO']
+
+    // 2. Fetch Client Data
+    const { data: clientData } = await supabase
+      .from('CLIENTES')
+      .select('*')
+      .eq('CODIGO', clientId)
+      .single()
+
+    // 3. Fetch Employee Data
+    const { data: employeeData } = await supabase
+      .from('FUNCIONARIOS')
+      .select('*')
+      .eq('id', employeeId)
+      .single()
+
+    // 4. Fetch Payments from RECEBIMENTOS
+    const { data: paymentsData } = await supabase
+      .from('RECEBIMENTOS')
+      .select('*')
+      .eq('venda_id', orderId)
+
+    // 5. Structure Data for PDF
+    // Minimal reconstruction of the 'Acerto' payload
+    const items = orderData.map((d) => ({
+      produtoNome: d.MERCADORIA,
+      precoUnitario: d['PREÇO VENDIDO'] || 0, // Fallback if needed
+      saldoInicial: Number(d['SALDO INICIAL']) || 0,
+      contagem: Number(d.CONTAGEM) || 0,
+      quantVendida: Number(d['QUANTIDADE VENDIDA']) || 0,
+      saldoFinal: Number(d['SALDO FINAL']) || 0,
+      valorVendido: Number(d['VALOR VENDIDO']) || 0,
+    }))
+
+    const totalVendido = items.reduce(
+      (acc, item) => acc + (item.valorVendido || 0),
+      0,
+    )
+    const totalPago = (paymentsData || []).reduce(
+      (acc, p) => acc + (Number(p.valor_pago) || 0),
+      0,
+    )
+
+    const payload = {
+      reportType: 'acerto', // Standard receipt
+      format: '80mm', // Default to thermal for quick receipts
+      client: clientData,
+      employee: employeeData,
+      items: items,
+      date: firstItem['DATA DO ACERTO'] || new Date().toISOString(),
+      orderNumber: orderId,
+      totalVendido: totalVendido,
+      valorDesconto: 0, // Simplified
+      valorAcerto: Number(firstItem['VALOR DEVIDO']) || 0,
+      valorPago: totalPago,
+      debito: (Number(firstItem['VALOR DEVIDO']) || 0) - totalPago,
+      payments: (paymentsData || []).map((p) => ({
+        method: p.forma_pagamento,
+        paidValue: Number(p.valor_pago),
+        dueDate: p.vencimento,
+      })),
+    }
+
+    // 6. Call Edge Function
+    const { data: pdfBlob, error: pdfError } = await supabase.functions.invoke(
+      'generate-pdf',
+      {
+        body: payload,
+      },
+    )
+
+    if (pdfError) throw pdfError
+    if (!(pdfBlob instanceof Blob)) throw new Error('Falha ao gerar PDF')
+
+    return pdfBlob
   },
 }
