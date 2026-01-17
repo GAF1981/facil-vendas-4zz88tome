@@ -34,6 +34,7 @@ export default function RecebimentoPage() {
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('')
+  const [orderFilter, setOrderFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState<
     'PENDENTE' | 'PAGO' | 'TODOS'
   >('PENDENTE')
@@ -54,6 +55,7 @@ export default function RecebimentoPage() {
       const data = await recebimentoService.getInstallments({
         search: searchTerm,
         status: statusFilter,
+        orderId: orderFilter,
       })
       setInstallments(data)
 
@@ -82,7 +84,7 @@ export default function RecebimentoPage() {
       loadData()
     }, 500)
     return () => clearTimeout(timer)
-  }, [searchTerm, statusFilter])
+  }, [searchTerm, statusFilter, orderFilter])
 
   const handleSelectInstallment = (id: number) => {
     if (selectedInstallmentId === id) {
@@ -167,21 +169,30 @@ export default function RecebimentoPage() {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-lg">Filtros</CardTitle>
-          <div className="flex flex-col md:flex-row gap-4 mt-2">
-            <div className="flex-1 space-y-1">
-              <Label htmlFor="search">Buscar (Nome, Código ou Pedido)</Label>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-2">
+            <div className="space-y-1 col-span-2">
+              <Label htmlFor="search">Buscar (Nome ou Código)</Label>
               <div className="relative">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="search"
-                  placeholder="Digite para buscar..."
+                  placeholder="Nome do cliente..."
                   className="pl-8"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
             </div>
-            <div className="w-full md:w-[200px] space-y-1">
+            <div className="space-y-1">
+              <Label htmlFor="orderFilter">Pedido</Label>
+              <Input
+                id="orderFilter"
+                placeholder="Nº Pedido"
+                value={orderFilter}
+                onChange={(e) => setOrderFilter(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
               <Label>Status</Label>
               <Select
                 value={statusFilter}
@@ -204,7 +215,6 @@ export default function RecebimentoPage() {
             <Table>
               <TableHeader className="bg-muted/50">
                 <TableRow>
-                  <TableHead className="w-[50px] text-center">Sel.</TableHead>
                   <TableHead>Vencimento</TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Pedido</TableHead>
@@ -213,9 +223,10 @@ export default function RecebimentoPage() {
                   <TableHead className="text-right text-green-600">
                     Valor Pago
                   </TableHead>
-                  <TableHead className="text-right text-blue-600">
-                    Saldo a Pagar
+                  <TableHead className="text-right text-red-600 font-bold">
+                    Débito
                   </TableHead>
+                  <TableHead className="w-[50px] text-center">Sel.</TableHead>
                   <TableHead className="text-center">Status</TableHead>
                 </TableRow>
               </TableHeader>
@@ -250,14 +261,6 @@ export default function RecebimentoPage() {
                         key={inst.id}
                         className={isSelected ? 'bg-muted/50' : ''}
                       >
-                        <TableCell className="text-center">
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={() =>
-                              handleSelectInstallment(inst.id)
-                            }
-                          />
-                        </TableCell>
                         <TableCell>
                           {safeFormatDate(inst.vencimento, 'dd/MM/yyyy')}
                         </TableCell>
@@ -281,8 +284,16 @@ export default function RecebimentoPage() {
                         <TableCell className="text-right font-mono text-green-600">
                           {formatCurrency(inst.valor_pago)}
                         </TableCell>
-                        <TableCell className="text-right font-mono font-bold text-blue-600">
+                        <TableCell className="text-right font-mono font-bold text-red-600">
                           {formatCurrency(saldo)}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() =>
+                              handleSelectInstallment(inst.id)
+                            }
+                          />
                         </TableCell>
                         <TableCell className="text-center">
                           {isPaid ? (

@@ -1874,6 +1874,7 @@ export type Database = {
           cliente_id: number
           created_at: string | null
           data_combinada: string | null
+          data_pagamento: string | null
           forma_cobranca: string | null
           forma_pagamento: string
           funcionario_id: number
@@ -1888,6 +1889,7 @@ export type Database = {
           cliente_id: number
           created_at?: string | null
           data_combinada?: string | null
+          data_pagamento?: string | null
           forma_cobranca?: string | null
           forma_pagamento: string
           funcionario_id: number
@@ -1902,6 +1904,7 @@ export type Database = {
           cliente_id?: number
           created_at?: string | null
           data_combinada?: string | null
+          data_pagamento?: string | null
           forma_cobranca?: string | null
           forma_pagamento?: string
           funcionario_id?: number

@@ -147,7 +147,11 @@ export const recebimentoService = {
   },
 
   async getInstallments(
-    filters: { search?: string; status?: 'PENDENTE' | 'PAGO' | 'TODOS' } = {},
+    filters: {
+      search?: string
+      status?: 'PENDENTE' | 'PAGO' | 'TODOS'
+      orderId?: string
+    } = {},
   ): Promise<RecebimentoInstallment[]> {
     let query = supabase
       .from('RECEBIMENTOS')
@@ -155,17 +159,22 @@ export const recebimentoService = {
       .order('vencimento', { ascending: true })
       .limit(1000)
 
+    if (filters.orderId) {
+      query = query.eq('venda_id', filters.orderId)
+    }
+
     if (filters.search) {
       const term = filters.search
       const isNumber = !isNaN(Number(term))
       if (isNumber) {
         // Search by Client Code or Order ID (venda_id)
-        query = query.or(`cliente_id.eq.${term},venda_id.eq.${term}`)
+        if (!filters.orderId) {
+          query = query.or(`cliente_id.eq.${term},venda_id.eq.${term}`)
+        } else {
+          query = query.eq('cliente_id', term)
+        }
       } else {
         // Search by Client Name requires separate filter or post-filter if RPC not used
-        // Supabase join filtering:
-        // query = query.ilike('CLIENTES.NOME CLIENTE', `%${term}%`) - This syntax depends on Postgrest version
-        // Standard approach for inner join filter: !inner
         query = query
           .not('CLIENTES', 'is', null) // Ensure joined
           .filter('CLIENTES.NOME CLIENTE', 'ilike', `%${term}%`)
@@ -203,11 +212,7 @@ export const recebimentoService = {
     pixDetails?: { nome: string; banco: string },
     userName?: string,
   ) {
-    // 1. Fetch current state to increment safely or just set?
-    // AC implies "incrementing valor_pago". But typically we process "remaining balance".
-    // If I select an installment of 100 that has 0 paid, and I pay 50. valor_pago becomes 50.
-    // If I select it again (balance 50) and pay 50. valor_pago becomes 100.
-    // So we fetch current first.
+    // 1. Fetch current state
     const { data: current, error: fetchError } = await supabase
       .from('RECEBIMENTOS')
       .select('valor_pago, valor_registrado')
@@ -217,10 +222,6 @@ export const recebimentoService = {
     if (fetchError) throw fetchError
 
     const newTotalPaid = (current.valor_pago || 0) + amountPaid
-    // AC says: "updating valor_registrado".
-    // Typically we don't change registered value on payment unless it's a correction.
-    // But if the requirement implies it, we might need logic.
-    // Assuming standard "process payment" just updates paid value.
 
     // 2. Update Installment
     const { error: updateError } = await supabase
@@ -228,9 +229,6 @@ export const recebimentoService = {
       .update({
         valor_pago: newTotalPaid,
         data_pagamento: new Date(`${paymentDate}T12:00:00`).toISOString(),
-        // Update method if it changed? Usually method is per payment.
-        // If we want to track METHOD of this specific payment, and RECEBIMENTOS row has only one method column,
-        // we are overwriting the "scheduled method" with "actual method".
         forma_pagamento: method,
       } as any)
       .eq('id', installmentId)
