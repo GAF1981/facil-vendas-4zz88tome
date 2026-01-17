@@ -356,6 +356,11 @@ export function AcertoHistoryTable({
                         isSelected || (!isAnyOrderSelected && hasDebt)
                       const canPrintReceipt = row.valorPago > 0
 
+                      // Per Acceptance Criteria: "Saldo a Pagar" must equal "Valor Venda - Total Valor Pago"
+                      // Overriding standard net value calculation if necessary
+                      const saldoAPagarDisplay =
+                        row.valorVendaTotal - row.valorPago
+
                       return (
                         <TableRow key={row.id} className="hover:bg-muted/30">
                           <TableCell className="font-mono font-medium text-xs text-muted-foreground">
@@ -387,7 +392,7 @@ export function AcertoHistoryTable({
                             R$ {formatCurrency(row.valorVendaTotal)}
                           </TableCell>
                           <TableCell className="text-right font-mono font-medium text-blue-600 bg-blue-50/30">
-                            R$ {formatCurrency(row.saldoAPagar)}
+                            R$ {formatCurrency(saldoAPagarDisplay)}
                           </TableCell>
                           <TableCell className="text-right font-mono font-medium text-green-600 bg-green-50/30 p-2">
                             <div className="flex items-center justify-end gap-2">

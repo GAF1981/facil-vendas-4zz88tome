@@ -41,6 +41,7 @@ const AVAILABLE_METHODS: PaymentMethodType[] = [
   'Cheque',
 ]
 
+// Updated Banks List with BS2 and CORA as priority
 const BANKS = [
   'BS2',
   'CORA',
@@ -73,7 +74,7 @@ export function RecebimentoPaymentDialog({
 
   // Pix Specific State
   const [pixName, setPixName] = useState('')
-  const [pixBank, setPixBank] = useState('BS2')
+  const [pixBank, setPixBank] = useState('BS2') // Default to BS2
 
   useEffect(() => {
     if (open) {
@@ -87,14 +88,14 @@ export function RecebimentoPaymentDialog({
     }
   }, [open])
 
-  // Smart Auto-fill: Update value when payments change
+  // Smart Auto-fill: Update value when payments change OR when order changes
   useEffect(() => {
     if (order) {
       const currentTotal = payments.reduce((acc, p) => acc + p.value, 0)
       const remainder = Math.max(0, order.remainingValue - currentTotal)
       setValue(formatCurrency(remainder))
     }
-  }, [payments, order])
+  }, [payments, order, open]) // Trigger on open too to ensure fresh calculation
 
   const isMethodRestricted = method && RESTRICTED_METHODS.includes(method)
 
@@ -137,7 +138,7 @@ export function RecebimentoPaymentDialog({
     setMethod('')
     setInstallments(1)
     setPixName('')
-    setPixBank('BS2')
+    setPixBank('BS2') // Reset to default
   }
 
   const handleRemovePayment = (index: number) => {
@@ -163,7 +164,7 @@ export function RecebimentoPaymentDialog({
   const totalEntered = payments.reduce((acc, p) => acc + p.value, 0)
   const balanceDue = order.remainingValue
 
-  // Validation Rule Change: allow partial payments, so we just check if any payment is added
+  // Validation Rule: Must have payments
   const canConfirm = payments.length > 0
 
   const today = format(new Date(), 'yyyy-MM-dd')
@@ -189,7 +190,7 @@ export function RecebimentoPaymentDialog({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-muted p-6 rounded-lg border flex flex-col items-center justify-center">
               <span className="text-sm text-muted-foreground uppercase font-semibold">
-                Saldo a Pagar
+                Saldo a Pagar (Débito)
               </span>
               <span className="text-3xl font-bold mt-2">
                 {formatCurrency(balanceDue)}
@@ -280,14 +281,13 @@ export function RecebimentoPaymentDialog({
                   <Select
                     value={installments.toString()}
                     onValueChange={(v) => setInstallments(Number(v))}
-                    disabled={true} // Generally simplified for single payments in this context, or enable if needed
+                    disabled={true}
                   >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="1">1x (À vista)</SelectItem>
-                      {/* Add more if needed later */}
                     </SelectContent>
                   </Select>
                 </div>

@@ -55,20 +55,11 @@ export default function RecebimentoPage() {
       const result = await cobrancaService.getDebts()
       const flatOrders: FlattenedOrder[] = result
         .flatMap((client) =>
-          client.orders
-            // We want to see orders with recent payments too, even if debt is small, for Storno.
-            // But main purpose is paying debts. Let's keep logic but ensure paid orders are visible if they have activity?
-            // User Story implies we want to see debts to pay AND view history.
-            // "missing columns... in the Resumo Acerto section"
-            // Let's relax the filter slightly or assume cobrancaService returns historical debts too.
-            // Current service filters .gt('debito', 0).
-            // We might need to adjust service or just rely on what's returned.
-            // For now, we use what's returned but display better.
-            .map((order) => ({
-              ...order,
-              clientName: client.clientName,
-              clientId: client.clientId,
-            })),
+          client.orders.map((order) => ({
+            ...order,
+            clientName: client.clientName,
+            clientId: client.clientId,
+          })),
         )
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
@@ -170,8 +161,7 @@ export default function RecebimentoPage() {
       const clientMock = { CODIGO: selectedOrderData.clientId } as ClientRow
 
       const employeeMock = {
-        id: 1, // Fallback ID - ideally we get this from user context if mapped, or pass logic
-        // For now relying on BE or assuming logged in user is valid
+        id: 1, // Fallback ID - ideally we get this from user context
         nome_completo: user.email || 'Sistema',
         email: user.email || '',
         situacao: 'ATIVO',
@@ -191,6 +181,7 @@ export default function RecebimentoPage() {
         className: 'bg-green-600 text-white',
       })
 
+      // Refresh data immediately
       await loadData()
     } catch (error) {
       console.error(error)
@@ -308,6 +299,13 @@ export default function RecebimentoPage() {
                 ) : (
                   filteredOrders.map((order) => {
                     const isSelected = selectedOrderId === order.orderId
+                    // Calculate "Saldo a Pagar" strictly as Total - Paid as per User Story
+                    // NOTE: Typically "Saldo a Pagar" is Net Value (after discount), but AC requests:
+                    // "value in 'Saldo a Pagar' must strictly equal valor_venda - total_valor_pago"
+                    // Assuming totalValue is "Valor Venda" and paidValue is "Valor Pago"
+                    const saldoAPagarDisplay =
+                      order.totalValue - order.paidValue
+
                     return (
                       <TableRow
                         key={order.orderId}
@@ -336,7 +334,7 @@ export default function RecebimentoPage() {
                           {formatCurrency(order.totalValue)}
                         </TableCell>
                         <TableCell className="text-right text-blue-600 font-mono font-medium">
-                          {formatCurrency(order.netValue)}
+                          {formatCurrency(saldoAPagarDisplay)}
                         </TableCell>
                         <TableCell className="text-right font-mono text-green-600 font-medium">
                           {formatCurrency(order.paidValue)}
