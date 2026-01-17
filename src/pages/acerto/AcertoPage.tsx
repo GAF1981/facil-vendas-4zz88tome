@@ -469,6 +469,7 @@ export default function AcertoPage() {
     try {
       const now = new Date()
       // 1. Save Transaction and get final Order Number
+      // This call also triggers reportsService.updateDebtHistoryForOrder immediately after save
       const finalOrderNumber = await bancoDeDadosService.saveTransaction(
         client,
         emp,

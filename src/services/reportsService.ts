@@ -51,10 +51,11 @@ export interface DebitoReportRow {
   valor_pago: number
   debito: number
   desconto: number
-  debito_total?: number // Added for Total Debt column
+  debito_total?: number
 }
 
 export const reportsService = {
+  // ... (keep existing methods like getProjectionsReport, getTopSellingItems, getInitialBalanceAdjustments)
   async getProjectionsReport(): Promise<ProjectionReportRow[]> {
     const { data, error } = await supabase
       .from('BANCO_DE_DADOS')
@@ -138,8 +139,6 @@ export const reportsService = {
           if (indexD > 0) {
             currentOrder.monthlyAverage = currentOrder.totalValue / indexD
           } else {
-            // Updated Logic: If monthly average would be 0 (indexD <= 0) and we have a sales value,
-            // calculate the average as Value / 2.
             if (currentOrder.totalValue > 0) {
               currentOrder.monthlyAverage = currentOrder.totalValue / 2
             } else {
@@ -155,7 +154,6 @@ export const reportsService = {
             currentOrder.projection = 0
           }
 
-          // New Logic: Ensure projection minimum is 100 if calculated as 0
           if (currentOrder.projection === 0) {
             currentOrder.projection = 100
           }
@@ -205,6 +203,7 @@ export const reportsService = {
     if (error) throw error
   },
 
+  // Crucial function for Immediate Order Synchronization
   async updateDebtHistoryForOrder(orderId: number) {
     const { error } = await supabase.rpc('update_debito_historico_order', {
       p_pedido_id: orderId,
@@ -214,12 +213,12 @@ export const reportsService = {
         `Failed to auto-update debt history for order ${orderId}`,
         error,
       )
+      // Throwing error to allow caller to handle it (e.g., showing a warning toast)
+      throw error
     }
   },
 
   async getDebtsReport(): Promise<DebitoReportRow[]> {
-    // 1. Fetch base report data from the VIEW to get totals
-    // Using 'as any' because the view is not in the generated types yet
     const { data: reportData, error } = await supabase
       .from('debitos_com_total_view' as any)
       .select('*')
@@ -229,7 +228,6 @@ export const reportsService = {
     if (error) throw error
     if (!reportData || reportData.length === 0) return []
 
-    // 2. Identify missing data and collect IDs for enrichment
     const orderIdsToFetch = new Set<number>()
     const clientCodes = new Set<number>()
 
@@ -237,17 +235,14 @@ export const reportsService = {
       if (row.cliente_codigo) {
         clientCodes.add(row.cliente_codigo)
       } else {
-        // If client code is missing, we need to fetch it from sales order
         orderIdsToFetch.add(row.pedido_id)
       }
     })
 
-    // 3. Fetch missing Client Codes from BANCO_DE_DADOS
     const orderIds = Array.from(orderIdsToFetch)
     const orderClientMap = new Map<number, number>()
 
     if (orderIds.length > 0) {
-      // Chunking to avoid query length limits
       const chunkSize = 1000
       for (let i = 0; i < orderIds.length; i += chunkSize) {
         const chunk = orderIds.slice(i, i + chunkSize)
@@ -268,7 +263,6 @@ export const reportsService = {
       }
     }
 
-    // 4. Fetch Client Names from CLIENTES table for ALL involved clients (to ensure fresh data)
     const allClientCodes = Array.from(clientCodes)
     const clientNameMap = new Map<number, string>()
 
@@ -289,16 +283,13 @@ export const reportsService = {
       }
     }
 
-    // 5. Merge enriched data back into rows
     const enrichedData = reportData.map((row: any) => {
       let clientCode = row.cliente_codigo
 
-      // Try to fill missing code from Sales Order map
       if (!clientCode && orderClientMap.has(row.pedido_id)) {
         clientCode = orderClientMap.get(row.pedido_id) || null
       }
 
-      // Get fresh name from Client map using the code
       let clientName = row.cliente_nome
       if (clientCode && clientNameMap.has(clientCode)) {
         clientName = clientNameMap.get(clientCode) || clientName
@@ -308,12 +299,10 @@ export const reportsService = {
         ...row,
         cliente_codigo: clientCode,
         cliente_nome: clientName,
-        // Ensure saldo_a_pagar is present, if not fallback to calculation
         saldo_a_pagar:
           row.saldo_a_pagar !== undefined && row.saldo_a_pagar !== null
             ? row.saldo_a_pagar
             : row.valor_venda - (row.desconto || 0),
-        // Pass through the total debt from view
         debito_total: row.debito_total,
       }
     })

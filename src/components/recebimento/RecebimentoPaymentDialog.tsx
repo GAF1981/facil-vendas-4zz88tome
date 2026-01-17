@@ -92,6 +92,7 @@ export function RecebimentoPaymentDialog({
     if (!installment) return
     const numAmount = parseCurrency(amount)
 
+    // Validation: Prevent processing if amount is empty, zero, or negative
     if (numAmount <= 0) return
 
     setLoading(true)

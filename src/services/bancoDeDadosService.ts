@@ -11,6 +11,7 @@ import { rotaService } from '@/services/rotaService'
 import { reportsService } from '@/services/reportsService'
 
 export const bancoDeDadosService = {
+  // ... (keep existing helper methods like hasOutstandingBalance, etc.)
   async hasOutstandingBalance(clienteId: number): Promise<boolean> {
     const { count, error } = await supabase
       .from('BANCO_DE_DADOS')
@@ -22,7 +23,6 @@ export const bancoDeDadosService = {
       console.error('Error checking client balance:', error)
       return false
     }
-
     return (count || 0) > 0
   },
 
@@ -57,7 +57,6 @@ export const bancoDeDadosService = {
       console.error('Error fetching last ID VENDA ITENS:', error)
       return null
     }
-
     return data?.['ID VENDA ITENS'] || null
   },
 
@@ -73,14 +72,10 @@ export const bancoDeDadosService = {
       console.error('Error fetching max ID VENDA ITENS:', error)
       throw error
     }
-
-    // If table is empty, start at 0 (next will be 1)
     return (data?.['ID VENDA ITENS'] || 0) as number
   },
 
   async getMaxNumeroPedido() {
-    // Using quotes for column with spaces to be safe
-    // Crucial fix: Filter out NULL values to avoid incorrect ordering (NULLS FIRST)
     const { data, error } = await supabase
       .from('BANCO_DE_DADOS')
       .select('"NÚMERO DO PEDIDO"')
@@ -93,14 +88,11 @@ export const bancoDeDadosService = {
     return (data?.['NÚMERO DO PEDIDO'] || 0) as number
   },
 
-  // This is primarily for PREVIEW in the UI.
-  // For actual saving, use reserveNextOrderNumber() to guarantee uniqueness/consistency.
   async getNextNumeroPedido() {
     const max = await this.getMaxNumeroPedido()
     return max + 1
   },
 
-  // Calls the RPC to get the next order number safely
   async reserveNextOrderNumber(): Promise<number> {
     const { data, error } = await supabase.rpc('get_next_order_number')
     if (error) throw error
@@ -123,9 +115,7 @@ export const bancoDeDadosService = {
       console.error('Error fetching last acerto:', error)
       return null
     }
-
     if (!data) return null
-
     return {
       date: data['DATA DO ACERTO'] || '',
       time: data['HORA DO ACERTO'] || '',
@@ -189,7 +179,7 @@ export const bancoDeDadosService = {
           quantVendida: quantVendida,
           valorVendido: valorVendido,
           saldoFinal: 0,
-          idVendaItens: null, // Let DB handle identity
+          idVendaItens: null,
         }
       })
       .filter((i) => i !== null) as AcertoItem[]
@@ -209,33 +199,25 @@ export const bancoDeDadosService = {
       console.error('Error calculating monthly average:', error)
       return 0
     }
-
     if (!data || data.length === 0) return 0
 
     const monthlyTotals: Record<string, number> = {}
-
     data.forEach((row) => {
       const date = row['DATA DO ACERTO']
       const valStr = row['VALOR VENDIDO']
       if (!date || !valStr) return
-
       const monthKey = date.substring(0, 7)
       const val = parseCurrency(valStr)
-
       monthlyTotals[monthKey] = (monthlyTotals[monthKey] || 0) + val
     })
 
     const months = Object.values(monthlyTotals)
     if (months.length === 0) return 0
-
     const total = months.reduce((a, b) => a + b, 0)
     return total / months.length
   },
 
   async getAcertoHistory(clienteId: number) {
-    // Calling refresh to ensure we have latest cached data if possible,
-    // though for history table we generally rely on direct query or view.
-    // The previous implementation used BANCO_DE_DADOS directly.
     const { data, error } = await supabase
       .from('BANCO_DE_DADOS')
       .select(
@@ -258,7 +240,6 @@ export const bancoDeDadosService = {
     ] as number[]
 
     let paymentsMap = new Map<number, any>()
-
     if (orderIds.length > 0) {
       const { data: paymentsData, error: paymentsError } = await supabase
         .from('RECEBIMENTOS')
@@ -279,7 +260,6 @@ export const bancoDeDadosService = {
           }
           existing.total += p.valor_pago || 0
           if (p.forma_pagamento) existing.methods.add(p.forma_pagamento)
-
           existing.details.push({
             id: p.id,
             method: p.forma_pagamento,
@@ -289,18 +269,15 @@ export const bancoDeDadosService = {
             employeeName: p.FUNCIONARIOS?.nome_completo || 'N/A',
             createdAt: p.created_at || '',
           })
-
           paymentsMap.set(p.venda_id, existing)
         })
       }
     }
 
     const ordersMap = new Map<number, any>()
-
     data.forEach((row) => {
       const orderId = row['NÚMERO DO PEDIDO']
       if (!orderId) return
-
       if (!ordersMap.has(orderId)) {
         ordersMap.set(orderId, {
           id: orderId,
@@ -311,7 +288,6 @@ export const bancoDeDadosService = {
           desconto: row['DESCONTO POR GRUPO'],
         })
       }
-
       const order = ordersMap.get(orderId)
       order.valorVendaTotal += parseCurrency(row['VALOR VENDIDO'])
     })
@@ -328,14 +304,12 @@ export const bancoDeDadosService = {
       const discountFactor = descontoVal > 1 ? descontoVal / 100 : descontoVal
       const valorDesconto = order.valorVendaTotal * discountFactor
       const saldoAPagar = order.valorVendaTotal - valorDesconto
-
       const paymentInfo = paymentsMap.get(order.id)
       const valorPago = paymentInfo ? paymentInfo.total : 0
       const uniqueMethods = paymentInfo
         ? Array.from(paymentInfo.methods).join(', ')
         : '-'
       const paymentDetails = paymentInfo ? paymentInfo.details : []
-
       const debito = saldoAPagar - valorPago
 
       return {
@@ -349,26 +323,18 @@ export const bancoDeDadosService = {
       }
     })
 
-    // Calculate Monthly Average
-    // Note: This logic is duplicated in frontend/backend, consider centralizing or using views
     for (let i = 0; i < result.length; i++) {
       const current = result[i]
       let mediaMensal = null
-
       if (i < result.length - 1) {
         const previous = result[i + 1]
-        // Safe parsing
         try {
-          // Use hardcoded time if missing to avoid parsing errors
           const currentDateTime = `${current.data}T${current.hora || '00:00:00'}`
           const prevDateTime = `${previous.data}T${previous.hora || '00:00:00'}`
-
-          // Calculate difference in days
           const dateCurrent = new Date(currentDateTime)
           const datePrev = new Date(prevDateTime)
           const diffTime = Math.abs(dateCurrent.getTime() - datePrev.getTime())
           const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-
           if (diffDays > 0) {
             const factor = diffDays / 30
             mediaMensal = current.valorVendaTotal / factor
@@ -377,10 +343,8 @@ export const bancoDeDadosService = {
           console.warn('Error calculating monthly average for row', i, e)
         }
       }
-
       result[i].mediaMensal = mediaMensal
     }
-
     return result
   },
 
@@ -394,7 +358,6 @@ export const bancoDeDadosService = {
       .limit(10)
 
     if (error) throw error
-
     return data.map((row) => ({
       id: row.pedido_id,
       data: row.data_acerto,
@@ -422,7 +385,6 @@ export const bancoDeDadosService = {
       .eq('venda_id', orderId)
 
     if (paymentsError) throw paymentsError
-
     return { items: itemsData || [], payments: paymentsData || [] }
   },
 
@@ -438,13 +400,11 @@ export const bancoDeDadosService = {
     data_acerto?: string
   }) {
     const quantity = payload.saldo_novo - payload.saldo_anterior
-
     const { error } = await supabase.from('AJUSTE_SALDO_INICIAL').insert({
       ...payload,
       quantidade_alterada: quantity,
       data_acerto: payload.data_acerto || new Date().toISOString(),
     } as any)
-
     if (error) throw error
   },
 
@@ -461,14 +421,12 @@ export const bancoDeDadosService = {
     // 1. Get Context (Order Number)
     const nextPedido =
       customOrderNumber ?? (await this.reserveNextOrderNumber())
-
     const dataAcertoStr = format(date, 'yyyy-MM-dd')
     const horaAcerto = format(date, 'HH:mm:ss')
     const dataEHora = date.toISOString()
 
     // 2. Fetch current product prices
     const productIds = items.map((i) => i.produtoId)
-
     if (productIds.length === 0) return nextPedido
 
     const { data: productsData, error: productsError } = await supabase
@@ -483,21 +441,17 @@ export const bancoDeDadosService = {
       priceMap.set(p.ID, parseCurrency(p.PREÇO))
     })
 
-    // Construct Payment String (FORMA)
     const paymentString = payments
       .map(
         (p) =>
           `${p.method} Reg: R$ ${formatCurrency(p.value)} Pago: R$ ${formatCurrency(p.paidValue)} (${p.installments}x)`,
       )
       .join(' | ')
-
     const formaPagamento = paymentString || acertoTipo
 
-    // Determine Status NF
     const nfCadastro = client['NOTA FISCAL'] || 'NÃO'
     const nfVenda = notaFiscalVenda || 'NÃO'
     let statusNf = 'Pendente'
-
     if (nfCadastro === 'NÃO' && nfVenda === 'NÃO') {
       statusNf = 'Resolvida'
     } else if (nfCadastro === 'SIM' && nfVenda === 'NÃO') {
@@ -512,11 +466,9 @@ export const bancoDeDadosService = {
       const valorVendidoVal = currentPrice * item.quantVendida
       const saldoFinal = item.saldoFinal
       const contagem = item.contagem
-
       const diff = saldoFinal - contagem
       let novasConsignacoesVal = 0
       let recolhidoVal = 0
-
       if (diff > 0) {
         novasConsignacoesVal = diff
         recolhidoVal = 0
@@ -528,15 +480,12 @@ export const bancoDeDadosService = {
       const descontoStr = client.Desconto || '0'
       const descontoVal = parseCurrency(descontoStr.replace('%', ''))
       const discountFactor = descontoVal > 1 ? descontoVal / 100 : descontoVal
-
       const valorConsignadoVendaVal = saldoFinal * currentPrice
       const valorConsignadoCustoVal =
         valorConsignadoVendaVal - valorConsignadoVendaVal * discountFactor
-
       const itemDebt = valorVendidoVal * (1 - discountFactor)
 
       return {
-        // 'ID VENDA ITENS': item.idVendaItens, // OMITTED to fix identity issue
         'NÚMERO DO PEDIDO': nextPedido,
         'DATA DO ACERTO': dataAcertoStr,
         'HORA DO ACERTO': horaAcerto,
@@ -567,7 +516,6 @@ export const bancoDeDadosService = {
         ),
         'VALOR DEVIDO': itemDebt,
         DETALHES_PAGAMENTO: payments,
-        // New Columns
         nota_fiscal_cadastro: nfCadastro,
         nota_fiscal_venda: nfVenda,
         nota_fiscal_emitida: statusNf,
@@ -578,15 +526,11 @@ export const bancoDeDadosService = {
     const { error } = await supabase
       .from('BANCO_DE_DADOS')
       .insert(rowsToInsert as any)
-
     if (error) throw error
 
     // 5. Insert into RECEBIMENTOS
     const recebimentosToInsert: RecebimentoInsert[] = []
-
     payments.forEach((payment) => {
-      // Use details if available (even for 1x to capture correct calculated paid values)
-      // Fallback to main payment object if details missing (legacy safety)
       const detailsToUse =
         payment.details && payment.details.length > 0
           ? payment.details
@@ -597,7 +541,6 @@ export const bancoDeDadosService = {
                 dueDate: payment.dueDate,
               },
             ]
-
       detailsToUse.forEach((detail) => {
         recebimentosToInsert.push({
           venda_id: nextPedido,
@@ -605,7 +548,7 @@ export const bancoDeDadosService = {
           funcionario_id: employee.id,
           forma_pagamento: payment.method,
           valor_registrado: detail.value,
-          valor_pago: detail.paidValue || 0, // Ensure we use the granular paidValue (e.g. 0 for future installments or check)
+          valor_pago: detail.paidValue || 0,
           vencimento: new Date(`${detail.dueDate}T12:00:00`).toISOString(),
           ID_da_fêmea: nextPedido,
         })
@@ -616,7 +559,6 @@ export const bancoDeDadosService = {
       const { error: recebimentosError } = await supabase
         .from('RECEBIMENTOS')
         .insert(recebimentosToInsert)
-
       if (recebimentosError) {
         console.error('Error inserting recebimentos:', recebimentosError)
         throw recebimentosError
@@ -625,14 +567,10 @@ export const bancoDeDadosService = {
 
     // 6. Insert into NOTA_FISCAL if requested
     if (nfVenda === 'SIM') {
-      const { error: nfError } = await supabase.from('NOTA_FISCAL').insert({
-        venda_id: nextPedido,
-        cliente_id: client.CODIGO,
-      })
-
-      if (nfError) {
-        console.error('Error inserting nota fiscal record:', nfError)
-      }
+      const { error: nfError } = await supabase
+        .from('NOTA_FISCAL')
+        .insert({ venda_id: nextPedido, cliente_id: client.CODIGO })
+      if (nfError) console.error('Error inserting nota fiscal record:', nfError)
     }
 
     // 7. Check Rota and Decrement x_na_rota

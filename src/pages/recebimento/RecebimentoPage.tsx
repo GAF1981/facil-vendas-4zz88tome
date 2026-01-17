@@ -108,6 +108,7 @@ export default function RecebimentoPage() {
     if (!selectedInstallment || !user) return
 
     try {
+      // Process payment (DB Update + Sync RPC)
       const result = await recebimentoService.processInstallmentPayment(
         id,
         amount,
@@ -133,7 +134,7 @@ export default function RecebimentoPage() {
         })
       }
 
-      // Refresh data to reflect changes immediately in the UI (UI Consistency)
+      // Refresh data to reflect changes immediately in the UI (UI Synchronization)
       await loadData()
     } catch (error) {
       console.error(error)

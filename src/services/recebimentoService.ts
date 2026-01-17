@@ -12,18 +12,14 @@ export const recebimentoService = {
     payments: PaymentEntry[],
     linkedOrderId: number,
   ) {
-    // 1. Validation
     if (!linkedOrderId) {
       throw new Error(
         'É necessário selecionar um pedido para vincular o pagamento.',
       )
     }
 
-    // 2. Process payments one by one to ensure we capture IDs for Pix
     for (const payment of payments) {
       const inserts: RecebimentoInsert[] = []
-
-      // Handle installments
       if (
         payment.installments > 1 &&
         payment.details &&
@@ -42,7 +38,6 @@ export const recebimentoService = {
           })
         })
       } else {
-        // Single payment
         inserts.push({
           venda_id: linkedOrderId,
           cliente_id: client.CODIGO,
@@ -63,10 +58,8 @@ export const recebimentoService = {
           .from('RECEBIMENTOS')
           .insert(inserts)
           .select()
-
         if (recError) throw recError
 
-        // 3. If Pix, insert into PIX table
         if (payment.method === 'Pix' && payment.pixDetails && insertedData) {
           const insertedRecord = insertedData[0]
           if (insertedRecord) {
@@ -78,16 +71,12 @@ export const recebimentoService = {
               confirmado_por: employee.nome_completo,
               venda_id: linkedOrderId,
             })
-
-            if (pixError) {
-              console.error('Error creating PIX record:', pixError)
-            }
+            if (pixError) console.error('Error creating PIX record:', pixError)
           }
         }
       }
     }
 
-    // 4. Update Debt History
     try {
       await reportsService.updateDebtHistoryForOrder(linkedOrderId)
     } catch (error) {
@@ -105,7 +94,6 @@ export const recebimentoService = {
       .order('created_at', { ascending: false })
 
     if (error) throw error
-
     return data.map((row: any) => ({
       id: row.id,
       method: row.forma_pagamento,
@@ -123,7 +111,6 @@ export const recebimentoService = {
     userId: number,
     userName: string,
   ) {
-    // 1. Update RECEBIMENTOS to set valor_pago = 0
     const { error: updateError } = await supabase
       .from('RECEBIMENTOS')
       .update({ valor_pago: 0, data_pagamento: null } as any)
@@ -131,7 +118,6 @@ export const recebimentoService = {
 
     if (updateError) throw updateError
 
-    // 2. Log action to system_logs
     const { error: logError } = await supabase.from('system_logs').insert({
       type: 'PAYMENT_REVERSAL',
       description: `Estorno de pagamento (ID: ${paymentId}) do pedido #${orderId}`,
@@ -139,10 +125,8 @@ export const recebimentoService = {
       meta: { paymentId, orderId, reversedBy: userName },
       created_at: new Date().toISOString(),
     })
-
     if (logError) console.error('Error logging reversal:', logError)
 
-    // 3. Update debt history to reflect the change
     await reportsService.updateDebtHistoryForOrder(orderId)
   },
 
@@ -167,22 +151,19 @@ export const recebimentoService = {
       const term = filters.search
       const isNumber = !isNaN(Number(term))
       if (isNumber) {
-        // Search by Client Code or Order ID (venda_id)
         if (!filters.orderId) {
           query = query.or(`cliente_id.eq.${term},venda_id.eq.${term}`)
         } else {
           query = query.eq('cliente_id', term)
         }
       } else {
-        // Search by Client Name requires separate filter or post-filter if RPC not used
         query = query
-          .not('CLIENTES', 'is', null) // Ensure joined
+          .not('CLIENTES', 'is', null)
           .filter('CLIENTES.NOME CLIENTE', 'ilike', `%${term}%`)
       }
     }
 
     const { data, error } = await query
-
     if (error) throw error
 
     let installments = (data || []).map((row: any) => ({
@@ -199,7 +180,6 @@ export const recebimentoService = {
         return filters.status === 'PAGO' ? isPaid : !isPaid
       })
     }
-
     return installments
   },
 
@@ -215,9 +195,7 @@ export const recebimentoService = {
     // 1. Fetch current state
     const { data: current, error: fetchError } = await supabase
       .from('RECEBIMENTOS')
-      .select(
-        'valor_pago, valor_registrado, cliente_id, funcionario_id, venda_id',
-      )
+      .select('valor_pago')
       .eq('id', installmentId)
       .single()
 
@@ -226,7 +204,6 @@ export const recebimentoService = {
     const newTotalPaid = (current.valor_pago || 0) + amountPaid
 
     // 2. Update Installment in RECEBIMENTOS table
-    // Per Requirements: We update the existing record to maintain the schedule linkage.
     const { error: updateError } = await supabase
       .from('RECEBIMENTOS')
       .update({
@@ -254,7 +231,7 @@ export const recebimentoService = {
     await supabase.from('system_logs').insert({
       type: 'PAYMENT_RECEIVED',
       description: `Pagamento recebido de R$ ${amountPaid} no pedido #${orderId}`,
-      user_id: null, // System context if unknown
+      user_id: null,
       meta: {
         installmentId,
         amountPaid,
@@ -265,7 +242,6 @@ export const recebimentoService = {
 
     // 5. Sync Debt History - Critical for Cross-Module Sync
     // Calls the RPC function 'update_debito_historico_order'.
-    // Wrapped in try-catch to prevent transaction failure perception if only sync fails.
     try {
       await reportsService.updateDebtHistoryForOrder(orderId)
       return { success: true }
