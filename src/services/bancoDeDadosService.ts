@@ -9,6 +9,7 @@ import { PaymentEntry } from '@/types/payment'
 import { RecebimentoInsert } from '@/types/recebimento'
 import { rotaService } from '@/services/rotaService'
 import { reportsService } from '@/services/reportsService'
+import { estoqueCarroService } from '@/services/estoqueCarroService'
 
 export const bancoDeDadosService = {
   // ... (keep existing helper methods like hasOutstandingBalance, etc.)
@@ -608,6 +609,19 @@ export const bancoDeDadosService = {
     } catch (debtError) {
       console.error('Error auto-updating debt history:', debtError)
       // We log but don't fail the transaction, as the primary record is safe
+    }
+
+    // 9. Sync Stock Movements (Vehicle <-> Client)
+    try {
+      await estoqueCarroService.syncStockFromSettlement(
+        employee.id,
+        employee.nome_completo,
+        date,
+        nextPedido,
+        items,
+      )
+    } catch (stockError) {
+      console.error('Error syncing stock movements:', stockError)
     }
 
     return nextPedido

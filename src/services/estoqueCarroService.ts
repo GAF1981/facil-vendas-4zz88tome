@@ -7,6 +7,7 @@ import {
   DeliveryHistoryRow,
   DeliveryHistoryFilter,
 } from '@/types/delivery_history'
+import { AcertoItem } from '@/types/acerto'
 
 export const estoqueCarroService = {
   async getActiveSession(funcionarioId: number) {
@@ -274,6 +275,114 @@ export const estoqueCarroService = {
         new Date(b.created_at || b.data_horario).getTime() -
         new Date(a.created_at || a.data_horario).getTime(),
     )
+  },
+
+  async syncStockFromSettlement(
+    employeeId: number,
+    employeeName: string,
+    settlementDate: Date,
+    orderId: number,
+    items: AcertoItem[],
+  ) {
+    // 1. Find Valid Session
+    // Logic: Session Start <= Settlement Date AND (Session End IS NULL OR Session End >= Settlement Date)
+    const { data: sessions, error: sessionError } = await supabase
+      .from('ID ESTOQUE CARRO')
+      .select('*')
+      .eq('funcionario_id', employeeId)
+      .lte('data_inicio', settlementDate.toISOString())
+      .order('data_inicio', { ascending: false })
+      .limit(5)
+
+    if (sessionError) {
+      console.error('Error finding stock session:', sessionError)
+      return
+    }
+
+    const validSession = sessions?.find((s) => {
+      if (!s.data_fim) return true
+      return parseISO(s.data_fim) >= settlementDate
+    })
+
+    if (!validSession) {
+      console.warn(
+        `No valid stock session found for employee ${employeeId} at ${settlementDate.toISOString()}. Stock movement skipped.`,
+      )
+      return
+    }
+
+    const sessionId = validSession.id
+    const timestampStr = settlementDate.toISOString()
+
+    // 2. Fetch Product Details (Barcode)
+    const productIds = items.map((i) => i.produtoId)
+    if (productIds.length === 0) return
+
+    const { data: products } = await supabase
+      .from('PRODUTOS')
+      .select('ID, "CÓDIGO BARRAS"')
+      .in('ID', productIds)
+
+    const barcodeMap = new Map<number, string>()
+    products?.forEach((p) => {
+      if (p['CÓDIGO BARRAS']) {
+        barcodeMap.set(p.ID, String(p['CÓDIGO BARRAS']))
+      }
+    })
+
+    const carToClientInserts: any[] = []
+    const clientToCarInserts: any[] = []
+
+    for (const item of items) {
+      const diff = item.saldoFinal - item.contagem
+      const absDiff = Math.abs(diff)
+
+      if (absDiff === 0) continue
+
+      const payload = {
+        id_estoque_carro: sessionId,
+        produto_id: item.produtoId,
+        quantidade: absDiff,
+        pedido: orderId,
+        data_horario: timestampStr,
+        created_at: timestampStr,
+        funcionario: employeeName,
+        codigo_produto: item.produtoCodigo,
+        barcode: barcodeMap.get(item.produtoId) || null,
+        produto: item.produtoNome,
+        preco: item.precoUnitario,
+      }
+
+      if (diff > 0) {
+        // SaldoFinal > Contagem => Sold/Consigned => Vehicle -> Client
+        // NOVAS CONSIGNAÇÕES
+        carToClientInserts.push({
+          ...payload,
+          SAIDAS_carro_cliente: absDiff,
+        })
+      } else {
+        // SaldoFinal < Contagem => Recolhido => Client -> Vehicle
+        // RECOLHIDO
+        clientToCarInserts.push({
+          ...payload,
+          ENTRADAS_cliente_carro: absDiff,
+        })
+      }
+    }
+
+    if (carToClientInserts.length > 0) {
+      const { error } = await supabase
+        .from('ESTOQUE CARRO: CARRO PARA O CLIENTE')
+        .insert(carToClientInserts)
+      if (error) console.error('Error inserting car->client movements:', error)
+    }
+
+    if (clientToCarInserts.length > 0) {
+      const { error } = await supabase
+        .from('ESTOQUE CARRO: CLIENTE PARA O CARRO')
+        .insert(clientToCarInserts)
+      if (error) console.error('Error inserting client->car movements:', error)
+    }
   },
 
   async updateStockMovements(sessionId: number, employeeId: number) {
