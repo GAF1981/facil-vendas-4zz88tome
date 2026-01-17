@@ -25,7 +25,11 @@ export default function CobrancaPage() {
   const [loading, setLoading] = useState(true)
   const [debts, setDebts] = useState<ClientDebt[]>([])
   const [filteredDebts, setFilteredDebts] = useState<ClientDebt[]>([])
-  const [searchTerm, setSearchTerm] = useState('')
+
+  // Split Filters
+  const [clientFilter, setClientFilter] = useState('')
+  const [orderFilter, setOrderFilter] = useState('')
+
   const [statusFilter, setStatusFilter] = useState<string>('todos')
   const [cityFilter, setCityFilter] = useState<string>('todos')
   const [motoqueiroFilter, setMotoqueiroFilter] = useState<string>('todos')
@@ -85,14 +89,21 @@ export default function CobrancaPage() {
   useEffect(() => {
     let result = debts
 
-    // Search
-    if (searchTerm) {
-      const lower = searchTerm.toLowerCase()
+    // Client Filter
+    if (clientFilter) {
+      const lower = clientFilter.toLowerCase()
       result = result.filter(
         (d) =>
           d.clientName.toLowerCase().includes(lower) ||
-          d.clientId.toString().includes(lower) ||
-          d.orders.some((o) => o.orderId.toString().includes(lower)),
+          d.clientId.toString().includes(lower),
+      )
+    }
+
+    // Order Filter (Client level filter)
+    if (orderFilter) {
+      const lower = orderFilter.toLowerCase()
+      result = result.filter((d) =>
+        d.orders.some((o) => o.orderId.toString().includes(lower)),
       )
     }
 
@@ -141,7 +152,8 @@ export default function CobrancaPage() {
     setFilteredDebts(result)
   }, [
     debts,
-    searchTerm,
+    clientFilter,
+    orderFilter,
     statusFilter,
     cityFilter,
     motoqueiroFilter,
@@ -239,15 +251,27 @@ export default function CobrancaPage() {
       <Card>
         <CardContent className="p-4 space-y-4">
           <div className="flex flex-col md:flex-row gap-4 flex-wrap">
-            <div className="flex-1 relative min-w-[200px]">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar cliente, código ou pedido..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
-              />
+            <div className="flex flex-col sm:flex-row gap-4 flex-1">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Cliente ou Código"
+                  value={clientFilter}
+                  onChange={(e) => setClientFilter(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <div className="relative w-full sm:w-[200px]">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Nº Pedido"
+                  value={orderFilter}
+                  onChange={(e) => setOrderFilter(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
             </div>
+
             <div className="w-full md:w-[150px]">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger>
@@ -336,6 +360,7 @@ export default function CobrancaPage() {
                 statusFilter={statusFilter}
                 motoqueiroFilter={motoqueiroFilter}
                 dataCombinadaFilter={dataCombinadaFilter}
+                orderFilter={orderFilter}
                 showOnlySelected={false}
               />
             </TabsContent>
@@ -364,6 +389,7 @@ export default function CobrancaPage() {
                 statusFilter={statusFilter}
                 motoqueiroFilter={motoqueiroFilter}
                 dataCombinadaFilter={dataCombinadaFilter}
+                orderFilter={orderFilter}
                 showOnlySelected={true}
               />
             </TabsContent>

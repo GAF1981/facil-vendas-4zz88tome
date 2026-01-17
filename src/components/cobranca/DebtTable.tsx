@@ -53,6 +53,7 @@ interface DebtTableProps {
   statusFilter?: string
   dataCombinadaFilter?: string
   motoqueiroFilter?: string
+  orderFilter?: string
   showOnlySelected?: boolean
 }
 
@@ -100,6 +101,7 @@ export function DebtTable({
   statusFilter = 'todos',
   dataCombinadaFilter = '',
   motoqueiroFilter = 'todos',
+  orderFilter = '',
   showOnlySelected = false,
 }: DebtTableProps) {
   const [selectedClient, setSelectedClient] = useState<ClientDebt | null>(null)
@@ -195,6 +197,12 @@ export function DebtTable({
     // Apply Deep Filters Here
     let filtered = rows
 
+    if (orderFilter) {
+      filtered = filtered.filter((r) =>
+        r.orderId.toString().includes(orderFilter),
+      )
+    }
+
     if (statusFilter !== 'todos') {
       filtered = filtered.filter((r) => r.status === statusFilter)
     }
@@ -202,19 +210,6 @@ export function DebtTable({
     if (dataCombinadaFilter) {
       filtered = filtered.filter((r) => r.dataCombinada === dataCombinadaFilter)
     }
-
-    // Motoqueiro Filter Logic
-    // If showOnlySelected is true (Rota Motoqueiro view), we prioritize selection over this filter.
-    // However, if the user explicitly changed motoqueiroFilter from 'todos' even while in this view,
-    // they might want to filter within their selection. But based on requirements, prioritization implies consistency.
-    // We will apply motoqueiroFilter normally unless it conflicts with the "show only selected" mandate.
-    // Actually, if showOnlySelected is true, filtering by selection is the primary action.
-    // We will assume that if the user is in "Rota View", they want to see the selected items.
-    // If we apply the motoqueiroFilter strictly, we might hide selected items that are not yet marked as 'com_rota'.
-    // To solve this, we can skip motoqueiroFilter check if showOnlySelected is true, OR
-    // we can rely on the fact that CobrancaPage likely reset motoqueiroFilter to 'todos'.
-    // BUT, solely relying on CobrancaPage reset is brittle.
-    // Let's implement robust logic: If showOnlySelected is true, we ignore motoqueiroFilter status check to ensure visibility.
 
     if (!showOnlySelected && motoqueiroFilter !== 'todos') {
       if (motoqueiroFilter === 'com_rota') {
@@ -252,6 +247,7 @@ export function DebtTable({
     statusFilter,
     dataCombinadaFilter,
     motoqueiroFilter,
+    orderFilter,
     showOnlySelected,
     selectedItems,
   ])
