@@ -225,7 +225,13 @@ export default function AcertoPage() {
   }
 
   const handleQueueAdjustment = (adjustment: PendingStockAdjustment) => {
-    setPendingAdjustments((prev) => [...prev, adjustment])
+    // Ensure date is properly formatted as ISO string before queueing
+    // This is defensive coding for the User Story
+    const safeAdjustment = {
+      ...adjustment,
+      data_acerto: adjustment.data_acerto || new Date().toISOString(),
+    }
+    setPendingAdjustments((prev) => [...prev, safeAdjustment])
   }
 
   const handleRemoveItem = (uid: string) => {
@@ -481,12 +487,14 @@ export default function AcertoPage() {
       )
 
       // 2. Process Pending Stock Adjustments
+      // Ensure we send valid dates to prevent timestamp errors
       if (pendingAdjustments.length > 0) {
         for (const adj of pendingAdjustments) {
           try {
             await bancoDeDadosService.logInitialBalanceAdjustment({
               ...adj,
               numero_pedido: finalOrderNumber,
+              data_acerto: adj.data_acerto || now.toISOString(), // Ensure proper ISO timestamp
             })
           } catch (logError) {
             console.error('Failed to log adjustment', adj, logError)

@@ -400,10 +400,15 @@ export const bancoDeDadosService = {
     data_acerto?: string
   }) {
     const quantity = payload.saldo_novo - payload.saldo_anterior
+
+    // Ensure we are sending a valid timestamp ISO string
+    // If payload.data_acerto is missing or empty, use current time
+    const timestamp = payload.data_acerto || new Date().toISOString()
+
     const { error } = await supabase.from('AJUSTE_SALDO_INICIAL').insert({
       ...payload,
       quantidade_alterada: quantity,
-      data_acerto: payload.data_acerto || new Date().toISOString(),
+      data_acerto: timestamp,
     } as any)
     if (error) throw error
   },
@@ -423,7 +428,7 @@ export const bancoDeDadosService = {
       customOrderNumber ?? (await this.reserveNextOrderNumber())
     const dataAcertoStr = format(date, 'yyyy-MM-dd')
     const horaAcerto = format(date, 'HH:mm:ss')
-    const dataEHora = date.toISOString()
+    const dataEHora = date.toISOString() // This is the full ISO string
 
     // 2. Fetch current product prices
     const productIds = items.map((i) => i.produtoId)
@@ -489,7 +494,7 @@ export const bancoDeDadosService = {
         'NÚMERO DO PEDIDO': nextPedido,
         'DATA DO ACERTO': dataAcertoStr,
         'HORA DO ACERTO': horaAcerto,
-        'DATA E HORA': dataEHora,
+        'DATA E HORA': dataEHora, // Sending full ISO string here
         'CÓDIGO DO CLIENTE': client.CODIGO,
         CLIENTE: client['NOME CLIENTE'],
         'CODIGO FUNCIONARIO': employee.id,
@@ -582,6 +587,7 @@ export const bancoDeDadosService = {
 
     // 8. Auto-update debt history for this order (Requirement - Immediate Sync)
     // Ensures immediate consistency in Debt Center
+    // This calls the stored procedure that we updated in the migration
     try {
       await reportsService.updateDebtHistoryForOrder(nextPedido)
     } catch (debtError) {
