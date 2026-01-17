@@ -42,6 +42,8 @@ const AVAILABLE_METHODS: PaymentMethodType[] = [
 ]
 
 const BANKS = [
+  'BS2',
+  'CORA',
   'Banco do Brasil',
   'Bradesco',
   'Caixa',
@@ -71,20 +73,28 @@ export function RecebimentoPaymentDialog({
 
   // Pix Specific State
   const [pixName, setPixName] = useState('')
-  const [pixBank, setPixBank] = useState('')
+  const [pixBank, setPixBank] = useState('BS2')
 
   useEffect(() => {
     if (open) {
       setPayments([])
       setMethod('')
-      // Set default value to remaining amount
-      setValue(order ? formatCurrency(order.remainingValue) : '')
+      // Initial value set handled by the payments dependency effect below
       setDate(format(new Date(), 'yyyy-MM-dd'))
       setInstallments(1)
       setPixName('')
-      setPixBank('')
+      setPixBank('BS2')
     }
-  }, [open, order])
+  }, [open])
+
+  // Smart Auto-fill: Update value when payments change
+  useEffect(() => {
+    if (order) {
+      const currentTotal = payments.reduce((acc, p) => acc + p.value, 0)
+      const remainder = Math.max(0, order.remainingValue - currentTotal)
+      setValue(formatCurrency(remainder))
+    }
+  }, [payments, order])
 
   const isMethodRestricted = method && RESTRICTED_METHODS.includes(method)
 
@@ -123,12 +133,11 @@ export function RecebimentoPaymentDialog({
 
     setPayments([...payments, newPayment])
 
-    // Reset Form
+    // Reset Form (Value is reset by effect)
     setMethod('')
-    setValue('')
     setInstallments(1)
     setPixName('')
-    setPixBank('')
+    setPixBank('BS2')
   }
 
   const handleRemovePayment = (index: number) => {

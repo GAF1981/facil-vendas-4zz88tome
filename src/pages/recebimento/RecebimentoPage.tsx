@@ -271,6 +271,9 @@ export default function RecebimentoPage() {
                   <TableHead>Data</TableHead>
                   <TableHead>Vendedor</TableHead>
                   <TableHead className="text-right">Valor Venda</TableHead>
+                  <TableHead className="text-right text-blue-600">
+                    Saldo a Pagar
+                  </TableHead>
                   <TableHead className="text-right text-green-600">
                     Valor Pago
                   </TableHead>
@@ -289,14 +292,14 @@ export default function RecebimentoPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="h-24 text-center">
+                    <TableCell colSpan={10} className="h-24 text-center">
                       <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                     </TableCell>
                   </TableRow>
                 ) : filteredOrders.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={9}
+                      colSpan={10}
                       className="h-24 text-center text-muted-foreground"
                     >
                       Nenhum débito encontrado.
@@ -331,6 +334,9 @@ export default function RecebimentoPage() {
                         </TableCell>
                         <TableCell className="text-right text-muted-foreground font-mono">
                           {formatCurrency(order.totalValue)}
+                        </TableCell>
+                        <TableCell className="text-right text-blue-600 font-mono font-medium">
+                          {formatCurrency(order.netValue)}
                         </TableCell>
                         <TableCell className="text-right font-mono text-green-600 font-medium">
                           {formatCurrency(order.paidValue)}
