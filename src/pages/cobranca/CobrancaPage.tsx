@@ -59,10 +59,11 @@ export default function CobrancaPage() {
       .channel('cobranca-updates')
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'debitos_historico' },
+        { event: '*', schema: 'public', table: 'debitos_historico' },
         (payload) => {
           console.log('Debitos updated, refreshing...', payload)
-          loadDebts()
+          // Small delay to ensure DB consistency if multiple triggers fire
+          setTimeout(() => loadDebts(), 500)
         },
       )
       .subscribe()
@@ -203,7 +204,11 @@ export default function CobrancaPage() {
             <Label htmlFor="simplified-mode">Cobrança simplificado</Label>
           </div>
 
-          <Button variant="outline" onClick={loadDebts} disabled={loading}>
+          <Button
+            variant="outline"
+            onClick={() => loadDebts()}
+            disabled={loading}
+          >
             <RefreshCw
               className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`}
             />
@@ -251,6 +256,7 @@ export default function CobrancaPage() {
                 <SelectContent>
                   <SelectItem value="todos">Todos Status</SelectItem>
                   <SelectItem value="VENCIDO">vencido</SelectItem>
+                  <SelectItem value="A VENCER">a vencer</SelectItem>
                 </SelectContent>
               </Select>
             </div>

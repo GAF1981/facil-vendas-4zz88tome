@@ -1,8 +1,11 @@
--- Drop existing functions to resolve potential overloading ambiguity (int vs bigint)
+-- Create unique index to allow UPSERT operations on debitos_historico
+CREATE UNIQUE INDEX IF NOT EXISTS idx_debitos_historico_pedido_id ON debitos_historico(pedido_id);
+
+-- Drop previous overloaded versions to avoid ambiguity
 DROP FUNCTION IF EXISTS update_debito_historico_order(integer);
 DROP FUNCTION IF EXISTS update_debito_historico_order(bigint);
 
--- Create the robust version of the function
+-- Robust Function to Calculate and Update Debt History
 CREATE OR REPLACE FUNCTION update_debito_historico_order(p_pedido_id BIGINT)
 RETURNS VOID
 LANGUAGE plpgsql
@@ -23,6 +26,7 @@ DECLARE
     
 BEGIN
     -- 1. Calculate Total Paid from RECEBIMENTOS
+    -- Only completed payments reduce the debt
     SELECT COALESCE(SUM(valor_pago), 0)
     INTO v_total_pago
     FROM "RECEBIMENTOS"
@@ -49,7 +53,7 @@ BEGIN
     FROM "BANCO_DE_DADOS"
     WHERE "NÚMERO DO PEDIDO" = p_pedido_id;
 
-    -- If no sales data found, we can't update or create debt history
+    -- If no sales data found (order doesn't exist yet), exit.
     IF v_cliente_id IS NULL THEN
         RETURN;
     END IF;
@@ -75,7 +79,7 @@ BEGIN
     END IF;
 
     -- 5. UPSERT into debitos_historico
-    -- This ensures that if the record doesn't exist, it is created.
+    -- This ensures that if the record doesn't exist (new order), it is created.
     -- If it exists, it is updated with fresh values.
     INSERT INTO debitos_historico (
         pedido_id,
@@ -108,8 +112,31 @@ BEGIN
         saldo_a_pagar = EXCLUDED.saldo_a_pagar,
         valor_venda = EXCLUDED.valor_venda,
         desconto = EXCLUDED.desconto,
-        data_acerto = EXCLUDED.data_acerto, -- Update metadata too in case of correction
+        data_acerto = EXCLUDED.data_acerto,
         vendedor_nome = EXCLUDED.vendedor_nome;
         
 END;
 $$;
+
+-- Create Trigger Function to automatically update debt when payments change
+CREATE OR REPLACE FUNCTION trigger_update_debito_historico()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    PERFORM update_debito_historico_order(OLD.venda_id);
+    RETURN OLD;
+  ELSE
+    PERFORM update_debito_historico_order(NEW.venda_id);
+    RETURN NEW;
+  END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Drop trigger if exists to allow clean creation
+DROP TRIGGER IF EXISTS trg_update_debito_historico_recebimentos ON "RECEBIMENTOS";
+
+-- Create Trigger
+CREATE TRIGGER trg_update_debito_historico_recebimentos
+AFTER INSERT OR UPDATE OR DELETE ON "RECEBIMENTOS"
+FOR EACH ROW
+EXECUTE FUNCTION trigger_update_debito_historico();

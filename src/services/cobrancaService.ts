@@ -224,6 +224,8 @@ export const cobrancaService = {
           const vDate = r.vencimento
           const parsedDate = vDate ? parseISO(vDate) : null
 
+          // Logic Check: Even if partial payment made, if remaining < reg, and date < today => VENCIDO
+          // If date > today, it is A VENCER (Pending/To Mature)
           if (valPago >= valReg && valReg > 0) {
             status = 'PAGO'
           } else if (
@@ -234,6 +236,7 @@ export const cobrancaService = {
           ) {
             status = 'VENCIDO'
           }
+          // Default remains 'A VENCER' for future dates
 
           return {
             id: r.id,
