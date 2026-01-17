@@ -1,5 +1,4 @@
 import { useEffect, useState, useMemo } from 'react'
-import { cobrancaService } from '@/services/cobrancaService'
 import { recebimentoService } from '@/services/recebimentoService'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,39 +11,38 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { formatCurrency, safeFormatDate } from '@/lib/formatters'
-import { Loader2, Printer, CheckSquare, Search, RotateCcw } from 'lucide-react'
+import { Loader2, CheckSquare, Search, RotateCcw } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { OrderDebt } from '@/types/cobranca'
+import { RecebimentoInstallment } from '@/types/recebimento'
 import { RecebimentoPaymentDialog } from '@/components/recebimento/RecebimentoPaymentDialog'
-import { PaymentEntry } from '@/types/payment'
 import { useAuth } from '@/hooks/use-auth'
-import { ClientRow } from '@/types/client'
 import { Checkbox } from '@/components/ui/checkbox'
-import { PaymentHistoryDialog } from '@/components/recebimento/PaymentHistoryDialog'
 import { Label } from '@/components/ui/label'
-
-interface FlattenedOrder extends OrderDebt {
-  clientName: string
-  clientId: number
-}
+import { Badge } from '@/components/ui/badge'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 export default function RecebimentoPage() {
   const [loading, setLoading] = useState(true)
-  const [orders, setOrders] = useState<FlattenedOrder[]>([])
+  const [installments, setInstallments] = useState<RecebimentoInstallment[]>([])
 
-  // Advanced Filtering
-  const [searchName, setSearchName] = useState('')
-  const [searchOrder, setSearchOrder] = useState('')
+  // Filters
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState<
+    'PENDENTE' | 'PAGO' | 'TODOS'
+  >('PENDENTE')
 
-  // Single selection state
-  const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null)
-
+  // Selection
+  const [selectedInstallmentId, setSelectedInstallmentId] = useState<
+    number | null
+  >(null)
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [historyOpen, setHistoryOpen] = useState(false)
-  const [historyOrderId, setHistoryOrderId] = useState<number | null>(null)
-
-  const [generatingPdf, setGeneratingPdf] = useState<number | null>(null)
 
   const { toast } = useToast()
   const { user } = useAuth()
@@ -52,30 +50,25 @@ export default function RecebimentoPage() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const result = await cobrancaService.getDebts()
-      const flatOrders: FlattenedOrder[] = result
-        .flatMap((client) =>
-          client.orders.map((order) => ({
-            ...order,
-            clientName: client.clientName,
-            clientId: client.clientId,
-          })),
-        )
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      // Fetch using service with filters
+      const data = await recebimentoService.getInstallments({
+        search: searchTerm,
+        status: statusFilter,
+      })
+      setInstallments(data)
 
-      setOrders(flatOrders)
-      // Reset selection on reload if the selected order is no longer available or we just want to reset
+      // Reset selection if item no longer in list
       if (
-        selectedOrderId &&
-        !flatOrders.find((o) => o.orderId === selectedOrderId)
+        selectedInstallmentId &&
+        !data.find((i) => i.id === selectedInstallmentId)
       ) {
-        setSelectedOrderId(null)
+        setSelectedInstallmentId(null)
       }
     } catch (error) {
       console.error(error)
       toast({
         title: 'Erro',
-        description: 'Não foi possível carregar os débitos.',
+        description: 'Não foi possível carregar as parcelas.',
         variant: 'destructive',
       })
     } finally {
@@ -84,113 +77,60 @@ export default function RecebimentoPage() {
   }
 
   useEffect(() => {
-    loadData()
-  }, [])
+    // Debounce loadData for search
+    const timer = setTimeout(() => {
+      loadData()
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [searchTerm, statusFilter])
 
-  const filteredOrders = useMemo(() => {
-    return orders.filter((o) => {
-      const matchesName =
-        !searchName ||
-        o.clientName.toLowerCase().includes(searchName.toLowerCase()) ||
-        o.clientId.toString().includes(searchName)
-
-      const matchesOrder =
-        !searchOrder || o.orderId.toString().includes(searchOrder)
-
-      return matchesName && matchesOrder
-    })
-  }, [orders, searchName, searchOrder])
-
-  const handleSelectOrder = (orderId: number) => {
-    if (selectedOrderId === orderId) {
-      setSelectedOrderId(null) // Deselect
+  const handleSelectInstallment = (id: number) => {
+    if (selectedInstallmentId === id) {
+      setSelectedInstallmentId(null)
     } else {
-      setSelectedOrderId(orderId) // Select new (auto deselects others)
+      setSelectedInstallmentId(id)
     }
   }
 
-  const selectedOrderData = useMemo(() => {
-    return orders.find((o) => o.orderId === selectedOrderId) || null
-  }, [orders, selectedOrderId])
+  const selectedInstallment = useMemo(() => {
+    return installments.find((i) => i.id === selectedInstallmentId) || null
+  }, [installments, selectedInstallmentId])
 
-  const handleOpenPayment = () => {
-    if (selectedOrderData) {
-      setDialogOpen(true)
-    }
-  }
-
-  const handleOpenHistory = (orderId: number, e: React.MouseEvent) => {
-    e.stopPropagation()
-    setHistoryOrderId(orderId)
-    setHistoryOpen(true)
-  }
-
-  const handleGeneratePdf = async (orderId: number, e: React.MouseEvent) => {
-    e.stopPropagation()
-    setGeneratingPdf(orderId)
-    try {
-      const blob = await cobrancaService.generateOrderReceipt(orderId)
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `recibo_pedido_${orderId}.pdf`
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
-      toast({
-        title: 'Sucesso',
-        description: 'PDF gerado com sucesso.',
-      })
-    } catch (error) {
-      console.error(error)
-      toast({
-        title: 'Erro',
-        description: 'Erro ao gerar PDF.',
-        variant: 'destructive',
-      })
-    } finally {
-      setGeneratingPdf(null)
-    }
-  }
-
-  const handleConfirmPayment = async (payments: PaymentEntry[]) => {
-    if (!selectedOrderData || !user) return
+  const handleProcessPayment = async (
+    id: number,
+    amount: number,
+    date: string,
+    method: string,
+    pixDetails?: { nome: string; banco: string },
+  ) => {
+    if (!selectedInstallment || !user) return
 
     try {
-      const clientMock = { CODIGO: selectedOrderData.clientId } as ClientRow
-
-      const employeeMock = {
-        id: 1, // Fallback ID - ideally we get this from user context
-        nome_completo: user.email || 'Sistema',
-        email: user.email || '',
-        situacao: 'ATIVO',
-        setor: [],
-      } as any
-
-      await recebimentoService.saveRecebimento(
-        clientMock,
-        employeeMock,
-        payments,
-        selectedOrderData.orderId,
+      await recebimentoService.processInstallmentPayment(
+        id,
+        amount,
+        date,
+        method,
+        selectedInstallment.venda_id,
+        pixDetails,
+        user.email || 'Usuário',
       )
 
       toast({
         title: 'Sucesso',
-        description: 'Recebimento registrado com sucesso.',
+        description: 'Pagamento processado com sucesso.',
         className: 'bg-green-600 text-white',
       })
 
-      // Refresh data immediately
+      // Refresh data to reflect changes immediately
       await loadData()
     } catch (error) {
       console.error(error)
       toast({
         title: 'Erro',
-        description: 'Falha ao registrar recebimento.',
+        description: 'Falha ao processar pagamento.',
         variant: 'destructive',
       })
-      throw error
     }
   }
 
@@ -202,19 +142,19 @@ export default function RecebimentoPage() {
             Recebimentos
           </h1>
           <p className="text-muted-foreground">
-            Registre pagamentos e gerencie débitos históricos.
+            Gerencie parcelas e pagamentos.
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={loadData} disabled={loading}>
-            <Loader2
+            <RotateCcw
               className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`}
             />
             Atualizar
           </Button>
           <Button
-            onClick={handleOpenPayment}
-            disabled={!selectedOrderId}
+            onClick={() => setDialogOpen(true)}
+            disabled={!selectedInstallmentId}
             variant="default"
             className="bg-green-600 hover:bg-green-700"
           >
@@ -226,29 +166,36 @@ export default function RecebimentoPage() {
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Filtros de Pesquisa</CardTitle>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
-            <div className="space-y-1">
-              <Label htmlFor="search-name">Cliente (Nome ou Código)</Label>
+          <CardTitle className="text-lg">Filtros</CardTitle>
+          <div className="flex flex-col md:flex-row gap-4 mt-2">
+            <div className="flex-1 space-y-1">
+              <Label htmlFor="search">Buscar (Nome, Código ou Pedido)</Label>
               <div className="relative">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
-                  id="search-name"
-                  placeholder="Buscar cliente..."
+                  id="search"
+                  placeholder="Digite para buscar..."
                   className="pl-8"
-                  value={searchName}
-                  onChange={(e) => setSearchName(e.target.value)}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="search-order">Número do Pedido</Label>
-              <Input
-                id="search-order"
-                placeholder="Ex: 12345"
-                value={searchOrder}
-                onChange={(e) => setSearchOrder(e.target.value)}
-              />
+            <div className="w-full md:w-[200px] space-y-1">
+              <Label>Status</Label>
+              <Select
+                value={statusFilter}
+                onValueChange={(v: any) => setStatusFilter(v)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PENDENTE">Pendentes</SelectItem>
+                  <SelectItem value="PAGO">Pagos</SelectItem>
+                  <SelectItem value="TODOS">Todos</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardHeader>
@@ -257,129 +204,99 @@ export default function RecebimentoPage() {
             <Table>
               <TableHeader className="bg-muted/50">
                 <TableRow>
-                  <TableHead className="w-[80px]">Pedido</TableHead>
+                  <TableHead className="w-[50px] text-center">Sel.</TableHead>
+                  <TableHead>Vencimento</TableHead>
                   <TableHead>Cliente</TableHead>
-                  <TableHead>Data</TableHead>
-                  <TableHead>Vendedor</TableHead>
-                  <TableHead className="text-right">Valor Venda</TableHead>
-                  <TableHead className="text-right text-blue-600">
-                    Saldo a Pagar
-                  </TableHead>
+                  <TableHead>Pedido</TableHead>
+                  <TableHead>Método Orig.</TableHead>
+                  <TableHead className="text-right">Valor Parcela</TableHead>
                   <TableHead className="text-right text-green-600">
                     Valor Pago
                   </TableHead>
-                  <TableHead className="text-right text-red-600">
-                    Débito
+                  <TableHead className="text-right text-blue-600">
+                    Saldo a Pagar
                   </TableHead>
-                  <TableHead
-                    className="w-[50px] text-center"
-                    title="Selecionar para pagamento"
-                  >
-                    Sel.
-                  </TableHead>
-                  <TableHead className="w-[100px] text-center">Ações</TableHead>
+                  <TableHead className="text-center">Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="h-24 text-center">
+                    <TableCell colSpan={9} className="h-24 text-center">
                       <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                     </TableCell>
                   </TableRow>
-                ) : filteredOrders.length === 0 ? (
+                ) : installments.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={10}
+                      colSpan={9}
                       className="h-24 text-center text-muted-foreground"
                     >
-                      Nenhum débito encontrado.
+                      Nenhuma parcela encontrada.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredOrders.map((order) => {
-                    const isSelected = selectedOrderId === order.orderId
-                    // Calculate "Saldo a Pagar" strictly as Total - Paid as per User Story
-                    // NOTE: Typically "Saldo a Pagar" is Net Value (after discount), but AC requests:
-                    // "value in 'Saldo a Pagar' must strictly equal valor_venda - total_valor_pago"
-                    // Assuming totalValue is "Valor Venda" and paidValue is "Valor Pago"
-                    const saldoAPagarDisplay =
-                      order.totalValue - order.paidValue
+                  installments.map((inst) => {
+                    const isSelected = selectedInstallmentId === inst.id
+                    const saldo = Math.max(
+                      0,
+                      (inst.valor_registrado || 0) - inst.valor_pago,
+                    )
+                    const isPaid =
+                      saldo === 0 && (inst.valor_registrado || 0) > 0
 
                     return (
                       <TableRow
-                        key={order.orderId}
+                        key={inst.id}
                         className={isSelected ? 'bg-muted/50' : ''}
                       >
-                        <TableCell className="font-mono">
-                          #{order.orderId}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col">
-                            <span className="font-medium">
-                              {order.clientName}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              ID: {order.clientId}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {safeFormatDate(order.date, 'dd/MM/yyyy')}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {order.employeeName || 'N/D'}
-                        </TableCell>
-                        <TableCell className="text-right text-muted-foreground font-mono">
-                          {formatCurrency(order.totalValue)}
-                        </TableCell>
-                        <TableCell className="text-right text-blue-600 font-mono font-medium">
-                          {formatCurrency(saldoAPagarDisplay)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-green-600 font-medium">
-                          {formatCurrency(order.paidValue)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono font-bold text-red-600">
-                          {formatCurrency(order.remainingValue)}
-                        </TableCell>
                         <TableCell className="text-center">
                           <Checkbox
                             checked={isSelected}
                             onCheckedChange={() =>
-                              handleSelectOrder(order.orderId)
+                              handleSelectInstallment(inst.id)
                             }
-                            aria-label={`Selecionar pedido ${order.orderId}`}
                           />
                         </TableCell>
-                        <TableCell className="text-center">
-                          <div className="flex justify-center gap-1">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={(e) =>
-                                handleGeneratePdf(order.orderId, e)
-                              }
-                              disabled={generatingPdf === order.orderId}
-                              title="Gerar PDF"
-                            >
-                              {generatingPdf === order.orderId ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Printer className="h-4 w-4" />
-                              )}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={(e) =>
-                                handleOpenHistory(order.orderId, e)
-                              }
-                              title="Histórico / Estornar"
-                              className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                            >
-                              <RotateCcw className="h-4 w-4" />
-                            </Button>
+                        <TableCell>
+                          {safeFormatDate(inst.vencimento, 'dd/MM/yyyy')}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-medium">
+                              {inst.cliente_nome}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              #{inst.cliente_codigo}
+                            </span>
                           </div>
+                        </TableCell>
+                        <TableCell className="font-mono">
+                          #{inst.venda_id}
+                        </TableCell>
+                        <TableCell>{inst.forma_pagamento}</TableCell>
+                        <TableCell className="text-right font-mono">
+                          {formatCurrency(inst.valor_registrado || 0)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-green-600">
+                          {formatCurrency(inst.valor_pago)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-bold text-blue-600">
+                          {formatCurrency(saldo)}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {isPaid ? (
+                            <Badge className="bg-green-100 text-green-800 hover:bg-green-200 border-none">
+                              Pago
+                            </Badge>
+                          ) : (
+                            <Badge
+                              variant="outline"
+                              className="text-amber-600 border-amber-200 bg-amber-50"
+                            >
+                              Pendente
+                            </Badge>
+                          )}
                         </TableCell>
                       </TableRow>
                     )
@@ -394,16 +311,8 @@ export default function RecebimentoPage() {
       <RecebimentoPaymentDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        order={selectedOrderData}
-        clientName={selectedOrderData?.clientName || ''}
-        onConfirm={handleConfirmPayment}
-      />
-
-      <PaymentHistoryDialog
-        open={historyOpen}
-        onOpenChange={setHistoryOpen}
-        orderId={historyOrderId}
-        onUpdate={loadData}
+        installment={selectedInstallment}
+        onConfirm={handleProcessPayment}
       />
     </div>
   )

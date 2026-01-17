@@ -2425,10 +2425,19 @@ export type Database = {
         Args: { p_new_rota_id: number; p_old_rota_id: number }
         Returns: undefined
       }
-      update_debito_historico_order: {
-        Args: { p_pedido_id: number }
-        Returns: undefined
-      }
+      update_debito_historico_order:
+        | {
+            Args: { p_pedido_id: number }
+            Returns: {
+              error: true
+            } & 'Could not choose the best candidate function between: public.update_debito_historico_order(p_pedido_id => int8), public.update_debito_historico_order(p_pedido_id => int4). Try renaming the parameters or the function itself in the database so function overloading can be resolved'
+          }
+        | {
+            Args: { p_pedido_id: number }
+            Returns: {
+              error: true
+            } & 'Could not choose the best candidate function between: public.update_debito_historico_order(p_pedido_id => int8), public.update_debito_historico_order(p_pedido_id => int4). Try renaming the parameters or the function itself in the database so function overloading can be resolved'
+          }
       verify_employee_credentials: {
         Args: { p_email: string; p_senha: string }
         Returns: {

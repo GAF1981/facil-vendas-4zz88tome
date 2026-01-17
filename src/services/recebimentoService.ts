@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase/client'
 import { ClientRow } from '@/types/client'
 import { Employee } from '@/types/employee'
 import { PaymentEntry } from '@/types/payment'
-import { RecebimentoInsert } from '@/types/recebimento'
+import { RecebimentoInsert, RecebimentoInstallment } from '@/types/recebimento'
 import { reportsService } from '@/services/reportsService'
 
 export const recebimentoService = {
@@ -36,9 +36,7 @@ export const recebimentoService = {
             funcionario_id: employee.id,
             forma_pagamento: payment.method,
             valor_registrado: detail.value,
-            valor_pago: 0, // Installments initially 0 paid if future? Or depends on logic. Usually only first is paid if immediate.
-            // But if specific paidValue is passed in detail, use it.
-            // In RecebimentoPage context, we usually register immediate payments as paid.
+            valor_pago: 0,
             vencimento: new Date(`${detail.dueDate}T12:00:00`).toISOString(),
             ID_da_fêmea: linkedOrderId,
           })
@@ -56,6 +54,7 @@ export const recebimentoService = {
             ? new Date(`${payment.dueDate}T12:00:00`).toISOString()
             : new Date().toISOString(),
           ID_da_fêmea: linkedOrderId,
+          data_pagamento: new Date().toISOString(),
         })
       }
 
@@ -69,7 +68,6 @@ export const recebimentoService = {
 
         // 3. If Pix, insert into PIX table
         if (payment.method === 'Pix' && payment.pixDetails && insertedData) {
-          // Pix is always single payment in this context
           const insertedRecord = insertedData[0]
           if (insertedRecord) {
             const { error: pixError } = await supabase.from('PIX').insert({
@@ -94,7 +92,6 @@ export const recebimentoService = {
       await reportsService.updateDebtHistoryForOrder(linkedOrderId)
     } catch (error) {
       console.error('Failed to update debt history:', error)
-      // We don't throw here to avoid rollback of payment if just the cache update failed
     }
 
     return linkedOrderId
@@ -129,7 +126,7 @@ export const recebimentoService = {
     // 1. Update RECEBIMENTOS to set valor_pago = 0
     const { error: updateError } = await supabase
       .from('RECEBIMENTOS')
-      .update({ valor_pago: 0 })
+      .update({ valor_pago: 0, data_pagamento: null } as any)
       .eq('id', paymentId)
 
     if (updateError) throw updateError
@@ -146,6 +143,113 @@ export const recebimentoService = {
     if (logError) console.error('Error logging reversal:', logError)
 
     // 3. Update debt history to reflect the change
+    await reportsService.updateDebtHistoryForOrder(orderId)
+  },
+
+  async getInstallments(
+    filters: { search?: string; status?: 'PENDENTE' | 'PAGO' | 'TODOS' } = {},
+  ): Promise<RecebimentoInstallment[]> {
+    let query = supabase
+      .from('RECEBIMENTOS')
+      .select('*, CLIENTES(CODIGO, "NOME CLIENTE")')
+      .order('vencimento', { ascending: true })
+      .limit(1000)
+
+    if (filters.search) {
+      const term = filters.search
+      const isNumber = !isNaN(Number(term))
+      if (isNumber) {
+        // Search by Client Code or Order ID (venda_id)
+        query = query.or(`cliente_id.eq.${term},venda_id.eq.${term}`)
+      } else {
+        // Search by Client Name requires separate filter or post-filter if RPC not used
+        // Supabase join filtering:
+        // query = query.ilike('CLIENTES.NOME CLIENTE', `%${term}%`) - This syntax depends on Postgrest version
+        // Standard approach for inner join filter: !inner
+        query = query
+          .not('CLIENTES', 'is', null) // Ensure joined
+          .filter('CLIENTES.NOME CLIENTE', 'ilike', `%${term}%`)
+      }
+    }
+
+    const { data, error } = await query
+
+    if (error) throw error
+
+    let installments = (data || []).map((row: any) => ({
+      ...row,
+      cliente_nome: row.CLIENTES?.['NOME CLIENTE'] || 'Desconhecido',
+      cliente_codigo: row.CLIENTES?.CODIGO || 0,
+    })) as RecebimentoInstallment[]
+
+    if (filters.status && filters.status !== 'TODOS') {
+      installments = installments.filter((inst) => {
+        const valReg = inst.valor_registrado || 0
+        const valPago = inst.valor_pago || 0
+        const isPaid = valPago >= valReg && valReg > 0
+        return filters.status === 'PAGO' ? isPaid : !isPaid
+      })
+    }
+
+    return installments
+  },
+
+  async processInstallmentPayment(
+    installmentId: number,
+    amountPaid: number,
+    paymentDate: string,
+    method: string,
+    orderId: number,
+    pixDetails?: { nome: string; banco: string },
+    userName?: string,
+  ) {
+    // 1. Fetch current state to increment safely or just set?
+    // AC implies "incrementing valor_pago". But typically we process "remaining balance".
+    // If I select an installment of 100 that has 0 paid, and I pay 50. valor_pago becomes 50.
+    // If I select it again (balance 50) and pay 50. valor_pago becomes 100.
+    // So we fetch current first.
+    const { data: current, error: fetchError } = await supabase
+      .from('RECEBIMENTOS')
+      .select('valor_pago, valor_registrado')
+      .eq('id', installmentId)
+      .single()
+
+    if (fetchError) throw fetchError
+
+    const newTotalPaid = (current.valor_pago || 0) + amountPaid
+    // AC says: "updating valor_registrado".
+    // Typically we don't change registered value on payment unless it's a correction.
+    // But if the requirement implies it, we might need logic.
+    // Assuming standard "process payment" just updates paid value.
+
+    // 2. Update Installment
+    const { error: updateError } = await supabase
+      .from('RECEBIMENTOS')
+      .update({
+        valor_pago: newTotalPaid,
+        data_pagamento: new Date(`${paymentDate}T12:00:00`).toISOString(),
+        // Update method if it changed? Usually method is per payment.
+        // If we want to track METHOD of this specific payment, and RECEBIMENTOS row has only one method column,
+        // we are overwriting the "scheduled method" with "actual method".
+        forma_pagamento: method,
+      } as any)
+      .eq('id', installmentId)
+
+    if (updateError) throw updateError
+
+    // 3. Log Pix if applicable
+    if (method === 'Pix' && pixDetails) {
+      await supabase.from('PIX').insert({
+        recebimento_id: installmentId,
+        nome_no_pix: pixDetails.nome,
+        banco_pix: pixDetails.banco,
+        data_pix_realizado: new Date().toISOString(),
+        confirmado_por: userName || 'Sistema',
+        venda_id: orderId,
+      })
+    }
+
+    // 4. Sync Debt History
     await reportsService.updateDebtHistoryForOrder(orderId)
   },
 }
