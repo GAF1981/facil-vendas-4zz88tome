@@ -108,7 +108,7 @@ export default function RecebimentoPage() {
     if (!selectedInstallment || !user) return
 
     try {
-      await recebimentoService.processInstallmentPayment(
+      const result = await recebimentoService.processInstallmentPayment(
         id,
         amount,
         date,
@@ -118,11 +118,20 @@ export default function RecebimentoPage() {
         user.email || 'Usuário',
       )
 
-      toast({
-        title: 'Sucesso',
-        description: 'Pagamento processado e débito atualizado com sucesso.',
-        className: 'bg-green-600 text-white',
-      })
+      if (result.syncWarning) {
+        toast({
+          title: 'Pagamento Registrado',
+          description:
+            'O pagamento foi salvo, mas houve um atraso na sincronização com o histórico de débitos (Sync Delay).',
+          className: 'bg-yellow-600 text-white',
+        })
+      } else {
+        toast({
+          title: 'Sucesso',
+          description: 'Pagamento processado e débito atualizado com sucesso.',
+          className: 'bg-green-600 text-white',
+        })
+      }
 
       // Refresh data to reflect changes immediately in the UI (UI Consistency)
       await loadData()

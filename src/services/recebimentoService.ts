@@ -211,7 +211,7 @@ export const recebimentoService = {
     orderId: number,
     pixDetails?: { nome: string; banco: string },
     userName?: string,
-  ) {
+  ): Promise<{ success: boolean; syncWarning?: boolean }> {
     // 1. Fetch current state
     const { data: current, error: fetchError } = await supabase
       .from('RECEBIMENTOS')
@@ -264,8 +264,14 @@ export const recebimentoService = {
     })
 
     // 5. Sync Debt History - Critical for Cross-Module Sync
-    // Calls the RPC function 'update_debito_historico_order' which we improved
-    // This ensures Collection Center and Acerto History are updated
-    await reportsService.updateDebtHistoryForOrder(orderId)
+    // Calls the RPC function 'update_debito_historico_order'.
+    // Wrapped in try-catch to prevent transaction failure perception if only sync fails.
+    try {
+      await reportsService.updateDebtHistoryForOrder(orderId)
+      return { success: true }
+    } catch (syncError) {
+      console.error('Sync failed for order:', orderId, syncError)
+      return { success: true, syncWarning: true }
+    }
   },
 }

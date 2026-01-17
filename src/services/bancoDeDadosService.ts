@@ -4,7 +4,7 @@ import { ClientRow } from '@/types/client'
 import { Employee } from '@/types/employee'
 import { ProductRow } from '@/types/product'
 import { parseCurrency, formatCurrency } from '@/lib/formatters'
-import { format, parseISO, differenceInDays } from 'date-fns'
+import { format } from 'date-fns'
 import { PaymentEntry } from '@/types/payment'
 import { RecebimentoInsert } from '@/types/recebimento'
 import { rotaService } from '@/services/rotaService'
@@ -233,6 +233,9 @@ export const bancoDeDadosService = {
   },
 
   async getAcertoHistory(clienteId: number) {
+    // Calling refresh to ensure we have latest cached data if possible,
+    // though for history table we generally rely on direct query or view.
+    // The previous implementation used BANCO_DE_DADOS directly.
     const { data, error } = await supabase
       .from('BANCO_DE_DADOS')
       .select(
@@ -346,20 +349,32 @@ export const bancoDeDadosService = {
       }
     })
 
+    // Calculate Monthly Average
+    // Note: This logic is duplicated in frontend/backend, consider centralizing or using views
     for (let i = 0; i < result.length; i++) {
       const current = result[i]
       let mediaMensal = null
 
       if (i < result.length - 1) {
         const previous = result[i + 1]
-        const dateCurrent = parseISO(current.data)
-        const datePrev = parseISO(previous.data)
+        // Safe parsing
+        try {
+          // Use hardcoded time if missing to avoid parsing errors
+          const currentDateTime = `${current.data}T${current.hora || '00:00:00'}`
+          const prevDateTime = `${previous.data}T${previous.hora || '00:00:00'}`
 
-        const diffDays = differenceInDays(dateCurrent, datePrev)
+          // Calculate difference in days
+          const dateCurrent = new Date(currentDateTime)
+          const datePrev = new Date(prevDateTime)
+          const diffTime = Math.abs(dateCurrent.getTime() - datePrev.getTime())
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 
-        if (diffDays > 0) {
-          const factor = diffDays / 30
-          mediaMensal = current.valorVendaTotal / factor
+          if (diffDays > 0) {
+            const factor = diffDays / 30
+            mediaMensal = current.valorVendaTotal / factor
+          }
+        } catch (e) {
+          console.warn('Error calculating monthly average for row', i, e)
         }
       }
 
@@ -370,8 +385,6 @@ export const bancoDeDadosService = {
   },
 
   async getHistoryForPdf(clienteId: number) {
-    // Specifically fetches history from 'debitos_historico' for PDF report generation
-    // to ensure consistency with the reports module and include Média Mensal/Pedido fields.
     const { data, error } = await supabase
       .from('debitos_historico')
       .select('*')
@@ -629,11 +642,13 @@ export const bancoDeDadosService = {
       console.error('Error updating Rota counter on settlement:', rotaError)
     }
 
-    // 8. Auto-update debt history for this order (Requirement)
+    // 8. Auto-update debt history for this order (Requirement - Immediate Sync)
+    // Ensures immediate consistency in Debt Center
     try {
       await reportsService.updateDebtHistoryForOrder(nextPedido)
     } catch (debtError) {
       console.error('Error auto-updating debt history:', debtError)
+      // We log but don't fail the transaction, as the primary record is safe
     }
 
     return nextPedido
