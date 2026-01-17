@@ -18,7 +18,7 @@ import {
   PaymentInstallment,
 } from '@/types/payment'
 import { cn } from '@/lib/utils'
-import { addDays, format, isAfter, startOfDay } from 'date-fns'
+import { addDays, format, isAfter, startOfDay, parseISO } from 'date-fns'
 
 interface AcertoPaymentSummaryProps {
   saldoAPagar: number
@@ -46,6 +46,42 @@ export function AcertoPaymentSummary({
     )
   }
 
+  // Helper to calculate paid value based on rules
+  const calculatePaidValue = (
+    method: string,
+    value: number,
+    dueDateStr: string,
+    isEntry: boolean,
+    hasZeroDownPayment: boolean,
+  ): number => {
+    if (isReceiptMode) {
+      // In receipt mode, restricted methods are strictly fully paid or strictly valid
+      if (isRestrictedMethod(method)) return value
+      return value // Default assumption for receipts
+    } else {
+      // Acerto (Sales) Mode
+      if (method === 'Boleto') return 0
+
+      // For Pix, Dinheiro, Cheque
+      // Check if Future Date
+      const today = startOfDay(new Date())
+      const due = parseISO(dueDateStr)
+      // If due date is strictly after today, it is NOT paid immediately
+      if (isAfter(due, today)) return 0
+
+      // If Today or Past
+      if (
+        isEntry &&
+        hasZeroDownPayment &&
+        (method === 'Pix' || method === 'Dinheiro')
+      ) {
+        return 0
+      }
+
+      return value
+    }
+  }
+
   // Helper to generate installments based on business rules
   const generateInstallments = (
     totalValue: number,
@@ -66,7 +102,6 @@ export function AcertoPaymentSummary({
     }
 
     // In Receipt Mode for restricted methods, count is always 1 (enforced by caller/UI)
-    // and Zero Down Payment is not applicable/allowed usually, but if passed we ignore for restricted
     if (isRestrictedMethod(method)) {
       effectiveCount = 1
     }
@@ -80,57 +115,49 @@ export function AcertoPaymentSummary({
     const remainder = Number((totalValue - totalDistributed).toFixed(2))
 
     // Determine initial date logic
+    // Ensure we use Noon to avoid timezone issues when converting to string
     const start = new Date(baseDate + 'T12:00:00')
 
     return Array.from({ length: count }, (_, i) => {
       let dueDateObj = i === 0 ? start : addDays(start, i * 30)
       let dueDate = format(dueDateObj, 'yyyy-MM-dd')
       let value = installmentValue
-      let paidValue = 0
 
       const isEntry = i === 0
 
       if (isReceiptMode) {
-        // Receipt Mode Logic
         if (isRestrictedMethod(method)) {
-          // Strict Sync: Paid Value = Value
-          paidValue = value
-          // Add remainder to the single installment
           if (i === 0) value += remainder
-          if (i === 0) paidValue = value
         } else {
-          // Other methods in receipt mode (e.g. Credit Card?) - Default behavior
           if (i === count - 1) value += remainder
-          paidValue = value // Assuming receipts are paid immediately unless specified
         }
       } else {
-        // Sales (Acerto) Mode Logic (Legacy)
+        // Sales (Acerto) Mode Logic
         if (isEntry && (method === 'Pix' || method === 'Dinheiro')) {
           if (hasZeroDownPayment) {
             value = 0
-            paidValue = 0
-          } else {
-            paidValue = value
           }
         } else {
           if (
             hasZeroDownPayment &&
             (method === 'Pix' || method === 'Dinheiro')
           ) {
+            // Distribute remainder on last
             if (i === count - 1) value += remainder
           } else {
             if (i === count - 1) value += remainder
           }
         }
-
-        if (method === 'Boleto') {
-          paidValue = 0
-        }
-
-        if (method === 'Cheque') {
-          paidValue = value
-        }
       }
+
+      // Calculate Paid Value dynamically
+      const paidValue = calculatePaidValue(
+        method,
+        Number(value.toFixed(2)),
+        dueDate,
+        isEntry,
+        hasZeroDownPayment,
+      )
 
       return {
         number: i + 1,
@@ -198,7 +225,7 @@ export function AcertoPaymentSummary({
     onPaymentsChange(
       payments.map((p) => {
         if (p.method !== method) return p
-        if (field === 'paidValue') return p
+        if (field === 'paidValue') return p // Paid value is calculated
 
         // Receipt Mode Constraint: Installments
         if (
@@ -218,51 +245,28 @@ export function AcertoPaymentSummary({
 
         const updated = { ...p, [field]: updatedValue }
 
-        // Date Sync Logic
-        if (field === 'dueDate') {
-          const newDate = updatedValue as string
-          const shouldSyncDetails =
-            (method === 'Boleto' ||
-              method === 'Cheque' ||
-              isRestrictedMethod(method)) &&
-            p.installments === 1
-
-          const isSemEntrada = p.hasZeroDownPayment
-
-          if (shouldSyncDetails || isSemEntrada) {
-            if (updated.details) {
-              const newDetails = generateInstallments(
-                updated.value,
-                updated.installments,
-                method,
-                updated.hasZeroDownPayment,
-                newDate,
-              )
-              updated.details = newDetails
-            }
-          } else if (p.installments === 1 && updated.details) {
-            updated.details[0].dueDate = newDate
-          }
-        } else if (
+        // Recalculate details if any structural field changes
+        if (
+          field === 'dueDate' ||
           field === 'value' ||
           field === 'installments' ||
           field === 'hasZeroDownPayment'
         ) {
-          const val = field === 'value' ? (value as number) : p.value
+          const val = field === 'value' ? (updatedValue as number) : p.value
           const count =
-            field === 'installments' ? (value as number) : p.installments
+            field === 'installments' ? (updatedValue as number) : p.installments
           const zeroDown =
             field === 'hasZeroDownPayment'
-              ? (value as boolean)
+              ? (updatedValue as boolean)
               : p.hasZeroDownPayment
+          let baseDate =
+            field === 'dueDate' ? (updatedValue as string) : p.dueDate
 
-          let baseDate = p.dueDate
           if (field === 'hasZeroDownPayment' && zeroDown) {
             baseDate = format(new Date(), 'yyyy-MM-dd')
             updated.dueDate = baseDate
           }
 
-          // Re-validate date just in case
           if (isRestrictedMethod(method)) {
             baseDate = validateDate(baseDate, method)
             updated.dueDate = baseDate
@@ -280,7 +284,8 @@ export function AcertoPaymentSummary({
             newDetails.reduce((acc, d) => acc + d.paidValue, 0).toFixed(2),
           )
 
-          if (count === 1 || zeroDown) {
+          // Sync first installment date to main date if applicable
+          if ((count === 1 || zeroDown) && newDetails.length > 0) {
             updated.dueDate = newDetails[0].dueDate
           }
         }
@@ -302,12 +307,13 @@ export function AcertoPaymentSummary({
       payments.map((p) => {
         if (p.method !== method || !p.details) return p
 
-        // Receipt Mode Constraint: Date
         let updatedValue = value
+        // Receipt Mode Constraint: Date
         if (field === 'dueDate' && isRestrictedMethod(method)) {
           updatedValue = validateDate(value as string, method)
         }
 
+        // If updating main date via first installment (when synced)
         if (field === 'dueDate' && index === 0) {
           const shouldSyncMain =
             (method === 'Boleto' ||
@@ -317,18 +323,51 @@ export function AcertoPaymentSummary({
           const isSemEntrada = p.hasZeroDownPayment
 
           if (shouldSyncMain || isSemEntrada) {
-            return {
-              ...p,
-              dueDate: updatedValue as string,
-              details: p.details.map((d, i) =>
-                i === index ? { ...d, [field]: updatedValue } : d,
-              ),
-            }
+            // Need to regenerate all to keep shifts correct if logic depended on start date
+            // For simplicity, just update logic here
+            const updated = { ...p, dueDate: updatedValue as string }
+            // Let's regenerate to be safe and consistent with generateInstallments logic
+            const newDetails = generateInstallments(
+              p.value,
+              p.installments,
+              method,
+              p.hasZeroDownPayment,
+              updatedValue as string,
+            )
+            updated.details = newDetails
+            updated.paidValue = Number(
+              newDetails.reduce((acc, d) => acc + d.paidValue, 0).toFixed(2),
+            )
+            return updated
           }
         }
 
         const newDetails = [...p.details]
-        newDetails[index] = { ...newDetails[index], [field]: updatedValue }
+        const currentDetail = { ...newDetails[index], [field]: updatedValue }
+
+        // Recalculate paidValue for this installment if date changed
+        if (field === 'dueDate') {
+          currentDetail.paidValue = calculatePaidValue(
+            method,
+            currentDetail.value,
+            updatedValue as string,
+            index === 0,
+            p.hasZeroDownPayment || false,
+          )
+        }
+
+        // If value changed, update paidValue too
+        if (field === 'value') {
+          currentDetail.paidValue = calculatePaidValue(
+            method,
+            updatedValue as number,
+            currentDetail.dueDate,
+            index === 0,
+            p.hasZeroDownPayment || false,
+          )
+        }
+
+        newDetails[index] = currentDetail
 
         let newValue = p.value
         let newPaidValue = p.paidValue
@@ -337,22 +376,11 @@ export function AcertoPaymentSummary({
           newValue = Number(
             newDetails.reduce((acc, curr) => acc + curr.value, 0).toFixed(2),
           )
-
-          // Sync paid value if restricted method
-          if (isRestrictedMethod(method)) {
-            newDetails[index].paidValue = newDetails[index].value
-          } else if (method === 'Cheque') {
-            newDetails[index].paidValue = newDetails[index].value
-          }
         }
 
-        if (field === 'paidValue' || field === 'value') {
-          newPaidValue = Number(
-            newDetails
-              .reduce((acc, curr) => acc + curr.paidValue, 0)
-              .toFixed(2),
-          )
-        }
+        newPaidValue = Number(
+          newDetails.reduce((acc, curr) => acc + curr.paidValue, 0).toFixed(2),
+        )
 
         return {
           ...p,
@@ -469,11 +497,13 @@ export function AcertoPaymentSummary({
                   entry.method === 'Pix' || entry.method === 'Dinheiro'
                 const isRestricted = isRestrictedMethod(entry.method)
 
-                // Hide installments if restricted in receipt mode
                 const isInstallmentsDisabled =
                   disabled ||
                   (isPixOrDinheiro && !entry.hasZeroDownPayment) ||
                   isRestricted
+
+                // Visual cue if payment is future dated (paidValue = 0 but value > 0)
+                const isFuture = entry.value > 0 && entry.paidValue === 0
 
                 return (
                   <div
@@ -491,7 +521,6 @@ export function AcertoPaymentSummary({
                           </div>
                         </div>
 
-                        {/* Hide Sem Entrada check if restricted in Receipt Mode, as it implies strict 1x payment */}
                         {isPixOrDinheiro && !isRestricted && (
                           <div className="flex items-center gap-2 pt-1">
                             <Checkbox
@@ -551,8 +580,13 @@ export function AcertoPaymentSummary({
                               isOverpaid ? 'text-red-600' : 'text-green-700',
                             )}
                           >
-                            Valor Pago (Total)
+                            Valor Pago (Hoje)
                           </Label>
+                          {isFuture && (
+                            <span className="text-[10px] text-amber-600 bg-amber-50 px-1.5 rounded border border-amber-200">
+                              Agendado
+                            </span>
+                          )}
                         </div>
                         <div className="relative">
                           <span className="absolute left-3 top-2.5 text-muted-foreground text-sm">
@@ -648,14 +682,9 @@ export function AcertoPaymentSummary({
                           <div className="grid gap-3">
                             {entry.details.map((inst, idx) => {
                               const isEntrada = idx === 0 && isPixOrDinheiro
-                              const isBoleto = entry.method === 'Boleto'
                               const isZeroEntry =
                                 isEntrada && entry.hasZeroDownPayment
-                              const isPaidDisabled =
-                                disabled ||
-                                isBoleto ||
-                                isZeroEntry ||
-                                (!isEntrada && isPixOrDinheiro)
+                              const isPaidDisabled = true // Paid value is calculated automatically now based on date
 
                               return (
                                 <div
@@ -716,14 +745,6 @@ export function AcertoPaymentSummary({
                                       value={inst.paidValue}
                                       disabled={isPaidDisabled}
                                       readOnly={isPaidDisabled}
-                                      onChange={(e) =>
-                                        handleUpdateInstallment(
-                                          entry.method,
-                                          idx,
-                                          'paidValue',
-                                          parseFloat(e.target.value) || 0,
-                                        )
-                                      }
                                     />
                                   </div>
 

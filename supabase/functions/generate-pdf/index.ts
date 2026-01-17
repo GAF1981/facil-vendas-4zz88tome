@@ -413,8 +413,8 @@ Deno.serve(async (req) => {
         totalVendido = 0,
         valorDesconto = 0,
         valorAcerto = 0, // Total A Pagar
-        valorPago = 0, // Total Pago
-        debito = 0, // Restante
+        valorPago = 0, // Total Pago (Imediato)
+        debito = 0, // Restante (Inclui parcelas futuras)
         payments = [],
         history = [],
         signature,
@@ -496,8 +496,6 @@ Deno.serve(async (req) => {
         y -= 12
 
         // Details Grid (Right aligned keys and values for clean look, or Left Key Right Value)
-        // Reference image aligns values to the right.
-        // "Saldo Inicial:        200"
         const drawDetailLine = (label: string, value: string | number) => {
           drawText(label, margins.left, y, { size: 9 })
           drawText(String(value), width - margins.right, y, {
@@ -557,11 +555,7 @@ Deno.serve(async (req) => {
 
       let hasImmediatePayment = false
       for (const p of payments) {
-        // Show payment if paidValue > 0 or if it's a direct payment
-        // We aggregate total paid by method to simplify?
-        // Image shows "Pix R$ 1.000,00".
-        // Let's assume `paidValue` is what matters here.
-        if (p.paidValue > 0) {
+        if (p.paidValue > 0.01) {
           drawText(p.method, margins.left, y, { size: 9, font: fontBold })
           drawText(
             `R$ ${formatCurrency(p.paidValue)}`,
@@ -593,25 +587,41 @@ Deno.serve(async (req) => {
       })
       y -= 15
 
-      // List all installments from payments structure
+      // List all installments where value > paidValue
+      // This effectively lists future payments
+      let hasFuturePayments = false
       for (const p of payments) {
         if (p.details && p.details.length > 0) {
           p.details.forEach((det: any, idx: number) => {
-            const installmentNum = det.number || idx + 1
-            const totalInstallments = p.installments || p.details.length
-            const label = `${p.method} (${installmentNum}/${totalInstallments}) - ${safeFormatDate(det.dueDate)}`
+            // Only show pending amounts (Future dated payments have paidValue=0)
+            const isPending = det.value > (det.paidValue || 0) + 0.01
+            if (isPending) {
+              const installmentNum = det.number || idx + 1
+              const totalInstallments = p.installments || p.details.length
+              const label = `${p.method} (${installmentNum}/${totalInstallments}) - ${safeFormatDate(det.dueDate)}`
 
-            drawText(label, margins.left, y, { size: 9 })
-            drawText(
-              `R$ ${formatCurrency(det.value)}`,
-              width - margins.right,
-              y,
-              { size: 9, align: 'right' },
-            )
-            y -= 12
+              drawText(label, margins.left, y, { size: 9 })
+              drawText(
+                `R$ ${formatCurrency(det.value)}`,
+                width - margins.right,
+                y,
+                { size: 9, align: 'right' },
+              )
+              y -= 12
+              hasFuturePayments = true
+            }
           })
         }
       }
+      if (!hasFuturePayments) {
+        drawText('Nenhum agendamento futuro.', margins.left, y, {
+          size: 9,
+          font: fontRegular,
+          color: rgb(0.5, 0.5, 0.5),
+        })
+        y -= 12
+      }
+
       y -= 5
       drawLine(y)
       y -= 15
@@ -620,16 +630,17 @@ Deno.serve(async (req) => {
       drawText('RESUMO FINANCEIRO', margins.left, y, {
         size: 9,
         font: fontBold,
-      }) // Image has it bold but simple text
+      })
       y -= 15
 
-      drawText('Valor Total Pago:', margins.left, y, { size: 9 })
+      drawText('Valor Total Pago (Hoje):', margins.left, y, { size: 9 })
       drawText(`R$ ${formatCurrency(valorPago)}`, width - margins.right, y, {
         size: 9,
         align: 'right',
       })
       y -= 12
 
+      // Matches "Valor a Pagar" per user story
       drawText('RESTANTE (DEBITO):', margins.left, y, {
         size: 9,
         font: fontBold,
