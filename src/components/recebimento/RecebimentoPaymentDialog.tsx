@@ -92,8 +92,14 @@ export function RecebimentoPaymentDialog({
     if (!installment) return
     const numAmount = parseCurrency(amount)
 
-    // Validation: Prevent processing if amount is empty, zero, or negative
+    // Validation
     if (numAmount <= 0) return
+    if (!method) return
+
+    // Pix Validation
+    if (method === 'Pix') {
+      if (!pixName.trim() || !pixBank) return
+    }
 
     setLoading(true)
     try {
@@ -122,6 +128,7 @@ export function RecebimentoPaymentDialog({
   )
 
   const isAmountValid = parseCurrency(amount) > 0
+  const isPixValid = method !== 'Pix' || (!!pixName.trim() && !!pixBank)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -167,7 +174,7 @@ export function RecebimentoPaymentDialog({
             <Label>Forma de Pagamento</Label>
             <Select value={method} onValueChange={setMethod}>
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue placeholder="Selecione..." />
               </SelectTrigger>
               <SelectContent>
                 {PAYMENT_METHODS.map((m) => (
@@ -187,6 +194,7 @@ export function RecebimentoPaymentDialog({
                   value={pixName}
                   onChange={(e) => setPixName(e.target.value)}
                   className="h-8 text-sm"
+                  placeholder="Nome do pagador"
                 />
               </div>
               <div className="space-y-2">
@@ -228,7 +236,7 @@ export function RecebimentoPaymentDialog({
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={loading || !isAmountValid}
+            disabled={loading || !isAmountValid || !isPixValid || !method}
             className="bg-green-600 hover:bg-green-700"
           >
             {loading ? (

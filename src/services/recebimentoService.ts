@@ -205,7 +205,9 @@ export const recebimentoService = {
     orderId: number,
     pixDetails?: { nome: string; banco: string },
     userName?: string,
+    employeeId?: number,
   ): Promise<{ success: boolean; syncWarning?: boolean }> {
+    // 1. Fetch current data to handle partial payments accumulation
     const { data: current, error: fetchError } = await supabase
       .from('RECEBIMENTOS')
       .select('valor_pago')
@@ -216,17 +218,27 @@ export const recebimentoService = {
 
     const newTotalPaid = (current.valor_pago || 0) + amountPaid
 
+    // 2. Prepare Update Payload
+    // We update the existing installment to reflect the payment
+    const updatePayload: any = {
+      valor_pago: newTotalPaid,
+      data_pagamento: new Date(`${paymentDate}T12:00:00`).toISOString(),
+      forma_pagamento: method,
+    }
+
+    // Update funcionario_id to reflect who processed the payment if employeeId is provided
+    if (employeeId) {
+      updatePayload.funcionario_id = employeeId
+    }
+
     const { error: updateError } = await supabase
       .from('RECEBIMENTOS')
-      .update({
-        valor_pago: newTotalPaid,
-        data_pagamento: new Date(`${paymentDate}T12:00:00`).toISOString(),
-        forma_pagamento: method,
-      } as any)
+      .update(updatePayload)
       .eq('id', installmentId)
 
     if (updateError) throw updateError
 
+    // 3. Handle Pix Record insertion if applicable
     if (method === 'Pix' && pixDetails) {
       await supabase.from('PIX').insert({
         recebimento_id: installmentId,
@@ -238,18 +250,22 @@ export const recebimentoService = {
       })
     }
 
+    // 4. Log the transaction
     await supabase.from('system_logs').insert({
       type: 'PAYMENT_RECEIVED',
       description: `Pagamento recebido de R$ ${amountPaid} no pedido #${orderId}`,
-      user_id: null,
+      user_id: employeeId || null,
       meta: {
         installmentId,
         amountPaid,
         method,
         orderId,
+        processedBy: userName,
       },
+      created_at: new Date().toISOString(),
     })
 
+    // 5. Update Debt History (Recalculate Debito and Valor Pago for the order)
     try {
       await reportsService.updateDebtHistoryForOrder(orderId)
       return { success: true }

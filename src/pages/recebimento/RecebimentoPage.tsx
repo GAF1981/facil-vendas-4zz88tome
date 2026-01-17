@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { RecebimentoInstallment } from '@/types/recebimento'
 import { RecebimentoPaymentDialog } from '@/components/recebimento/RecebimentoPaymentDialog'
 import { useAuth } from '@/hooks/use-auth'
+import { useUserStore } from '@/stores/useUserStore'
 import { RecebimentoFilters } from '@/components/recebimento/RecebimentoFilters'
 import { RecebimentoTable } from '@/components/recebimento/RecebimentoTable'
 import { DateRange } from 'react-day-picker'
@@ -31,6 +32,7 @@ export default function RecebimentoPage() {
 
   const { toast } = useToast()
   const { user } = useAuth()
+  const { employee } = useUserStore()
 
   const loadData = async () => {
     setLoading(true)
@@ -88,9 +90,11 @@ export default function RecebimentoPage() {
     method: string,
     pixDetails?: { nome: string; banco: string },
   ) => {
-    if (!selectedInstallment || !user) return
+    if (!selectedInstallment) return
 
     try {
+      const userName = employee?.nome_completo || user?.email || 'Sistema'
+
       const result = await recebimentoService.processInstallmentPayment(
         id,
         amount,
@@ -98,7 +102,8 @@ export default function RecebimentoPage() {
         method,
         selectedInstallment.venda_id,
         pixDetails,
-        user.email || 'Usuário',
+        userName,
+        employee?.id,
       )
 
       if (result.syncWarning) {
@@ -111,7 +116,7 @@ export default function RecebimentoPage() {
       } else {
         toast({
           title: 'Sucesso',
-          description: 'Pagamento processado e débito atualizado com sucesso.',
+          description: 'Recebimento processado com sucesso.',
           className: 'bg-green-600 text-white',
         })
       }
