@@ -48,7 +48,6 @@ export default function CobrancaPage() {
   ])
   const [cityFilter, setCityFilter] = useState<string>('todos')
   const [motoqueiroFilter, setMotoqueiroFilter] = useState<string>('todos')
-  const [dataCombinadaFilter, setDataCombinadaFilter] = useState<string>('')
 
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
   const [isSimplified, setIsSimplified] = useState(false)
@@ -125,8 +124,7 @@ export default function CobrancaPage() {
 
     if (
       statusFilter.length > 0 ||
-      (!shouldIgnoreMotoqueiroFilter && motoqueiroFilter !== 'todos') ||
-      dataCombinadaFilter
+      (!shouldIgnoreMotoqueiroFilter && motoqueiroFilter !== 'todos')
     ) {
       result = result.filter((client) => {
         return client.orders.some((order) =>
@@ -134,12 +132,6 @@ export default function CobrancaPage() {
             let matches = true
 
             if (statusFilter.length > 0 && !statusFilter.includes(inst.status))
-              matches = false
-
-            if (
-              dataCombinadaFilter &&
-              inst.dataCombinada !== dataCombinadaFilter
-            )
               matches = false
 
             if (!shouldIgnoreMotoqueiroFilter && motoqueiroFilter !== 'todos') {
@@ -168,7 +160,6 @@ export default function CobrancaPage() {
     statusFilter,
     cityFilter,
     motoqueiroFilter,
-    dataCombinadaFilter,
     activeTab,
   ])
 
@@ -219,9 +210,6 @@ export default function CobrancaPage() {
           if (statusFilter.length > 0 && !statusFilter.includes(inst.status))
             matches = false
 
-          if (dataCombinadaFilter && inst.dataCombinada !== dataCombinadaFilter)
-            matches = false
-
           if (!shouldIgnoreMotoqueiroFilter && motoqueiroFilter !== 'todos') {
             if (
               motoqueiroFilter === 'com_rota' &&
@@ -253,14 +241,7 @@ export default function CobrancaPage() {
       totalValorPago: paid,
       totalDebito: debt,
     }
-  }, [
-    filteredDebts,
-    orderFilter,
-    statusFilter,
-    dataCombinadaFilter,
-    motoqueiroFilter,
-    activeTab,
-  ])
+  }, [filteredDebts, orderFilter, statusFilter, motoqueiroFilter, activeTab])
 
   const handleBulkClearMotoqueiro = async () => {
     if (selectedItems.size === 0) return
@@ -341,7 +322,6 @@ export default function CobrancaPage() {
     setStatusFilter(['VENCIDO', 'A VENCER'])
     setCityFilter('todos')
     setMotoqueiroFilter('todos')
-    setDataCombinadaFilter('')
   }
 
   return (
@@ -466,15 +446,7 @@ export default function CobrancaPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="w-full md:w-[150px]">
-              <Input
-                type="date"
-                value={dataCombinadaFilter}
-                onChange={(e) => setDataCombinadaFilter(e.target.value)}
-                className="w-full"
-                placeholder="Data Combinada"
-              />
-            </div>
+
             <div className="w-full md:w-[150px]">
               <Select value={cityFilter} onValueChange={setCityFilter}>
                 <SelectTrigger>
@@ -567,7 +539,6 @@ export default function CobrancaPage() {
                 isSimplified={isSimplified}
                 statusFilter={statusFilter}
                 motoqueiroFilter={motoqueiroFilter}
-                dataCombinadaFilter={dataCombinadaFilter}
                 orderFilter={orderFilter}
                 showOnlySelected={false}
               />
@@ -604,7 +575,6 @@ export default function CobrancaPage() {
                 isSimplified={isSimplified}
                 statusFilter={statusFilter}
                 motoqueiroFilter={motoqueiroFilter}
-                dataCombinadaFilter={dataCombinadaFilter}
                 orderFilter={orderFilter}
                 showOnlySelected={true}
               />

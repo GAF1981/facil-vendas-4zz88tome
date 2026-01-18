@@ -1,5 +1,12 @@
 import { PaymentEntry } from './payment'
 
+export interface PaymentHistoryDetail {
+  date: string
+  value: number
+  method: string
+  employee: string
+}
+
 export interface Receivable {
   id: number
   vencimento: string | null
@@ -13,6 +20,7 @@ export interface Receivable {
   motivo?: string | null // New field
   // Metadata to indicate source
   source?: 'NEGOTIATION' | 'RECEIPT' | 'ORIGINAL'
+  paymentHistory?: PaymentHistoryDetail[]
 }
 
 export interface CollectionInstallment {

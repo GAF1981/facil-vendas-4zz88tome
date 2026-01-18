@@ -19,9 +19,10 @@ import {
   ArrowUp,
   ArrowDown,
   MessageCircle,
+  CircleAlert,
 } from 'lucide-react'
-import { ClientDebt } from '@/types/cobranca'
-import { formatCurrency } from '@/lib/formatters'
+import { ClientDebt, PaymentHistoryDetail } from '@/types/cobranca'
+import { formatCurrency, safeFormatDate } from '@/lib/formatters'
 import { format, parseISO } from 'date-fns'
 import { DebtDetailsDialog } from './DebtDetailsDialog'
 import { CollectionActionsSheet } from './CollectionActionsSheet'
@@ -52,7 +53,6 @@ interface DebtTableProps {
   onToggleAll?: (ids: string[]) => void
   isSimplified?: boolean
   statusFilter?: string[]
-  dataCombinadaFilter?: string
   motoqueiroFilter?: string
   orderFilter?: string
   showOnlySelected?: boolean
@@ -87,6 +87,7 @@ interface FlatRow {
   orderTotal: number
   orderPayments: { method: string; value: number; dueDate: string }[]
   source: 'NEGOTIATION' | 'RECEIPT' | 'ORIGINAL'
+  paymentHistory?: PaymentHistoryDetail[]
 }
 
 type SortConfig = {
@@ -103,7 +104,6 @@ export function DebtTable({
   onToggleAll,
   isSimplified = false,
   statusFilter = [],
-  dataCombinadaFilter = '',
   motoqueiroFilter = 'todos',
   orderFilter = '',
   showOnlySelected = false,
@@ -239,6 +239,7 @@ export function DebtTable({
               dueDate: pd.date,
             })),
             source: inst.source || 'ORIGINAL',
+            paymentHistory: inst.paymentHistory || [],
           }
         })
       }),
@@ -257,9 +258,7 @@ export function DebtTable({
       filtered = filtered.filter((r) => statusFilter.includes(r.status))
     }
 
-    if (dataCombinadaFilter) {
-      filtered = filtered.filter((r) => r.dataCombinada === dataCombinadaFilter)
-    }
+    // Removed dataCombinadaFilter logic as per requirements
 
     if (!showOnlySelected && motoqueiroFilter !== 'todos') {
       if (motoqueiroFilter === 'com_rota') {
@@ -295,7 +294,6 @@ export function DebtTable({
     localUpdates,
     sortConfig,
     statusFilter,
-    dataCombinadaFilter,
     motoqueiroFilter,
     orderFilter,
     showOnlySelected,
@@ -602,7 +600,52 @@ export function DebtTable({
                       {formatCurrency(row.valorRegistrado)}
                     </TableCell>
                     <TableCell className="text-right font-mono text-xs text-green-600">
-                      {formatCurrency(row.valorPago)}
+                      <div className="flex items-center justify-end gap-1">
+                        {formatCurrency(row.valorPago)}
+                        {row.paymentHistory &&
+                          row.paymentHistory.length > 0 && (
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-4 w-4 p-0 text-green-600 hover:text-green-700"
+                                >
+                                  <CircleAlert className="h-3 w-3" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-72 p-3 text-xs">
+                                <h4 className="font-semibold mb-2">
+                                  Histórico de Pagamentos (Parcela)
+                                </h4>
+                                <div className="space-y-2">
+                                  {row.paymentHistory.map((h, i) => (
+                                    <div
+                                      key={i}
+                                      className="flex justify-between items-center border-b pb-1 last:border-0"
+                                    >
+                                      <div className="flex flex-col">
+                                        <span className="font-medium">
+                                          {safeFormatDate(h.date, 'dd/MM/yy')}
+                                        </span>
+                                        <span className="text-[10px] text-muted-foreground">
+                                          {h.employee} • {h.method}
+                                        </span>
+                                      </div>
+                                      <span className="font-bold text-green-600">
+                                        {formatCurrency(h.value)}
+                                      </span>
+                                    </div>
+                                  ))}
+                                  <div className="pt-2 border-t flex justify-between font-bold">
+                                    <span>Total Pago:</span>
+                                    <span>{formatCurrency(row.valorPago)}</span>
+                                  </div>
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                          )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-right font-mono text-xs text-red-600 font-bold">
                       <div className="flex items-center justify-end gap-2">
