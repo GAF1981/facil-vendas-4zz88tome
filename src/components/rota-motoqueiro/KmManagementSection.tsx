@@ -18,12 +18,13 @@ import {
 } from '@/components/ui/table'
 import { rotaMotoqueiroService } from '@/services/rotaMotoqueiroService'
 import { RotaMotoqueiroKm } from '@/types/rota_motoqueiro'
-import { format } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { Gauge, Plus, Pencil, Trash2 } from 'lucide-react'
+import { Gauge, Plus, Pencil, Trash2, RefreshCw } from 'lucide-react'
 import { KmFormDialog } from './KmFormDialog'
 import { formatCurrency } from '@/lib/formatters'
 import { useToast } from '@/hooks/use-toast'
+import { cn } from '@/lib/utils'
 
 export function KmManagementSection() {
   const [data, setData] = useState<RotaMotoqueiroKm[]>([])
@@ -34,9 +35,11 @@ export function KmManagementSection() {
   const [editingRecord, setEditingRecord] = useState<RotaMotoqueiroKm | null>(
     null,
   )
+  const [loading, setLoading] = useState(false)
   const { toast } = useToast()
 
   const loadData = async () => {
+    setLoading(true)
     try {
       const res = await rotaMotoqueiroService.getAll(selectedMonth)
       setData(res)
@@ -47,6 +50,8 @@ export function KmManagementSection() {
         description: 'Falha ao carregar registros de KM.',
         variant: 'destructive',
       })
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -92,14 +97,33 @@ export function KmManagementSection() {
     }
   })
 
+  // Format display date for Brazil (from UTC ISO string)
+  const formatBrazilDisplay = (isoString: string) => {
+    try {
+      // UTC ISO -> Date Object
+      const date = parseISO(isoString)
+      // Display in Brazil Timezone
+      return date.toLocaleString('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    } catch (e) {
+      return isoString
+    }
+  }
+
   return (
-    <div className="space-y-4 border-t pt-6 mt-6">
+    <div className="space-y-4 border-t pt-6 mt-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h2 className="text-xl font-bold flex items-center gap-2">
           <Gauge className="h-6 w-6 text-primary" />
           KM Rota Motoqueiro
         </h2>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Select value={selectedMonth} onValueChange={setSelectedMonth}>
             <SelectTrigger className="w-[180px]">
               <SelectValue />
@@ -112,6 +136,14 @@ export function KmManagementSection() {
               ))}
             </SelectContent>
           </Select>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={loadData}
+            disabled={loading}
+          >
+            <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
+          </Button>
           <Button onClick={handleNew}>
             <Plus className="mr-2 h-4 w-4" /> Registrar KM
           </Button>
@@ -123,7 +155,7 @@ export function KmManagementSection() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">
               Total KM (
-              {format(new Date(selectedMonth + '-01T00:00:00'), 'MMMM', {
+              {format(new Date(selectedMonth + '-02T00:00:00'), 'MMMM', {
                 locale: ptBR,
               })}
               )
@@ -155,15 +187,15 @@ export function KmManagementSection() {
                     colSpan={4}
                     className="text-center h-24 text-muted-foreground"
                   >
-                    Nenhum registro para este mês.
+                    {loading
+                      ? 'Carregando...'
+                      : 'Nenhum registro para este mês.'}
                   </TableCell>
                 </TableRow>
               ) : (
                 data.map((row) => (
                   <TableRow key={row.id}>
-                    <TableCell>
-                      {format(new Date(row.data_hora), 'dd/MM/yyyy HH:mm')}
-                    </TableCell>
+                    <TableCell>{formatBrazilDisplay(row.data_hora)}</TableCell>
                     <TableCell>
                       {row.funcionario?.nome_completo || 'N/D'}
                     </TableCell>

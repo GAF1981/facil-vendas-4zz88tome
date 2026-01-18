@@ -16,7 +16,6 @@ import { rotaMotoqueiroService } from '@/services/rotaMotoqueiroService'
 import { useUserStore } from '@/stores/useUserStore'
 import { useToast } from '@/hooks/use-toast'
 import { Loader2 } from 'lucide-react'
-import { format } from 'date-fns'
 
 interface KmFormDialogProps {
   open: boolean
@@ -35,10 +34,24 @@ export function KmFormDialog({
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
 
+  // Helper to get Brazil time ISO string for inputs (YYYY-MM-DDTHH:MM)
+  // This simulates converting a Date object to "Brazil Local Time" string
+  const getBrazilInputString = (dateObj: Date) => {
+    // Subtract 3 hours from UTC timestamp to simulate Brazil Time (UTC-3)
+    // Then formatting as ISO gives us the correct "face value" digits for Brazil
+    const brazilTime = new Date(dateObj.getTime() - 3 * 60 * 60 * 1000)
+    return brazilTime.toISOString().slice(0, 16)
+  }
+
+  // Helper to get current Brazil time
+  const getCurrentBrazilTimeInput = () => {
+    return getBrazilInputString(new Date())
+  }
+
   const form = useForm<KmFormData>({
     resolver: zodResolver(kmSchema),
     defaultValues: {
-      data_hora: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
+      data_hora: getCurrentBrazilTimeInput(),
       km_percorrido: 0,
     },
   })
@@ -46,17 +59,16 @@ export function KmFormDialog({
   useEffect(() => {
     if (open) {
       if (editingRecord) {
-        // DB stores UTC ISO string. new Date(iso) converts to Local Date object.
-        // format(..., "yyyy-MM-dd'T'HH:mm") creates a string for datetime-local input in local time.
+        // DB stores UTC ISO string.
+        // We want to display it as Brazil Time in the input.
         const dt = new Date(editingRecord.data_hora)
-        const formattedDt = format(dt, "yyyy-MM-dd'T'HH:mm")
         form.reset({
-          data_hora: formattedDt,
+          data_hora: getBrazilInputString(dt),
           km_percorrido: editingRecord.km_percorrido,
         })
       } else {
         form.reset({
-          data_hora: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
+          data_hora: getCurrentBrazilTimeInput(),
           km_percorrido: 0,
         })
       }
@@ -75,10 +87,12 @@ export function KmFormDialog({
 
     setLoading(true)
     try {
-      // new Date(data.data_hora) creates a Date object from the local time string.
-      // toISOString() converts it to UTC for storage.
-      // This correctly preserves the "Point in Time".
-      const isoDate = new Date(data.data_hora).toISOString()
+      // Parse input string as Brazil Time (UTC-3)
+      // data.data_hora is YYYY-MM-DDTHH:MM
+      // Appending -03:00 tells Date constructor this is BRT
+      // We append :00 for seconds to ensure valid format
+      const brazilDate = new Date(`${data.data_hora}:00-03:00`)
+      const isoDate = brazilDate.toISOString()
 
       if (editingRecord) {
         await rotaMotoqueiroService.update(editingRecord.id, {
@@ -104,11 +118,12 @@ export function KmFormDialog({
       }
       onSuccess()
       onOpenChange(false)
-    } catch (error) {
+    } catch (error: any) {
       console.error(error)
+      const errorMsg = error.message || 'Falha ao salvar registro.'
       toast({
         title: 'Erro',
-        description: 'Falha ao salvar registro. Verifique os dados.',
+        description: errorMsg,
         variant: 'destructive',
       })
     } finally {
@@ -128,7 +143,7 @@ export function KmFormDialog({
         </DialogHeader>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label>Data e Hora</Label>
+            <Label>Data e Hora (Horário de Brasília)</Label>
             <Input type="datetime-local" {...form.register('data_hora')} />
             {form.formState.errors.data_hora && (
               <p className="text-red-500 text-xs font-medium">
