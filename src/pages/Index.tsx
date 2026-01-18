@@ -23,7 +23,6 @@ import {
 } from 'lucide-react'
 import { usePermissions } from '@/hooks/use-permissions'
 import { DashboardStats } from '@/components/dashboard/DashboardStats'
-import { RotaMotoqueiroCard } from '@/components/dashboard/RotaMotoqueiroCard'
 
 export default function Index() {
   const { canAccess } = usePermissions()
@@ -212,11 +211,6 @@ export default function Index() {
       </div>
 
       <DashboardStats />
-
-      {/* Rota Motoqueiro Card - Keeping it as requested implicitly by not removing, but the button is the main feature now */}
-      <div className="w-full">
-        <RotaMotoqueiroCard />
-      </div>
 
       {/* Modules Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
