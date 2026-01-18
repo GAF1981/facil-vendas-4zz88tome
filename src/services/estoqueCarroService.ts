@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase/client'
 import { EstoqueCarroItem, EstoqueCarroSession } from '@/types/estoque_carro'
 import { productsService } from './productsService'
 import { parseCurrency } from '@/lib/formatters'
-import { parseISO, isAfter, isBefore, isEqual } from 'date-fns'
+import { parseISO, isAfter, isBefore } from 'date-fns'
 import {
   DeliveryHistoryRow,
   DeliveryHistoryFilter,
@@ -107,8 +107,6 @@ export const estoqueCarroService = {
     session: EstoqueCarroSession,
   ): Promise<EstoqueCarroItem[]> {
     const sessionId = session.id
-    const sessionStart = session.data_inicio
-    const sessionEnd = session.data_fim
 
     // 1. Fetch Products
     const { data: products } = await productsService.getProducts(1, 10000)
@@ -159,27 +157,18 @@ export const estoqueCarroService = {
     })
 
     // 4. Fetch Stock Movements from REPOSIÇÃO E DEVOLUÇÃO (Inventory Module Integration)
-    // This replaces manual/legacy stock tables for Ent. Estoque and Saída Estoque
-    let repoQuery = supabase
+    // Use strict linking via id_estoque_carro
+    const { data: repoData } = await supabase
       .from('REPOSIÇÃO E DEVOLUÇÃO')
       .select('produto_id, quantidade, TIPO, created_at')
-      .eq('funcionario_id', session.funcionario_id)
-      .gte('created_at', sessionStart)
+      .eq('id_estoque_carro', sessionId)
 
-    if (sessionEnd) {
-      repoQuery = repoQuery.lte('created_at', sessionEnd)
-    }
-
-    const { data: repoData } = await repoQuery
-
-    const stockToCarMap = new Map<number, number>() // Ent. Estoque
-    const carToStockMap = new Map<number, number>() // Saída Estoque
+    const stockToCarMap = new Map<number, number>() // Ent. Estoque (REPOSIÇÃO)
+    const carToStockMap = new Map<number, number>() // Saída Estoque (DEVOLUÇÃO)
 
     repoData?.forEach((row) => {
       if (!row.produto_id) return
 
-      // Validate date strictly (though query does filtering, double check isn't harmful)
-      // The query handles the heavy lifting
       if (row.TIPO === 'REPOSIÇÃO') {
         stockToCarMap.set(
           row.produto_id,
@@ -257,18 +246,6 @@ export const estoqueCarroService = {
   },
 
   async getMovementDetails(sessionId: number, productId: number) {
-    // 1. Get Session Info for Date Filtering
-    const { data: session } = await supabase
-      .from('ID ESTOQUE CARRO')
-      .select('*')
-      .eq('id', sessionId)
-      .single()
-
-    if (!session) return []
-
-    const sessionStart = session.data_inicio
-    const sessionEnd = session.data_fim
-
     // Helper to fetch and normalize
     const fetchTable = async (table: string, type: string) => {
       const { data } = await supabase
@@ -289,18 +266,12 @@ export const estoqueCarroService = {
     ])
 
     // Fetch Stock Movements (Reposição/Devolução from Inventory Module)
-    let repoQuery = supabase
+    // Use strict linking via id_estoque_carro
+    const { data: repoData } = await supabase
       .from('REPOSIÇÃO E DEVOLUÇÃO')
       .select('*')
-      .eq('funcionario_id', session.funcionario_id)
+      .eq('id_estoque_carro', sessionId)
       .eq('produto_id', productId)
-      .gte('created_at', sessionStart)
-
-    if (sessionEnd) {
-      repoQuery = repoQuery.lte('created_at', sessionEnd)
-    }
-
-    const { data: repoData } = await repoQuery
 
     const inventoryMovements = (repoData || []).map((d) => ({
       ...d,
