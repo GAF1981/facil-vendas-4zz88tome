@@ -29,6 +29,7 @@ const MODULES_LIST = [
   'Controle',
   'Inativar Clientes',
   'Veículos',
+  'Rota Motoqueiro',
 ]
 
 // Sectors authorized to finalize routes

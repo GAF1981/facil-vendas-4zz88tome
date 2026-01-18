@@ -32,6 +32,7 @@ import {
   Truck,
   Car,
   UserX,
+  Bike,
 } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { usePermissions } from '@/hooks/use-permissions'
@@ -74,6 +75,12 @@ export function AppSidebar() {
       url: '/caixa',
       icon: Wallet,
       module: 'Caixa',
+    },
+    {
+      title: 'Rota Motoqueiro',
+      url: '/rota-motoqueiro',
+      icon: Bike,
+      module: 'Rota Motoqueiro',
     },
     {
       title: 'Estoque Carro',

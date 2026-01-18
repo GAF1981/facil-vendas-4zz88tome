@@ -19,6 +19,7 @@ import {
   Truck,
   Car,
   UserX,
+  Bike,
 } from 'lucide-react'
 import { usePermissions } from '@/hooks/use-permissions'
 import { DashboardStats } from '@/components/dashboard/DashboardStats'
@@ -59,6 +60,14 @@ export default function Index() {
       description: 'Fluxo de caixa e movimentações',
       color: 'text-cyan-600',
       module: 'Caixa',
+    },
+    {
+      title: 'Rota Motoqueiro',
+      icon: Bike,
+      to: '/rota-motoqueiro',
+      description: 'Gestão de cobranças via motoqueiro',
+      color: 'text-orange-500',
+      module: 'Rota Motoqueiro',
     },
     {
       title: 'Estoque Carro',
@@ -204,7 +213,7 @@ export default function Index() {
 
       <DashboardStats />
 
-      {/* Rota Motoqueiro Card */}
+      {/* Rota Motoqueiro Card - Keeping it as requested implicitly by not removing, but the button is the main feature now */}
       <div className="w-full">
         <RotaMotoqueiroCard />
       </div>

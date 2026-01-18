@@ -46,6 +46,7 @@ import PermissionsPage from '@/pages/admin/PermissionsPage'
 import EstoqueCarroPage from '@/pages/estoque-carro/EstoqueCarroPage'
 import InativarClientesPage from '@/pages/inativar-clientes/InativarClientesPage'
 import VehiclesPage from '@/pages/vehicles/VehiclesPage'
+import RotaMotoqueiroPage from '@/pages/rota-motoqueiro/RotaMotoqueiroPage'
 import { AuthProvider } from '@/hooks/use-auth'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { PermissionsProvider } from '@/hooks/use-permissions'
@@ -145,6 +146,13 @@ const App = () => (
 
                 <Route element={<PermissionGuard module="Rota" />}>
                   <Route path="/rota" element={<RotaPage />} />
+                </Route>
+
+                <Route element={<PermissionGuard module="Rota Motoqueiro" />}>
+                  <Route
+                    path="/rota-motoqueiro"
+                    element={<RotaMotoqueiroPage />}
+                  />
                 </Route>
 
                 <Route element={<PermissionGuard module="Resumo Acertos" />}>
