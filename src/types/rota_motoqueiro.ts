@@ -6,10 +6,9 @@ export interface RotaMotoqueiroKm {
   data_hora: string
   km_percorrido: number
   funcionario_id: number
-  // Joined
   funcionario?: {
     nome_completo: string
-  }
+  } | null
 }
 
 export type RotaMotoqueiroKmInsert = Omit<

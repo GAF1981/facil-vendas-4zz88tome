@@ -46,8 +46,9 @@ export function KmFormDialog({
   useEffect(() => {
     if (open) {
       if (editingRecord) {
+        // DB stores UTC ISO string. new Date(iso) converts to Local Date object.
+        // format(..., "yyyy-MM-dd'T'HH:mm") creates a string for datetime-local input in local time.
         const dt = new Date(editingRecord.data_hora)
-        // Format for datetime-local: YYYY-MM-DDTHH:mm
         const formattedDt = format(dt, "yyyy-MM-dd'T'HH:mm")
         form.reset({
           data_hora: formattedDt,
@@ -66,7 +67,7 @@ export function KmFormDialog({
     if (!employee) {
       toast({
         title: 'Erro',
-        description: 'Usuário não identificado',
+        description: 'Usuário não identificado. Faça login novamente.',
         variant: 'destructive',
       })
       return
@@ -74,7 +75,9 @@ export function KmFormDialog({
 
     setLoading(true)
     try {
-      // Ensure ISO string for DB
+      // new Date(data.data_hora) creates a Date object from the local time string.
+      // toISOString() converts it to UTC for storage.
+      // This correctly preserves the "Point in Time".
       const isoDate = new Date(data.data_hora).toISOString()
 
       if (editingRecord) {
@@ -84,7 +87,8 @@ export function KmFormDialog({
         })
         toast({
           title: 'Atualizado',
-          description: 'Registro de KM atualizado.',
+          description: 'Registro de KM atualizado com sucesso.',
+          className: 'bg-green-600 text-white',
         })
       } else {
         await rotaMotoqueiroService.create({
@@ -95,6 +99,7 @@ export function KmFormDialog({
         toast({
           title: 'Registrado',
           description: 'KM registrado com sucesso.',
+          className: 'bg-green-600 text-white',
         })
       }
       onSuccess()
@@ -103,7 +108,7 @@ export function KmFormDialog({
       console.error(error)
       toast({
         title: 'Erro',
-        description: 'Falha ao salvar registro.',
+        description: 'Falha ao salvar registro. Verifique os dados.',
         variant: 'destructive',
       })
     } finally {
@@ -126,7 +131,7 @@ export function KmFormDialog({
             <Label>Data e Hora</Label>
             <Input type="datetime-local" {...form.register('data_hora')} />
             {form.formState.errors.data_hora && (
-              <p className="text-red-500 text-xs">
+              <p className="text-red-500 text-xs font-medium">
                 {form.formState.errors.data_hora.message}
               </p>
             )}
@@ -136,10 +141,11 @@ export function KmFormDialog({
             <Input
               type="number"
               step="0.1"
+              min="0"
               {...form.register('km_percorrido')}
             />
             {form.formState.errors.km_percorrido && (
-              <p className="text-red-500 text-xs">
+              <p className="text-red-500 text-xs font-medium">
                 {form.formState.errors.km_percorrido.message}
               </p>
             )}

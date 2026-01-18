@@ -2121,6 +2121,38 @@ export type Database = {
           },
         ]
       }
+      rota_motoqueiro_km: {
+        Row: {
+          created_at: string
+          data_hora: string
+          funcionario_id: number
+          id: number
+          km_percorrido: number
+        }
+        Insert: {
+          created_at?: string
+          data_hora: string
+          funcionario_id: number
+          id?: number
+          km_percorrido: number
+        }
+        Update: {
+          created_at?: string
+          data_hora?: string
+          funcionario_id?: number
+          id?: number
+          km_percorrido?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'rota_motoqueiro_km_funcionario_id_fkey'
+            columns: ['funcionario_id']
+            isOneToOne: false
+            referencedRelation: 'FUNCIONARIOS'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       sessoes_inventario: {
         Row: {
           created_at: string

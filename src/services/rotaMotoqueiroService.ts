@@ -13,13 +13,16 @@ export const rotaMotoqueiroService = {
 
     if (month) {
       // month format: YYYY-MM
-      const start = `${month}-01T00:00:00`
-      // Calculate end of month roughly or use logic
-      // Easier: filter by text or date range
-      // Let's use date range for accuracy
       const [year, monthNum] = month.split('-').map(Number)
+
+      // Start of month: 1st day 00:00:00 Local Time
+      // We rely on new Date(year, monthIndex) using the browser's local timezone
       const startDate = new Date(year, monthNum - 1, 1)
-      const endDate = new Date(year, monthNum, 0, 23, 59, 59)
+      startDate.setHours(0, 0, 0, 0)
+
+      // End of month: Last day 23:59:59.999 Local Time
+      const endDate = new Date(year, monthNum, 0)
+      endDate.setHours(23, 59, 59, 999)
 
       query = query
         .gte('data_hora', startDate.toISOString())

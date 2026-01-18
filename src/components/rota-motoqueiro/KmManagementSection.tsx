@@ -42,6 +42,11 @@ export function KmManagementSection() {
       setData(res)
     } catch (e) {
       console.error(e)
+      toast({
+        title: 'Erro',
+        description: 'Falha ao carregar registros de KM.',
+        variant: 'destructive',
+      })
     }
   }
 
@@ -118,7 +123,7 @@ export function KmManagementSection() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">
               Total KM (
-              {format(new Date(selectedMonth + '-01'), 'MMMM', {
+              {format(new Date(selectedMonth + '-01T00:00:00'), 'MMMM', {
                 locale: ptBR,
               })}
               )

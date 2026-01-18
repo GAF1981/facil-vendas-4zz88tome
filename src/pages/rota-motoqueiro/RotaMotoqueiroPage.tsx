@@ -279,7 +279,7 @@ export default function RotaMotoqueiroPage() {
         </div>
       )}
 
-      {/* New Section Integration */}
+      {/* KM Management Section - Integrated at the bottom */}
       <KmManagementSection />
 
       <CollectionActionsSheet
