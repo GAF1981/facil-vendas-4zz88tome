@@ -304,10 +304,10 @@ export function AcertoHistoryTable({
                     </TableRow>
                   ) : (
                     history.map((row) => {
-                      // Per Acceptance Criteria and Screenshot visual fidelity:
-                      // "Saldo a Pagar" here represents the gap between Sales and Payment in the context of the table view
-                      const saldoAPagarDisplay =
-                        row.valorVendaTotal - row.valorPago
+                      // Per Acceptance Criteria:
+                      // "The value for 'Saldo a Pagar' must strictly be: Valor da Venda - valor do desconto."
+                      // This value is pre-calculated in the service as 'row.saldoAPagar'
+                      const saldoAPagarDisplay = row.saldoAPagar
 
                       return (
                         <TableRow key={row.id} className="hover:bg-muted/30">

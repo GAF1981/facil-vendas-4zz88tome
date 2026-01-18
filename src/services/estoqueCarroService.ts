@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase/client'
 import { EstoqueCarroItem, EstoqueCarroSession } from '@/types/estoque_carro'
 import { productsService } from './productsService'
 import { parseCurrency } from '@/lib/formatters'
-import { parseISO, isAfter, isBefore } from 'date-fns'
+import { parseISO, isAfter, isBefore, isEqual } from 'date-fns'
 import {
   DeliveryHistoryRow,
   DeliveryHistoryFilter,
@@ -95,6 +95,8 @@ export const estoqueCarroService = {
     session: EstoqueCarroSession,
   ): Promise<EstoqueCarroItem[]> {
     const sessionId = session.id
+    const sessionStart = session.data_inicio
+    const sessionEnd = session.data_fim
 
     // 1. Fetch Products
     const { data: products } = await productsService.getProducts(1, 10000)
@@ -111,7 +113,7 @@ export const estoqueCarroService = {
       initialMap.set(i.produto_id, i.saldo_inicial),
     )
 
-    // 3. Fetch Movements from the DETAIL TABLES
+    // 3. Fetch Movements from the DETAIL TABLES (Client Interactions)
     // Client -> Car (RECOLHIDO) -> 'ESTOQUE CARRO: CLIENTE PARA O CARRO' -> ENTRADAS_cliente_carro
     const { data: clientToCarData } = await supabase
       .from('ESTOQUE CARRO: CLIENTE PARA O CARRO')
@@ -144,39 +146,42 @@ export const estoqueCarroService = {
         )
     })
 
-    // Stock -> Car -> 'ESTOQUE CARRO: ESTOQUE PARA O CARRO'
-    const { data: stockToCarData } = await supabase
-      .from('ESTOQUE CARRO: ESTOQUE PARA O CARRO')
-      .select('produto_id, ENTRADAS_estoque_carro')
-      .eq('id_estoque_carro', sessionId)
+    // 4. Fetch Stock Movements from REPOSIÇÃO E DEVOLUÇÃO (Inventory Module Integration)
+    // This replaces manual/legacy stock tables for Ent. Estoque and Saída Estoque
+    let repoQuery = supabase
+      .from('REPOSIÇÃO E DEVOLUÇÃO')
+      .select('produto_id, quantidade, TIPO, created_at')
+      .eq('funcionario_id', session.funcionario_id)
+      .gte('created_at', sessionStart)
 
-    const stockToCarMap = new Map<number, number>()
-    stockToCarData?.forEach((row) => {
-      if (row.produto_id)
+    if (sessionEnd) {
+      repoQuery = repoQuery.lte('created_at', sessionEnd)
+    }
+
+    const { data: repoData } = await repoQuery
+
+    const stockToCarMap = new Map<number, number>() // Ent. Estoque
+    const carToStockMap = new Map<number, number>() // Saída Estoque
+
+    repoData?.forEach((row) => {
+      if (!row.produto_id) return
+
+      // Validate date strictly (though query does filtering, double check isn't harmful)
+      // The query handles the heavy lifting
+      if (row.TIPO === 'REPOSIÇÃO') {
         stockToCarMap.set(
           row.produto_id,
-          (stockToCarMap.get(row.produto_id) || 0) +
-            (row.ENTRADAS_estoque_carro || 0),
+          (stockToCarMap.get(row.produto_id) || 0) + row.quantidade,
         )
-    })
-
-    // Car -> Stock -> 'ESTOQUE CARRO: CARRO PARA O ESTOQUE'
-    const { data: carToStockData } = await supabase
-      .from('ESTOQUE CARRO: CARRO PARA O ESTOQUE')
-      .select('produto_id, SAIDAS_carro_estoque')
-      .eq('id_estoque_carro', sessionId)
-
-    const carToStockMap = new Map<number, number>()
-    carToStockData?.forEach((row) => {
-      if (row.produto_id)
+      } else if (row.TIPO === 'DEVOLUÇÃO') {
         carToStockMap.set(
           row.produto_id,
-          (carToStockMap.get(row.produto_id) || 0) +
-            (row.SAIDAS_carro_estoque || 0),
+          (carToStockMap.get(row.produto_id) || 0) + row.quantidade,
         )
+      }
     })
 
-    // 4. Fetch Counts and Adjustments
+    // 5. Fetch Counts and Adjustments
     const { data: counts } = await supabase
       .from('ESTOQUE CARRO CONTAGEM')
       .select('produto_id, quantidade')
@@ -240,6 +245,18 @@ export const estoqueCarroService = {
   },
 
   async getMovementDetails(sessionId: number, productId: number) {
+    // 1. Get Session Info for Date Filtering
+    const { data: session } = await supabase
+      .from('ID ESTOQUE CARRO')
+      .select('*')
+      .eq('id', sessionId)
+      .single()
+
+    if (!session) return []
+
+    const sessionStart = session.data_inicio
+    const sessionEnd = session.data_fim
+
     // Helper to fetch and normalize
     const fetchTable = async (table: string, type: string) => {
       const { data } = await supabase
@@ -250,27 +267,42 @@ export const estoqueCarroService = {
       return (data || []).map((d) => ({ ...d, movement_type: type }))
     }
 
-    const [clientToCar, carToClient, stockToCar, carToStock] =
-      await Promise.all([
-        fetchTable(
-          'ESTOQUE CARRO: CLIENTE PARA O CARRO',
-          'ENTRADAS_cliente_carro',
-        ),
-        fetchTable(
-          'ESTOQUE CARRO: CARRO PARA O CLIENTE',
-          'SAIDAS_carro_cliente',
-        ),
-        fetchTable(
-          'ESTOQUE CARRO: ESTOQUE PARA O CARRO',
-          'ENTRADAS_estoque_carro',
-        ),
-        fetchTable(
-          'ESTOQUE CARRO: CARRO PARA O ESTOQUE',
-          'SAIDAS_carro_estoque',
-        ),
-      ])
+    // Fetch Client Movements (Static/Transactional tables)
+    const [clientToCar, carToClient] = await Promise.all([
+      fetchTable(
+        'ESTOQUE CARRO: CLIENTE PARA O CARRO',
+        'ENTRADAS_cliente_carro',
+      ),
+      fetchTable('ESTOQUE CARRO: CARRO PARA O CLIENTE', 'SAIDAS_carro_cliente'),
+    ])
 
-    return [...clientToCar, ...carToClient, ...stockToCar, ...carToStock].sort(
+    // Fetch Stock Movements (Reposição/Devolução from Inventory Module)
+    let repoQuery = supabase
+      .from('REPOSIÇÃO E DEVOLUÇÃO')
+      .select('*')
+      .eq('funcionario_id', session.funcionario_id)
+      .eq('produto_id', productId)
+      .gte('created_at', sessionStart)
+
+    if (sessionEnd) {
+      repoQuery = repoQuery.lte('created_at', sessionEnd)
+    }
+
+    const { data: repoData } = await repoQuery
+
+    const inventoryMovements = (repoData || []).map((d) => ({
+      ...d,
+      movement_type:
+        d.TIPO === 'REPOSIÇÃO'
+          ? 'ENTRADAS_estoque_carro'
+          : 'SAIDAS_carro_estoque',
+      // Map quantity dynamically based on type for UI consistency if needed
+      [d.TIPO === 'REPOSIÇÃO'
+        ? 'ENTRADAS_estoque_carro'
+        : 'SAIDAS_carro_estoque']: d.quantidade,
+    }))
+
+    return [...clientToCar, ...carToClient, ...inventoryMovements].sort(
       (a, b) =>
         new Date(b.created_at || b.data_horario).getTime() -
         new Date(a.created_at || a.data_horario).getTime(),
@@ -408,6 +440,7 @@ export const estoqueCarroService = {
     const employeeName = employeeData?.nome_completo || 'Unknown'
 
     // 1. Clear existing data for this session to avoid duplicates
+    // NOTE: We only clear Client interaction tables now, as Stock interactions are dynamic
     await Promise.all([
       supabase
         .from('ESTOQUE CARRO: CLIENTE PARA O CARRO')
@@ -415,14 +448,6 @@ export const estoqueCarroService = {
         .eq('id_estoque_carro', sessionId),
       supabase
         .from('ESTOQUE CARRO: CARRO PARA O CLIENTE')
-        .delete()
-        .eq('id_estoque_carro', sessionId),
-      supabase
-        .from('ESTOQUE CARRO: ESTOQUE PARA O CARRO')
-        .delete()
-        .eq('id_estoque_carro', sessionId),
-      supabase
-        .from('ESTOQUE CARRO: CARRO PARA O ESTOQUE')
         .delete()
         .eq('id_estoque_carro', sessionId),
     ])
@@ -537,69 +562,6 @@ export const estoqueCarroService = {
       }
     })
 
-    // 4. Process ESTOQUE GERAL (Stock Transfers)
-    // Source: ESTOQUE GERAL ESTOQUE PARA CARRO -> Destination: ESTOQUE CARRO: ESTOQUE PARA O CARRO (ENTRADAS_estoque_carro)
-    const { data: stockToCarRows } = await supabase
-      .from('ESTOQUE GERAL ESTOQUE PARA CARRO')
-      .select('*')
-      .eq('funcionario_id', employeeId)
-      .gte('created_at', targetSession.data_inicio)
-
-    const stockToCarInserts: any[] = []
-    stockToCarRows?.forEach((row) => {
-      const rowDate = parseISO(row.created_at || '')
-      if (!isAfter(rowDate, startDate)) return
-      if (endDate && !isBefore(rowDate, endDate)) return
-
-      const qty = row.quantidade || 0
-      if (qty > 0) {
-        const details = getProductDetails(row.produto_id, null)
-        stockToCarInserts.push({
-          id_estoque_carro: sessionId,
-          produto_id: details.produto_id,
-          quantidade: qty,
-          data_horario: row.created_at,
-          funcionario: employeeName,
-          codigo_produto: details.codigo_produto,
-          barcode: details.barcode,
-          produto: details.produto,
-          preco: details.preco,
-          ENTRADAS_estoque_carro: qty,
-        })
-      }
-    })
-
-    // Source: ESTOQUE GERAL CARRO PARA ESTOQUE -> Destination: ESTOQUE CARRO: CARRO PARA O ESTOQUE (SAIDAS_carro_estoque)
-    const { data: carToStockRows } = await supabase
-      .from('ESTOQUE GERAL CARRO PARA ESTOQUE')
-      .select('*')
-      .eq('funcionario_id', employeeId)
-      .gte('created_at', targetSession.data_inicio)
-
-    const carToStockInserts: any[] = []
-    carToStockRows?.forEach((row) => {
-      const rowDate = parseISO(row.created_at || '')
-      if (!isAfter(rowDate, startDate)) return
-      if (endDate && !isBefore(rowDate, endDate)) return
-
-      const qty = row.quantidade || 0
-      if (qty > 0) {
-        const details = getProductDetails(row.produto_id, null)
-        carToStockInserts.push({
-          id_estoque_carro: sessionId,
-          produto_id: details.produto_id,
-          quantidade: qty,
-          data_horario: row.created_at,
-          funcionario: employeeName,
-          codigo_produto: details.codigo_produto,
-          barcode: details.barcode,
-          produto: details.produto,
-          preco: details.preco,
-          SAIDAS_carro_estoque: qty,
-        })
-      }
-    })
-
     // 5. Batch Insert
     const insertBatch = async (table: string, items: any[]) => {
       if (items.length === 0) return
@@ -615,8 +577,6 @@ export const estoqueCarroService = {
     await Promise.all([
       insertBatch('ESTOQUE CARRO: CLIENTE PARA O CARRO', clientToCarInserts),
       insertBatch('ESTOQUE CARRO: CARRO PARA O CLIENTE', carToClientInserts),
-      insertBatch('ESTOQUE CARRO: ESTOQUE PARA O CARRO', stockToCarInserts),
-      insertBatch('ESTOQUE CARRO: CARRO PARA O ESTOQUE', carToStockInserts),
     ])
   },
 
