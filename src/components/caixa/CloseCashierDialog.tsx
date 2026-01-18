@@ -29,6 +29,7 @@ interface CloseCashierDialogProps {
   onOpenChange: (open: boolean) => void
   currentRoute: Rota | undefined
   onSuccess?: () => void
+  targetEmployeeId?: number
 }
 
 export function CloseCashierDialog({
@@ -36,6 +37,7 @@ export function CloseCashierDialog({
   onOpenChange,
   currentRoute,
   onSuccess,
+  targetEmployeeId,
 }: CloseCashierDialogProps) {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('')
@@ -48,12 +50,15 @@ export function CloseCashierDialog({
       employeesService.getEmployees(1, 100).then(({ data }) => {
         setEmployees(data.filter((e) => e.situacao === 'ATIVO'))
       })
-      // Auto-populate with logged-in user and force selection
-      if (loggedInUser) {
+
+      // Use targetEmployeeId if provided (Role-based selection from parent), otherwise fallback to logged in user
+      if (targetEmployeeId) {
+        setSelectedEmployeeId(targetEmployeeId.toString())
+      } else if (loggedInUser) {
         setSelectedEmployeeId(loggedInUser.id.toString())
       }
     }
-  }, [open, loggedInUser])
+  }, [open, loggedInUser, targetEmployeeId])
 
   const handleConfirm = async () => {
     if (!currentRoute) {
@@ -143,8 +148,8 @@ export function CloseCashierDialog({
         <DialogHeader>
           <DialogTitle>Fechar Caixa</DialogTitle>
           <DialogDescription>
-            Inicie o processo de conferência e fechamento para seu caixa na{' '}
-            <strong>Rota #{currentRoute?.id}</strong>.
+            Inicie o processo de conferência e fechamento para o caixa
+            selecionado na <strong>Rota #{currentRoute?.id}</strong>.
             <br />
             <span className="text-xs text-muted-foreground mt-2 block">
               Nota: Serão gerados automaticamente comprovantes em A4 e 80mm.
@@ -154,11 +159,11 @@ export function CloseCashierDialog({
 
         <div className="py-4 space-y-4">
           <div className="space-y-2">
-            <Label>Funcionário (Você)</Label>
+            <Label>Funcionário</Label>
             <Select
               value={selectedEmployeeId}
               onValueChange={setSelectedEmployeeId}
-              disabled={true} // Restricted as requested
+              disabled={true} // Restricted to programmatic selection from parent or logic
             >
               <SelectTrigger className="bg-muted opacity-100 font-medium">
                 <SelectValue placeholder="Selecione..." />

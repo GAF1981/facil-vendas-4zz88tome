@@ -51,7 +51,6 @@ import { ExpenseGallery } from '@/components/caixa/ExpenseGallery'
 import { Label } from '@/components/ui/label'
 import { CloseCashierDialog } from '@/components/caixa/CloseCashierDialog'
 import { useUserStore } from '@/stores/useUserStore'
-import { MultiSelect, Option } from '@/components/common/MultiSelect'
 import {
   Tooltip,
   TooltipContent,
@@ -59,6 +58,8 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { fechamentoService } from '@/services/fechamentoService'
+import { employeesService } from '@/services/employeesService'
+import { Employee } from '@/types/employee'
 
 export default function CaixaPage() {
   const [loading, setLoading] = useState(true)
@@ -67,9 +68,10 @@ export default function CaixaPage() {
   const [summaryData, setSummaryData] = useState<CaixaSummaryRow[]>([])
   const [allReceipts, setAllReceipts] = useState<ReceiptDetail[]>([])
   const [allExpenses, setAllExpenses] = useState<ExpenseDetail[]>([])
+  const [activeEmployees, setActiveEmployees] = useState<Employee[]>([])
 
-  // Employee Filter State
-  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([])
+  // Employee Selection State (Single)
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('')
   const { employee: loggedInUser } = useUserStore()
 
   const { toast } = useToast()
@@ -95,15 +97,41 @@ export default function CaixaPage() {
   }>({ open: false, empId: null, empName: '' })
 
   const [generatingPdf, setGeneratingPdf] = useState(false)
-  const [printFormat, setPrintFormat] = useState<'A4' | '80mm'>('80mm') // Default to 80mm
+  const [printFormat, setPrintFormat] = useState<'A4' | '80mm'>('80mm')
 
-  // Initialization: Fetch Routes and Set Default User
+  // Permission Logic
+  const canSelectEmployee = useMemo(() => {
+    if (!loggedInUser) return false
+    const allowedSectors = ['Administrador', 'Gerente', 'Financeiro']
+    const userSectors = Array.isArray(loggedInUser.setor)
+      ? loggedInUser.setor
+      : loggedInUser.setor
+        ? [loggedInUser.setor]
+        : []
+    return userSectors.some((s) => allowedSectors.includes(s))
+  }, [loggedInUser])
+
+  // Initialization
   useEffect(() => {
     fetchRoutes()
-    if (loggedInUser) {
-      setSelectedEmployeeIds([loggedInUser.id.toString()])
-    }
+    fetchActiveEmployees()
   }, [])
+
+  // Set default employee
+  useEffect(() => {
+    if (loggedInUser && !selectedEmployeeId) {
+      setSelectedEmployeeId(loggedInUser.id.toString())
+    }
+  }, [loggedInUser, selectedEmployeeId])
+
+  const fetchActiveEmployees = async () => {
+    try {
+      const { data } = await employeesService.getEmployees(1, 1000)
+      setActiveEmployees(data.filter((e) => e.situacao === 'ATIVO'))
+    } catch (error) {
+      console.error('Error fetching employees', error)
+    }
+  }
 
   const fetchRoutes = async () => {
     try {
@@ -158,38 +186,30 @@ export default function CaixaPage() {
 
   const selectedRoute = routes.find((r) => r.id.toString() === selectedRouteId)
 
-  // Filtering Logic
-  const employeeOptions: Option[] = useMemo(() => {
-    return summaryData.map((s) => ({
-      label: s.funcionarioNome,
-      value: s.funcionarioId.toString(),
-    }))
-  }, [summaryData])
-
+  // Filtering Logic based on Single Selected Employee
   const filteredReceipts = useMemo(() => {
-    if (selectedEmployeeIds.length === 0) return allReceipts
-    return allReceipts.filter((r) =>
-      selectedEmployeeIds.includes(r.funcionarioId?.toString() || ''),
+    if (!selectedEmployeeId) return []
+    return allReceipts.filter(
+      (r) => r.funcionarioId?.toString() === selectedEmployeeId,
     )
-  }, [allReceipts, selectedEmployeeIds])
+  }, [allReceipts, selectedEmployeeId])
 
   const filteredExpenses = useMemo(() => {
-    if (selectedEmployeeIds.length === 0) return allExpenses
-    return allExpenses.filter((e) =>
-      selectedEmployeeIds.includes(e.funcionarioId?.toString() || ''),
+    if (!selectedEmployeeId) return []
+    return allExpenses.filter(
+      (e) => e.funcionarioId?.toString() === selectedEmployeeId,
     )
-  }, [allExpenses, selectedEmployeeIds])
+  }, [allExpenses, selectedEmployeeId])
 
   const filteredSummary = useMemo(() => {
-    if (selectedEmployeeIds.length === 0) return summaryData
-    return summaryData.filter((s) =>
-      selectedEmployeeIds.includes(s.funcionarioId.toString()),
+    if (!selectedEmployeeId) return []
+    return summaryData.filter(
+      (s) => s.funcionarioId.toString() === selectedEmployeeId,
     )
-  }, [summaryData, selectedEmployeeIds])
+  }, [summaryData, selectedEmployeeId])
 
-  // Calculations (Ensuring correct subtractions)
+  // Calculations
   const totalRecebido = filteredReceipts.reduce((acc, r) => acc + r.valor, 0)
-  // Ensure we only sum expenses that came out of the cashier
   const totalDespesas = filteredExpenses
     .filter((e) => e.saiuDoCaixa)
     .reduce((acc, e) => acc + e.valor, 0)
@@ -212,16 +232,27 @@ export default function CaixaPage() {
   const handleOpenGeneralExpense = async () => {
     if (!loggedInUser || !selectedRouteId) return
 
+    // If manager is viewing another employee, we must decide if they are adding expense FOR that employee or themselves.
+    // The requirement says "select which employee's cash closure I am performing".
+    // Usually, expenses are registered by the person logged in or for a specific person.
+    // Let's assume the context of the page dictates the "target" employee for the expense if possible.
+    // But ExpenseFormDialog defaults to loggedInUser usually.
+    // We will pass the selectedEmployeeId as preselected to facilitate managers helping employees.
+    const targetEmpId = selectedEmployeeId
+      ? parseInt(selectedEmployeeId)
+      : loggedInUser.id
+    const targetEmpName =
+      activeEmployees.find((e) => e.id === targetEmpId)?.nome_completo || ''
+
     try {
       const status = await fechamentoService.getClosureStatus(
         parseInt(selectedRouteId),
-        loggedInUser.id,
+        targetEmpId,
       )
       if (status === 'Aberto' || status === 'Fechado') {
         toast({
           title: 'Ação Bloqueada',
-          description:
-            'Seu Caixa está fechado para a Rota !!! Você deve aguardar abrir uma Nova Rota !!!',
+          description: `O Caixa de ${targetEmpName} está fechado para esta Rota.`,
           variant: 'destructive',
         })
         return
@@ -230,7 +261,7 @@ export default function CaixaPage() {
       console.error(e)
     }
 
-    setPreselectedEmployee(null)
+    setPreselectedEmployee({ id: targetEmpId, name: targetEmpName })
     setIsExpenseDialogOpen(true)
   }
 
@@ -254,20 +285,28 @@ export default function CaixaPage() {
     if (!selectedRoute) return
     setGeneratingPdf(true)
     try {
-      const reportType = employeeId ? 'employee-cash-summary' : 'cash-summary'
-      const employeeData = employeeId
+      // Logic adapted for Single Employee View PDF generation
+      // If we are in single view, we usually generate report for that employee
+      const targetId =
+        employeeId ||
+        (selectedEmployeeId ? parseInt(selectedEmployeeId) : undefined)
+
+      const reportType = targetId ? 'employee-cash-summary' : 'cash-summary'
+      const employeeData = targetId
         ? {
-            id: employeeId,
-            name: employeeName,
+            id: targetId,
+            name:
+              employeeName ||
+              activeEmployees.find((e) => e.id === targetId)?.nome_completo,
           }
         : null
 
-      const receiptsToPass = employeeId
-        ? allReceipts.filter((r) => r.funcionarioId === employeeId)
+      const receiptsToPass = targetId
+        ? allReceipts.filter((r) => r.funcionarioId === targetId)
         : allReceipts
 
-      const expensesToPass = employeeId
-        ? allExpenses.filter((e) => e.funcionarioId === employeeId)
+      const expensesToPass = targetId
+        ? allExpenses.filter((e) => e.funcionarioId === targetId)
         : allExpenses
 
       let finalTotalRecebido = totalRecebido
@@ -275,15 +314,20 @@ export default function CaixaPage() {
       let finalTotalSaldo = totalSaldo
       let finalSaldoDeAcerto = saldoDeAcerto
 
-      if (employeeId) {
-        const empSummary = summaryData.find(
-          (s) => s.funcionarioId === employeeId,
-        )
-        finalTotalRecebido = empSummary?.totalRecebido || 0
-        finalTotalDespesas = empSummary?.totalDespesas || 0
-        finalTotalSaldo = empSummary?.saldo || 0
+      if (targetId) {
+        // Re-calculate if passing specific ID (though page is already filtered, this ensures consistency if calling from table row)
+        const empSummary = summaryData.find((s) => s.funcionarioId === targetId)
+        // Fallback to page calcs if summary row missing (e.g. no activity yet)
+        if (empSummary) {
+          finalTotalRecebido = empSummary.totalRecebido
+          finalTotalDespesas = empSummary.totalDespesas
+          finalTotalSaldo = empSummary.saldo
+        } else if (targetId.toString() === selectedEmployeeId) {
+          finalTotalRecebido = totalRecebido
+          finalTotalDespesas = totalDespesas
+          finalTotalSaldo = totalSaldo
+        }
 
-        // Calculate specific Saldo de Acerto for Employee
         const empPix = receiptsToPass
           .filter((r) => r.forma === 'Pix')
           .reduce((acc, r) => acc + r.valor, 0)
@@ -296,7 +340,7 @@ export default function CaixaPage() {
           body: {
             reportType,
             format: printFormat,
-            summaryData: employeeId ? [] : filteredSummary,
+            summaryData: targetId ? [] : filteredSummary, // If individual, no summary table needed usually
             receipts: receiptsToPass,
             expenses: expensesToPass,
             totalRecebido: finalTotalRecebido,
@@ -370,7 +414,7 @@ export default function CaixaPage() {
             <Button
               onClick={() => setIsCloseCashierDialogOpen(true)}
               className="bg-purple-600 hover:bg-purple-700 flex-1 sm:flex-none text-white"
-              disabled={!selectedRoute}
+              disabled={!selectedRoute || !selectedEmployeeId}
             >
               <Lock className="mr-2 h-4 w-4" />
               Fechar Caixa
@@ -404,7 +448,7 @@ export default function CaixaPage() {
               ) : (
                 <Printer className="mr-2 h-4 w-4" />
               )}
-              PDF Geral
+              PDF
             </Button>
           </div>
           <Button
@@ -412,7 +456,7 @@ export default function CaixaPage() {
             className="bg-blue-600 hover:bg-blue-700 flex-1 sm:flex-none"
           >
             <PlusCircle className="mr-2 h-4 w-4" />
-            Cadastrar Despesa
+            Lançar Despesa
           </Button>
           <Button
             variant="outline"
@@ -436,18 +480,38 @@ export default function CaixaPage() {
                 Filtros & Rota
               </CardTitle>
               <CardDescription>
-                Selecione a rota e os funcionários para visualizar o balanço.
+                Selecione a rota e o funcionário para visualizar o balanço
+                individual.
               </CardDescription>
             </div>
             <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
               <div className="w-full sm:w-[250px]">
-                <Label className="text-xs mb-1 block">Funcionários</Label>
-                <MultiSelect
-                  options={employeeOptions}
-                  selected={selectedEmployeeIds}
-                  onChange={setSelectedEmployeeIds}
-                  placeholder="Selecione funcionários..."
-                />
+                <Label className="text-xs mb-1 block">Funcionário</Label>
+                <Select
+                  value={selectedEmployeeId}
+                  onValueChange={setSelectedEmployeeId}
+                  disabled={!canSelectEmployee}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {activeEmployees.map((emp) => (
+                      <SelectItem key={emp.id} value={emp.id.toString()}>
+                        {emp.nome_completo}
+                      </SelectItem>
+                    ))}
+                    {/* Fallback if logged user not active or list empty */}
+                    {!activeEmployees.find(
+                      (e) => e.id.toString() === selectedEmployeeId,
+                    ) &&
+                      loggedInUser && (
+                        <SelectItem value={loggedInUser.id.toString()}>
+                          {loggedInUser.nome_completo}
+                        </SelectItem>
+                      )}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="w-full sm:w-[250px]">
                 <Label className="text-xs mb-1 block">Rota</Label>
@@ -653,6 +717,9 @@ export default function CaixaPage() {
         onOpenChange={setIsCloseCashierDialogOpen}
         currentRoute={selectedRoute}
         onSuccess={() => fetchData(selectedRouteId)}
+        targetEmployeeId={
+          selectedEmployeeId ? parseInt(selectedEmployeeId) : undefined
+        }
       />
     </div>
   )

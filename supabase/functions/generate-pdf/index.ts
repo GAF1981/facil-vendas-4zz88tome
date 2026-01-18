@@ -77,9 +77,9 @@ Deno.serve(async (req) => {
       if (reportType === 'closing-confirmation') {
         const expensesCount = body.expenses ? body.expenses.length : 0
         const settlementsCount = body.settlements ? body.settlements.length : 0
-        // Approx: Header(100) + Input(100) + Expense(50 + count*20) + Acerto(50) + Table(settlements * 50) + Footer(50)
+        // Approx: Header(100) + Highlights(80) + Input(100) + Expense(50 + count*20) + Table(settlements * 50) + Footer(50)
         estimatedHeight =
-          400 + expensesCount * 20 + (settlementsCount || 0) * 80
+          450 + expensesCount * 20 + (settlementsCount || 0) * 80
       } else if (reportType === 'receipt') {
         estimatedHeight = 400
       } else if (!reportType || reportType === 'acerto') {
@@ -584,6 +584,21 @@ Deno.serve(async (req) => {
       drawText(`Rota ID: ${closingData.rota_id}`, margins.left, y, { size: 10 })
       y -= 15
       drawLine(y)
+      y -= 15
+
+      // NEW FEATURE: Highlighted Saldo do Acerto immediately after Identification
+      drawText('SALDO DO ACERTO', margins.left, y, {
+        size: 14,
+        font: fontBold,
+      })
+      drawText(
+        `R$ ${formatCurrency(closingData.saldo_acerto)}`,
+        width - margins.right,
+        y,
+        { size: 16, font: fontBold, align: 'right', color: rgb(0, 0, 0) },
+      )
+      y -= 25
+      drawLine(y)
       y -= 20
 
       // SECTION 1: Resumo de Entrada (Inputs)
@@ -645,7 +660,8 @@ Deno.serve(async (req) => {
       drawLine(y)
       y -= 20
 
-      // SECTION 3: Detalhamento do Acerto & Highlighted Total
+      // SECTION 3: Detalhamento do Acerto (Small Details)
+      // Removed the big highlighted "SALDO DO ACERTO" from here as it moved up
       drawText('DETALHAMENTO DO ACERTO', width / 2, y, {
         size: 11,
         font: fontBold,
@@ -654,21 +670,7 @@ Deno.serve(async (req) => {
       y -= 15
       drawRow('Venda Total:', closingData.venda_total)
       drawRow('Desconto Total:', closingData.desconto_total)
-      y -= 5
-
-      // Big Highlighted Saldo do Acerto
-      y -= 10
-      drawText('SALDO DO ACERTO', margins.left, y, {
-        size: 12,
-        font: fontBold,
-      })
-      drawText(
-        `R$ ${formatCurrency(closingData.saldo_acerto)}`,
-        width - margins.right,
-        y,
-        { size: 14, font: fontBold, align: 'right', color: rgb(0, 0, 0) },
-      )
-      y -= 25
+      y -= 15
       drawLine(y)
       y -= 20
 
