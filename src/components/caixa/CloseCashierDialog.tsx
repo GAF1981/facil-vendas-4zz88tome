@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -51,7 +51,6 @@ export function CloseCashierDialog({
         setEmployees(data.filter((e) => e.situacao === 'ATIVO'))
       })
 
-      // Use targetEmployeeId if provided (Role-based selection from parent), otherwise fallback to logged in user
       if (targetEmployeeId) {
         setSelectedEmployeeId(targetEmployeeId.toString())
       } else if (loggedInUser) {
@@ -59,6 +58,17 @@ export function CloseCashierDialog({
       }
     }
   }, [open, loggedInUser, targetEmployeeId])
+
+  const canChangeEmployee = useMemo(() => {
+    if (!loggedInUser) return false
+    const allowedSectors = ['Administrador', 'Gerente', 'Financeiro']
+    const userSectors = Array.isArray(loggedInUser.setor)
+      ? loggedInUser.setor
+      : loggedInUser.setor
+        ? [loggedInUser.setor]
+        : []
+    return userSectors.some((s) => allowedSectors.includes(s))
+  }, [loggedInUser])
 
   const handleConfirm = async () => {
     if (!currentRoute) {
@@ -111,11 +121,8 @@ export function CloseCashierDialog({
         className: 'bg-green-600 text-white',
       })
 
-      // Generate Dual PDFs (A4 and 80mm)
-      // We run them sequentially to avoid race conditions on browser download
       try {
         await fechamentoService.generateClosingPdf(fechamento, 'A4')
-        // Small delay to ensure browser handles first download
         await new Promise((resolve) => setTimeout(resolve, 1000))
         await fechamentoService.generateClosingPdf(fechamento, '80mm')
       } catch (pdfError) {
@@ -163,9 +170,9 @@ export function CloseCashierDialog({
             <Select
               value={selectedEmployeeId}
               onValueChange={setSelectedEmployeeId}
-              disabled={true} // Restricted to programmatic selection from parent or logic
+              disabled={!canChangeEmployee}
             >
-              <SelectTrigger className="bg-muted opacity-100 font-medium">
+              <SelectTrigger className="bg-background font-medium">
                 <SelectValue placeholder="Selecione..." />
               </SelectTrigger>
               <SelectContent>
@@ -176,6 +183,11 @@ export function CloseCashierDialog({
                 ))}
               </SelectContent>
             </Select>
+            {!canChangeEmployee && (
+              <p className="text-xs text-muted-foreground">
+                Você só pode fechar o seu próprio caixa.
+              </p>
+            )}
           </div>
         </div>
 

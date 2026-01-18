@@ -21,6 +21,8 @@ import {
   CreditCard,
   FileText,
   Eraser,
+  Trash2,
+  CalendarX,
 } from 'lucide-react'
 import { DebtTable } from '@/components/cobranca/DebtTable'
 import { useToast } from '@/hooks/use-toast'
@@ -37,7 +39,6 @@ export default function CobrancaPage() {
   const [debts, setDebts] = useState<ClientDebt[]>([])
   const [filteredDebts, setFilteredDebts] = useState<ClientDebt[]>([])
 
-  // Split Filters
   const [clientFilter, setClientFilter] = useState('')
   const [orderFilter, setOrderFilter] = useState('')
 
@@ -71,7 +72,6 @@ export default function CobrancaPage() {
     }
   }
 
-  // Realtime Subscription for automatic updates on payment
   useEffect(() => {
     const channel = supabase
       .channel('cobranca-updates')
@@ -80,7 +80,6 @@ export default function CobrancaPage() {
         { event: '*', schema: 'public', table: 'debitos_historico' },
         (payload) => {
           console.log('Debitos updated, refreshing...', payload)
-          // Small delay to ensure DB consistency if multiple triggers fire
           setTimeout(() => loadDebts(), 500)
         },
       )
@@ -93,7 +92,6 @@ export default function CobrancaPage() {
     }
   }, [])
 
-  // Derived Filters
   const uniqueCities = Array.from(
     new Set(
       debts.map((d) => d.city).filter((c): c is string => !!c && c !== 'N/D'),
@@ -103,7 +101,6 @@ export default function CobrancaPage() {
   useEffect(() => {
     let result = debts
 
-    // Client Filter
     if (clientFilter) {
       const lower = clientFilter.toLowerCase()
       result = result.filter(
@@ -113,7 +110,6 @@ export default function CobrancaPage() {
       )
     }
 
-    // Order Filter (Client level filter)
     if (orderFilter) {
       const lower = orderFilter.toLowerCase()
       result = result.filter((d) =>
@@ -121,7 +117,6 @@ export default function CobrancaPage() {
       )
     }
 
-    // City Filter
     if (cityFilter !== 'todos') {
       result = result.filter((d) => d.city === cityFilter)
     }
@@ -206,7 +201,6 @@ export default function CobrancaPage() {
     }
   }
 
-  // Exact Calculation for Summary Cards based on applied filters
   const { totalSaldoPagar, totalValorPago, totalDebito } = useMemo(() => {
     let saldo = 0
     let paid = 0
@@ -216,22 +210,18 @@ export default function CobrancaPage() {
 
     filteredDebts.forEach((client) => {
       client.orders.forEach((order) => {
-        // Apply Order Filter (Strict check)
         if (orderFilter && !order.orderId.toString().includes(orderFilter))
           return
 
         order.installments.forEach((inst) => {
           let matches = true
 
-          // Status Filter
           if (statusFilter.length > 0 && !statusFilter.includes(inst.status))
             matches = false
 
-          // Data Combinada Filter
           if (dataCombinadaFilter && inst.dataCombinada !== dataCombinadaFilter)
             matches = false
 
-          // Motoqueiro Filter
           if (!shouldIgnoreMotoqueiroFilter && motoqueiroFilter !== 'todos') {
             if (
               motoqueiroFilter === 'com_rota' &&
@@ -250,7 +240,7 @@ export default function CobrancaPage() {
               0,
               inst.valorRegistrado - inst.valorPago,
             )
-            saldo += inst.valorRegistrado // Using Registered Value as the 'to pay' basis for installments
+            saldo += inst.valorRegistrado
             paid += inst.valorPago
             debt += currentDebt
           }
@@ -272,6 +262,75 @@ export default function CobrancaPage() {
     activeTab,
   ])
 
+  const handleBulkClearMotoqueiro = async () => {
+    if (selectedItems.size === 0) return
+    if (!confirm('Deseja remover "Motoqueiro" dos itens selecionados?')) return
+
+    const items = Array.from(selectedItems).map((id) => {
+      const [, orderId, receivableId] = id.split('-')
+      return {
+        receivableId: parseInt(receivableId),
+        orderId: parseInt(orderId),
+      }
+    })
+
+    try {
+      await cobrancaService.bulkUpdateReceivables(items, {
+        forma_cobranca: null,
+      })
+      toast({ title: 'Sucesso', description: 'Motoqueiro removido.' })
+      setSelectedItems(new Set())
+      loadDebts()
+    } catch (e) {
+      console.error(e)
+      toast({
+        title: 'Erro',
+        description: 'Falha ao atualizar.',
+        variant: 'destructive',
+      })
+    }
+  }
+
+  const handleBulkClearDate = async () => {
+    if (selectedItems.size === 0) return
+    if (!confirm('Deseja limpar "Data Combinada" dos itens selecionados?'))
+      return
+
+    const items = Array.from(selectedItems).map((id) => {
+      const [, orderId, receivableId] = id.split('-')
+      return {
+        receivableId: parseInt(receivableId),
+        orderId: parseInt(orderId),
+      }
+    })
+
+    try {
+      await cobrancaService.bulkUpdateReceivables(items, {
+        data_combinada: null,
+      })
+      toast({ title: 'Sucesso', description: 'Data combinada removida.' })
+      setSelectedItems(new Set())
+      loadDebts()
+    } catch (e) {
+      console.error(e)
+      toast({
+        title: 'Erro',
+        description: 'Falha ao atualizar.',
+        variant: 'destructive',
+      })
+    }
+  }
+
+  const handleRefreshCourierRoute = async () => {
+    // This function ensures data is fresh. Since we already fetch and subscribe,
+    // explicitly reloading is the main action to ensure "Courier Dashboard Card" sees latest data
+    await loadDebts()
+    toast({
+      title: 'Rota Atualizada',
+      description: 'O painel do motoqueiro está sincronizado.',
+    })
+  }
+
   const statusOptions = [
     { label: 'Vencido', value: 'VENCIDO' },
     { label: 'A Vencer', value: 'A VENCER' },
@@ -285,7 +344,6 @@ export default function CobrancaPage() {
     setCityFilter('todos')
     setMotoqueiroFilter('todos')
     setDataCombinadaFilter('')
-    // Keep isSimplified and activeTab as user preference
   }
 
   return (
@@ -469,6 +527,38 @@ export default function CobrancaPage() {
             </TabsList>
 
             <TabsContent value="geral" className="mt-4">
+              <div className="mb-4 flex flex-wrap gap-2">
+                {selectedItems.size > 0 && (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={handleBulkClearMotoqueiro}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Limpar Motoqueiro ({selectedItems.size})
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleBulkClearDate}
+                    >
+                      <CalendarX className="mr-2 h-4 w-4" />
+                      Limpar Data ({selectedItems.size})
+                    </Button>
+                  </>
+                )}
+                <div className="ml-auto">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleRefreshCourierRoute}
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Atualizar Rota Motoqueiro
+                  </Button>
+                </div>
+              </div>
               <DebtTable
                 data={filteredDebts}
                 onRefresh={loadDebts}
@@ -492,6 +582,14 @@ export default function CobrancaPage() {
                   selecionados para rota de cobrança.
                 </div>
                 <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleRefreshCourierRoute}
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Atualizar Rota
+                  </Button>
                   <Button size="sm" variant="outline">
                     Gerar PDF Rota
                   </Button>

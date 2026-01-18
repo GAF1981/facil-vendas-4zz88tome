@@ -1,10 +1,5 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
-import {
-  PDFDocument,
-  StandardFonts,
-  rgb,
-  degrees,
-} from 'https://esm.sh/pdf-lib@1.17.1'
+import { PDFDocument, StandardFonts, rgb } from 'https://esm.sh/pdf-lib@1.17.1'
 import { corsHeaders } from '../_shared/cors.ts'
 
 const removeAccents = (str: string) => {
@@ -77,13 +72,11 @@ Deno.serve(async (req) => {
       if (reportType === 'closing-confirmation') {
         const expensesCount = body.expenses ? body.expenses.length : 0
         const settlementsCount = body.settlements ? body.settlements.length : 0
-        // Approx: Header(100) + Highlights(80) + Input(100) + Expense(50 + count*20) + Table(settlements * 50) + Footer(50)
         estimatedHeight =
           450 + expensesCount * 20 + (settlementsCount || 0) * 80
       } else if (reportType === 'receipt') {
         estimatedHeight = 400
       } else if (!reportType || reportType === 'acerto') {
-        // Acerto Receipt logic
         const itemsCount = body.items ? body.items.length : 0
         const historyCount = body.history ? body.history.length : 0
         const paymentsCount = body.payments ? body.payments.length : 0
@@ -94,14 +87,13 @@ Deno.serve(async (req) => {
             else installmentsCount += 1
           })
         }
-        // Increased height estimation per section to accommodate details
         estimatedHeight =
-          450 + // Header + Info
-          itemsCount * 100 + // Items with details
+          450 +
+          itemsCount * 100 +
           paymentsCount * 40 +
           installmentsCount * 30 +
-          historyCount * 160 + // History blocks
-          300 // Footer
+          historyCount * 160 +
+          300
       }
 
       page = pdfDoc.addPage([226, Math.max(400, estimatedHeight)])
@@ -110,7 +102,6 @@ Deno.serve(async (req) => {
       margins = { top: 20, bottom: 20, left: 10, right: 10 }
       y = height - margins.top
     } else {
-      // A4 Format
       page = pdfDoc.addPage()
       width = page.getSize().width
       height = page.getSize().height
@@ -194,13 +185,10 @@ Deno.serve(async (req) => {
       return false
     }
 
-    // --- REPORT TYPES LOGIC ---
-
     if (
       isThermal &&
       (!reportType || reportType === 'acerto' || reportType === 'receipt')
     ) {
-      // --- THERMAL 80MM ACERTO/RECEIPT LAYOUT ---
       const {
         client,
         employee,
@@ -214,7 +202,6 @@ Deno.serve(async (req) => {
         debito = 0,
         payments = [],
         history = [],
-        signature,
       } = body
 
       const sellerName = employee?.nome_completo || 'N/D'
@@ -223,7 +210,6 @@ Deno.serve(async (req) => {
       const clientAddress = `${client?.ENDEREÇO || ''}, ${client?.BAIRRO || ''}`
       const clientCity = `${client?.MUNICÍPIO || ''}`
 
-      // Header
       drawText('FACIL VENDAS', width / 2, y, {
         size: 16,
         font: fontBold,
@@ -239,7 +225,6 @@ Deno.serve(async (req) => {
       drawLine(y)
       y -= 15
 
-      // Client Info
       const infoSize = 9
       drawText(`Cliente: ${clientCode} - ${clientName}`, margins.left, y, {
         size: infoSize,
@@ -269,7 +254,6 @@ Deno.serve(async (req) => {
       drawLine(y)
       y -= 15
 
-      // Items Section
       drawText('ITENS DO PEDIDO', width / 2, y, {
         size: 10,
         font: fontBold,
@@ -279,7 +263,6 @@ Deno.serve(async (req) => {
 
       for (const item of items) {
         checkPageBreak(100)
-        // Product Line
         const priceStr = `R$ ${formatCurrency(item.precoUnitario)}`
         drawText(`${item.produtoNome}`, margins.left, y, {
           size: 9,
@@ -293,7 +276,6 @@ Deno.serve(async (req) => {
         })
         y -= 12
 
-        // Details
         const drawDetail = (label: string, val: any) => {
           drawText(label, margins.left, y, { size: 9 })
           drawText(String(val), width - margins.right, y, {
@@ -320,7 +302,6 @@ Deno.serve(async (req) => {
       drawLine(y)
       y -= 15
 
-      // Totals
       const drawTotal = (label: string, val: number, isBig = false) => {
         const f = isBig ? fontBold : fontRegular
         drawText(label, margins.left, y, { size: 9, font: f })
@@ -340,7 +321,6 @@ Deno.serve(async (req) => {
       drawLine(y)
       y -= 15
 
-      // Payments
       drawText('PAGAMENTOS', width / 2, y, {
         size: 10,
         font: fontBold,
@@ -373,7 +353,6 @@ Deno.serve(async (req) => {
       drawLine(y)
       y -= 15
 
-      // A PAGAR (Scheduled)
       drawText('A PAGAR', width / 2, y, {
         size: 10,
         font: fontBold,
@@ -385,8 +364,6 @@ Deno.serve(async (req) => {
       for (const p of payments) {
         if (p.details && p.details.length > 0) {
           for (const d of p.details) {
-            // Robust UTC parsing from YYYY-MM-DD
-            // If date is provided (YYYY-MM-DD), use Date.UTC to ensure correct day
             const parts = d.dueDate.split('-')
             let dueTime = 0
             if (parts.length === 3) {
@@ -405,7 +382,7 @@ Deno.serve(async (req) => {
               now.getDate(),
             )
 
-            // If due date is today or future, AND it's not fully paid (to avoid duplicating immediate payments)
+            // Include if Due >= Today (Logic Update)
             if (dueTime >= todayUTC) {
               if (d.paidValue < d.value) {
                 hasScheduled = true
@@ -430,6 +407,7 @@ Deno.serve(async (req) => {
 
       if (!hasScheduled) {
         if (debito > 0.01) {
+          // Fallback if details missing but debt exists
           drawText('Saldo Devedor Pendente.', margins.left, y, { size: 9 })
           y -= 12
         } else {
@@ -441,7 +419,6 @@ Deno.serve(async (req) => {
       drawLine(y)
       y -= 15
 
-      // Financial Summary
       drawText('RESUMO FINANCEIRO', margins.left, y, {
         size: 9,
         font: fontBold,
@@ -470,7 +447,6 @@ Deno.serve(async (req) => {
       drawLine(y)
       y -= 15
 
-      // Settlement History
       drawText('RESUMO DE ACERTOS (HISTORICO)', width / 2, y, {
         size: 10,
         font: fontBold,
@@ -513,13 +489,12 @@ Deno.serve(async (req) => {
         )
         drawHistLine('Pedido:', `#${h.id}`)
 
-        y -= 8 // Spacing between blocks
+        y -= 8
       }
 
       drawLine(y)
       y -= 30
 
-      // Footer / Signature
       checkPageBreak(50)
       const sigLineY = y
       page.drawLine({
@@ -541,7 +516,6 @@ Deno.serve(async (req) => {
         align: 'center',
       })
     } else if (reportType === 'closing-confirmation') {
-      // --- CLOSING CONFIRMATION LAYOUT UPDATE ---
       const {
         fechamento,
         receipts,
@@ -586,7 +560,6 @@ Deno.serve(async (req) => {
       drawLine(y)
       y -= 15
 
-      // NEW FEATURE: Highlighted Saldo do Acerto immediately after Identification
       drawText('SALDO DO ACERTO', margins.left, y, {
         size: 14,
         font: fontBold,
@@ -601,7 +574,6 @@ Deno.serve(async (req) => {
       drawLine(y)
       y -= 20
 
-      // SECTION 1: Resumo de Entrada (Inputs)
       drawText('RESUMO DE ENTRADA', width / 2, y, {
         size: 11,
         font: fontBold,
@@ -633,7 +605,6 @@ Deno.serve(async (req) => {
       drawLine(y)
       y -= 20
 
-      // SECTION 2: Detalhamento da Saída (Expenses)
       drawText('DETALHAMENTO DA SAÍDA', width / 2, y, {
         size: 11,
         font: fontBold,
@@ -660,8 +631,6 @@ Deno.serve(async (req) => {
       drawLine(y)
       y -= 20
 
-      // SECTION 3: Detalhamento do Acerto (Small Details)
-      // Removed the big highlighted "SALDO DO ACERTO" from here as it moved up
       drawText('DETALHAMENTO DO ACERTO', width / 2, y, {
         size: 11,
         font: fontBold,
@@ -674,7 +643,6 @@ Deno.serve(async (req) => {
       drawLine(y)
       y -= 20
 
-      // SECTION 4: Resumo dos Acertos (Table)
       if (settlements && settlements.length > 0) {
         checkPageBreak(50)
         drawText('RESUMO DOS ACERTOS', width / 2, y, {
@@ -684,8 +652,6 @@ Deno.serve(async (req) => {
         })
         y -= 20
 
-        // Table Header
-        // New columns: Ped, Data, Func, Cod, Cli, Vl.Venda, Pagto(BD), Pagto(Rec), Vl.Pago
         const cols = [
           { name: 'Ped', x: 0 },
           { name: 'Data', x: 30 },
@@ -699,17 +665,14 @@ Deno.serve(async (req) => {
         ]
 
         if (isThermal) {
-          // Simplified header for thermal
           drawText('Detalhamento disponível apenas em A4', margins.left, y, {
             size: 9,
           })
           y -= 15
         } else {
-          // A4 Table Header
           const startX = margins.left
           const colX = (offset: number) => startX + offset
 
-          // Draw Header Background
           page.drawRectangle({
             x: startX,
             y: y - 2,
@@ -740,7 +703,6 @@ Deno.serve(async (req) => {
 
           for (const s of settlements) {
             checkPageBreak(15)
-            // Row Data
             const dateStr = `${safeFormatDate(s.acertoDate)}`
             const timeStr = s.acertoTime?.substring(0, 5) || ''
             const empStr = (s.employee || '').split(' ')[0].substring(0, 10)

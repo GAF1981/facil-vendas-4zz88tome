@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import { usePermissions } from '@/hooks/use-permissions'
 import { DashboardStats } from '@/components/dashboard/DashboardStats'
+import { RotaMotoqueiroCard } from '@/components/dashboard/RotaMotoqueiroCard'
 
 export default function Index() {
   const { canAccess } = usePermissions()
@@ -202,6 +203,11 @@ export default function Index() {
       </div>
 
       <DashboardStats />
+
+      {/* Rota Motoqueiro Card appears here if relevant */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <RotaMotoqueiroCard />
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {visibleModules.map((module) => (

@@ -70,7 +70,6 @@ export default function CaixaPage() {
   const [allExpenses, setAllExpenses] = useState<ExpenseDetail[]>([])
   const [activeEmployees, setActiveEmployees] = useState<Employee[]>([])
 
-  // Employee Selection State (Single)
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('')
   const { employee: loggedInUser } = useUserStore()
 
@@ -99,7 +98,6 @@ export default function CaixaPage() {
   const [generatingPdf, setGeneratingPdf] = useState(false)
   const [printFormat, setPrintFormat] = useState<'A4' | '80mm'>('80mm')
 
-  // Permission Logic
   const canSelectEmployee = useMemo(() => {
     if (!loggedInUser) return false
     const allowedSectors = ['Administrador', 'Gerente', 'Financeiro']
@@ -111,13 +109,11 @@ export default function CaixaPage() {
     return userSectors.some((s) => allowedSectors.includes(s))
   }, [loggedInUser])
 
-  // Initialization
   useEffect(() => {
     fetchRoutes()
     fetchActiveEmployees()
   }, [])
 
-  // Set default employee
   useEffect(() => {
     if (loggedInUser && !selectedEmployeeId) {
       setSelectedEmployeeId(loggedInUser.id.toString())
@@ -186,7 +182,6 @@ export default function CaixaPage() {
 
   const selectedRoute = routes.find((r) => r.id.toString() === selectedRouteId)
 
-  // Filtering Logic based on Single Selected Employee
   const filteredReceipts = useMemo(() => {
     if (!selectedEmployeeId) return []
     return allReceipts.filter(
@@ -208,7 +203,6 @@ export default function CaixaPage() {
     )
   }, [summaryData, selectedEmployeeId])
 
-  // Calculations
   const totalRecebido = filteredReceipts.reduce((acc, r) => acc + r.valor, 0)
   const totalDespesas = filteredExpenses
     .filter((e) => e.saiuDoCaixa)
@@ -226,18 +220,11 @@ export default function CaixaPage() {
     .filter((r) => r.forma === 'Cheque')
     .reduce((acc, r) => acc + r.valor, 0)
 
-  // Saldo de Acerto = (Total Saldo - Total Pix)
   const saldoDeAcerto = totalSaldo - totalPix
 
   const handleOpenGeneralExpense = async () => {
     if (!loggedInUser || !selectedRouteId) return
 
-    // If manager is viewing another employee, we must decide if they are adding expense FOR that employee or themselves.
-    // The requirement says "select which employee's cash closure I am performing".
-    // Usually, expenses are registered by the person logged in or for a specific person.
-    // Let's assume the context of the page dictates the "target" employee for the expense if possible.
-    // But ExpenseFormDialog defaults to loggedInUser usually.
-    // We will pass the selectedEmployeeId as preselected to facilitate managers helping employees.
     const targetEmpId = selectedEmployeeId
       ? parseInt(selectedEmployeeId)
       : loggedInUser.id
@@ -285,8 +272,6 @@ export default function CaixaPage() {
     if (!selectedRoute) return
     setGeneratingPdf(true)
     try {
-      // Logic adapted for Single Employee View PDF generation
-      // If we are in single view, we usually generate report for that employee
       const targetId =
         employeeId ||
         (selectedEmployeeId ? parseInt(selectedEmployeeId) : undefined)
@@ -315,9 +300,7 @@ export default function CaixaPage() {
       let finalSaldoDeAcerto = saldoDeAcerto
 
       if (targetId) {
-        // Re-calculate if passing specific ID (though page is already filtered, this ensures consistency if calling from table row)
         const empSummary = summaryData.find((s) => s.funcionarioId === targetId)
-        // Fallback to page calcs if summary row missing (e.g. no activity yet)
         if (empSummary) {
           finalTotalRecebido = empSummary.totalRecebido
           finalTotalDespesas = empSummary.totalDespesas
@@ -340,7 +323,7 @@ export default function CaixaPage() {
           body: {
             reportType,
             format: printFormat,
-            summaryData: targetId ? [] : filteredSummary, // If individual, no summary table needed usually
+            summaryData: targetId ? [] : filteredSummary,
             receipts: receiptsToPass,
             expenses: expensesToPass,
             totalRecebido: finalTotalRecebido,
@@ -381,7 +364,6 @@ export default function CaixaPage() {
     }
   }
 
-  // Permission check for Close Cashier
   const canCloseCashier = useMemo(() => {
     if (!loggedInUser) return false
     const allowedSectors = ['Administrador', 'Gerente', 'Financeiro']
@@ -390,7 +372,12 @@ export default function CaixaPage() {
       : loggedInUser.setor
         ? [loggedInUser.setor]
         : []
-    return userSectors.some((s) => allowedSectors.includes(s))
+    // All users can close their OWN cashier, but admins can select others.
+    // The previous logic was: "only admins can use the button".
+    // But usually everyone closes their own cashier.
+    // The requirement says "Administrative roles... can now select which employee...".
+    // So everyone should access the button, but only admins can change selection inside dialog.
+    return true
   }, [loggedInUser])
 
   return (
@@ -501,7 +488,6 @@ export default function CaixaPage() {
                         {emp.nome_completo}
                       </SelectItem>
                     ))}
-                    {/* Fallback if logged user not active or list empty */}
                     {!activeEmployees.find(
                       (e) => e.id.toString() === selectedEmployeeId,
                     ) &&

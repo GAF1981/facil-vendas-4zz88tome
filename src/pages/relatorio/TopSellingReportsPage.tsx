@@ -47,6 +47,16 @@ export default function TopSellingReportsPage() {
     }
   }
 
+  const handleMonthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Input type="month" returns "YYYY-MM"
+    const val = e.target.value
+    if (val) {
+      const date = new Date(`${val}-01T12:00:00`)
+      setStartDate(format(startOfMonth(date), 'yyyy-MM-dd'))
+      setEndDate(format(endOfMonth(date), 'yyyy-MM-dd'))
+    }
+  }
+
   useEffect(() => {
     fetchData()
   }, []) // Initial load
@@ -72,47 +82,64 @@ export default function TopSellingReportsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Filtros</CardTitle>
-          <CardDescription>Selecione o período para análise.</CardDescription>
+          <CardDescription>
+            Selecione o mês ou período personalizado.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col sm:flex-row gap-4 items-end">
-            <div className="space-y-2 w-full sm:w-auto">
-              <Label htmlFor="start-date">Data Inicial</Label>
+          <div className="flex flex-col gap-4">
+            <div className="w-full sm:w-auto">
+              <Label>Mês de Referência</Label>
               <Input
-                id="start-date"
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                type="month"
+                className="w-full sm:w-[200px]"
+                onChange={handleMonthChange}
+                defaultValue={format(new Date(), 'yyyy-MM')}
               />
             </div>
-            <div className="space-y-2 w-full sm:w-auto">
-              <Label htmlFor="end-date">Data Final</Label>
-              <Input
-                id="end-date"
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-              />
+            <div className="flex flex-col sm:flex-row gap-4 items-end pt-2 border-t">
+              <div className="space-y-2 w-full sm:w-auto">
+                <Label htmlFor="start-date">Início (Personalizado)</Label>
+                <Input
+                  id="start-date"
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2 w-full sm:w-auto">
+                <Label htmlFor="end-date">Fim (Personalizado)</Label>
+                <Input
+                  id="end-date"
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                />
+              </div>
+              <Button
+                onClick={fetchData}
+                disabled={loading}
+                className="w-full sm:w-auto"
+              >
+                {loading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Search className="mr-2 h-4 w-4" />
+                )}
+                Gerar Relatório
+              </Button>
             </div>
-            <Button
-              onClick={fetchData}
-              disabled={loading}
-              className="w-full sm:w-auto"
-            >
-              {loading ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Search className="mr-2 h-4 w-4" />
-              )}
-              Buscar
-            </Button>
           </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Resultados</CardTitle>
+          <CardTitle>Ranking de Vendas</CardTitle>
+          <CardDescription>
+            Período: {format(new Date(startDate), 'dd/MM/yyyy')} até{' '}
+            {format(new Date(endDate), 'dd/MM/yyyy')}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="rounded-md border overflow-hidden">
@@ -132,7 +159,7 @@ export default function TopSellingReportsPage() {
                     <TableCell colSpan={5} className="h-32 text-center">
                       <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
                       <span className="text-muted-foreground mt-2 block">
-                        Carregando dados...
+                        Calculando...
                       </span>
                     </TableCell>
                   </TableRow>
