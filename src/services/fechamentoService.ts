@@ -172,7 +172,13 @@ export const fechamentoService = {
       rota,
     )
 
-    // 4. Invoke Edge Function with Full Payload
+    // 4. Fetch Settlements (Detailed Table Data)
+    const allSettlements = await resumoAcertosService.getSettlements(rota)
+    const settlements = allSettlements.filter(
+      (s) => s.employeeId === fechamento.funcionario_id,
+    )
+
+    // 5. Invoke Edge Function with Full Payload
     const { data: blob, error } = await supabase.functions.invoke(
       'generate-pdf',
       {
@@ -181,6 +187,7 @@ export const fechamentoService = {
           fechamento,
           receipts,
           expenses,
+          settlements, // New Data for Table
           format,
           date: new Date().toISOString(),
         },

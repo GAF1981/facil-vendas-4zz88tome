@@ -76,8 +76,10 @@ Deno.serve(async (req) => {
     if (isThermal) {
       if (reportType === 'closing-confirmation') {
         const expensesCount = body.expenses ? body.expenses.length : 0
-        const receiptsCount = body.receipts ? body.receipts.length : 0
-        estimatedHeight = 800 + expensesCount * 40 + receiptsCount * 40
+        const settlementsCount = body.settlements ? body.settlements.length : 0
+        // Approx: Header(100) + Input(100) + Expense(50 + count*20) + Acerto(50) + Table(settlements * 50) + Footer(50)
+        estimatedHeight =
+          400 + expensesCount * 20 + (settlementsCount || 0) * 80
       } else if (reportType === 'receipt') {
         estimatedHeight = 400
       } else if (!reportType || reportType === 'acerto') {
@@ -348,12 +350,6 @@ Deno.serve(async (req) => {
 
       let hasImmediate = false
       for (const p of payments) {
-        // Filter immediate payments if needed, or list all
-        // Usually receipts show what was paid.
-        // Assuming 'payments' contains registered payments for this order
-        // If installments > 1, listed in 'A PAGAR' section or here?
-        // User story image shows "Nenhum pagamento imediato" and "A PAGAR" separately.
-        // Let's check logic: if payment has value > 0 and paidValue > 0 => Immediate.
         if (p.paidValue > 0) {
           drawText(`${p.method} - Hoje`, margins.left, y, { size: 9 })
           drawText(
@@ -389,30 +385,50 @@ Deno.serve(async (req) => {
       for (const p of payments) {
         if (p.details && p.details.length > 0) {
           for (const d of p.details) {
-            // If due date is future
-            if (
-              new Date(d.dueDate) > new Date(new Date().setHours(0, 0, 0, 0))
-            ) {
-              hasScheduled = true
-              checkPageBreak(20)
-              const label = `${p.method} (${d.number}/${p.installments}) - ${safeFormatDate(d.dueDate)}`
-              drawText(label, margins.left, y, {
-                size: 9,
-                maxWidth: width - 80,
-              })
-              drawText(
-                `R$ ${formatCurrency(d.value)}`,
-                width - margins.right,
-                y,
-                { size: 9, align: 'right' },
-              )
-              y -= 12
+            // Robust UTC parsing from YYYY-MM-DD
+            // If date is provided (YYYY-MM-DD), use Date.UTC to ensure correct day
+            const parts = d.dueDate.split('-')
+            let dueTime = 0
+            if (parts.length === 3) {
+              const yNum = parseInt(parts[0])
+              const mNum = parseInt(parts[1]) - 1
+              const dNum = parseInt(parts[2])
+              dueTime = Date.UTC(yNum, mNum, dNum)
+            } else {
+              dueTime = new Date(d.dueDate).getTime()
+            }
+
+            const now = new Date()
+            const todayUTC = Date.UTC(
+              now.getFullYear(),
+              now.getMonth(),
+              now.getDate(),
+            )
+
+            // If due date is today or future, AND it's not fully paid (to avoid duplicating immediate payments)
+            if (dueTime >= todayUTC) {
+              if (d.paidValue < d.value) {
+                hasScheduled = true
+                checkPageBreak(20)
+                const label = `${p.method} (${d.number}/${p.installments}) - ${safeFormatDate(d.dueDate)}`
+                drawText(label, margins.left, y, {
+                  size: 9,
+                  maxWidth: width - 80,
+                })
+                drawText(
+                  `R$ ${formatCurrency(d.value)}`,
+                  width - margins.right,
+                  y,
+                  { size: 9, align: 'right' },
+                )
+                y -= 12
+              }
             }
           }
         }
       }
+
       if (!hasScheduled) {
-        // Logic to check if there is remaining debt
         if (debito > 0.01) {
           drawText('Saldo Devedor Pendente.', margins.left, y, { size: 9 })
           y -= 12
@@ -475,8 +491,6 @@ Deno.serve(async (req) => {
           y -= 11
         }
 
-        // Mapping fields based on requirement
-        // Data, Venda, Desconto, A pagar, Pago, Debito, Vendedor, Media Mensal, Pedido
         drawHistLine('Data:', safeFormatDate(h.data))
         drawHistLine('Venda:', `R$ ${formatCurrency(h.valorVendaTotal)}`)
         drawHistLine('Desconto:', `R$ ${formatCurrency(h.desconto || 0)}`)
@@ -484,7 +498,6 @@ Deno.serve(async (req) => {
         drawHistLine('Pago:', `R$ ${formatCurrency(h.valorPago)}`)
         drawHistLine('Debito:', `R$ ${formatCurrency(h.debito)}`)
 
-        // Vendedor can be long
         drawText('Vendedor:', margins.left, y, { size: 9, font: fontBold })
         drawText(h.vendedor || '-', width - margins.right, y, {
           size: 9,
@@ -528,8 +541,14 @@ Deno.serve(async (req) => {
         align: 'center',
       })
     } else if (reportType === 'closing-confirmation') {
-      // ... (Preserve existing closing logic)
-      const { fechamento, receipts, expenses, date: closingDate } = body
+      // --- CLOSING CONFIRMATION LAYOUT UPDATE ---
+      const {
+        fechamento,
+        receipts,
+        expenses,
+        settlements = [],
+        date: closingDate,
+      } = body
       const closingData = fechamento || body.data
 
       if (!closingData) throw new Error('No closing data provided')
@@ -563,43 +582,194 @@ Deno.serve(async (req) => {
       })
       y -= 15
       drawText(`Rota ID: ${closingData.rota_id}`, margins.left, y, { size: 10 })
-      y -= 20
+      y -= 15
       drawLine(y)
       y -= 20
 
-      const rows = [
-        { l: 'Venda Total', v: closingData.venda_total },
-        { l: 'Desconto Total', v: closingData.desconto_total },
-        {
-          l: 'Saldo do Acerto (Dívida)',
-          v: closingData.valor_a_receber,
-          bold: true,
-          color: rgb(0, 0, 0.8),
-        },
-        { l: 'Dinheiro', v: closingData.valor_dinheiro },
-        { l: 'Pix', v: closingData.valor_pix },
-        { l: 'Cheque', v: closingData.valor_cheque },
-        { l: 'Despesas', v: closingData.valor_despesas, color: rgb(1, 0, 0) },
-      ]
+      // SECTION 1: Resumo de Entrada (Inputs)
+      drawText('RESUMO DE ENTRADA', width / 2, y, {
+        size: 11,
+        font: fontBold,
+        align: 'center',
+      })
+      y -= 15
 
-      for (const row of rows) {
-        drawText(row.l, margins.left, y, {
-          size: 10,
-          font: row.bold ? fontBold : fontRegular,
-          color: row.color || rgb(0, 0, 0),
-        })
-        drawText(`R$ ${formatCurrency(row.v)}`, width - margins.right, y, {
+      const drawRow = (l: string, v: number, bold = false) => {
+        const f = bold ? fontBold : fontRegular
+        drawText(l, margins.left, y, { size: 10, font: f })
+        drawText(`R$ ${formatCurrency(v)}`, width - margins.right, y, {
           size: 10,
           align: 'right',
-          font: row.bold ? fontBold : fontRegular,
-          color: row.color || rgb(0, 0, 0),
+          font: f,
         })
         y -= 15
       }
+
+      drawRow('Dinheiro:', closingData.valor_dinheiro)
+      drawRow('Pix:', closingData.valor_pix)
+      drawRow('Cheque:', closingData.valor_cheque)
+      y -= 5
+      const totalEntrada =
+        closingData.valor_dinheiro +
+        closingData.valor_pix +
+        closingData.valor_cheque
+      drawRow('TOTAL ENTRADA:', totalEntrada, true)
+      y -= 10
+      drawLine(y)
+      y -= 20
+
+      // SECTION 2: Detalhamento da Saída (Expenses)
+      drawText('DETALHAMENTO DA SAÍDA', width / 2, y, {
+        size: 11,
+        font: fontBold,
+        align: 'center',
+      })
+      y -= 15
+      if (expenses && expenses.length > 0) {
+        expenses.forEach((exp: any) => {
+          checkPageBreak(20)
+          const desc = `${exp.grupo} - ${exp.detalhamento || ''}`
+          drawText(desc, margins.left, y, { size: 9, maxWidth: width - 80 })
+          drawText(
+            `R$ ${formatCurrency(exp.valor)}`,
+            width - margins.right,
+            y,
+            { size: 9, align: 'right' },
+          )
+          y -= 12
+        })
+      }
+      y -= 5
+      drawRow('TOTAL SAÍDA (DESPESAS):', closingData.valor_despesas, true)
+      y -= 10
+      drawLine(y)
+      y -= 20
+
+      // SECTION 3: Detalhamento do Acerto & Highlighted Total
+      drawText('DETALHAMENTO DO ACERTO', width / 2, y, {
+        size: 11,
+        font: fontBold,
+        align: 'center',
+      })
+      y -= 15
+      drawRow('Venda Total:', closingData.venda_total)
+      drawRow('Desconto Total:', closingData.desconto_total)
+      y -= 5
+
+      // Big Highlighted Saldo do Acerto
+      y -= 10
+      drawText('SALDO DO ACERTO', margins.left, y, {
+        size: 12,
+        font: fontBold,
+      })
+      drawText(
+        `R$ ${formatCurrency(closingData.saldo_acerto)}`,
+        width - margins.right,
+        y,
+        { size: 14, font: fontBold, align: 'right', color: rgb(0, 0, 0) },
+      )
+      y -= 25
+      drawLine(y)
+      y -= 20
+
+      // SECTION 4: Resumo dos Acertos (Table)
+      if (settlements && settlements.length > 0) {
+        checkPageBreak(50)
+        drawText('RESUMO DOS ACERTOS', width / 2, y, {
+          size: 11,
+          font: fontBold,
+          align: 'center',
+        })
+        y -= 20
+
+        // Table Header
+        // New columns: Ped, Data, Func, Cod, Cli, Vl.Venda, Pagto(BD), Pagto(Rec), Vl.Pago
+        const cols = [
+          { name: 'Ped', x: 0 },
+          { name: 'Data', x: 30 },
+          { name: 'Func', x: 80 },
+          { name: 'Cod', x: 140 },
+          { name: 'Cliente', x: 170 },
+          { name: 'Vl.Venda', x: 280, align: 'right' },
+          { name: 'Pgto (BD)', x: 330 },
+          { name: 'Pgto (Rec)', x: 400 },
+          { name: 'Vl.Pago', x: 480, align: 'right' },
+        ]
+
+        if (isThermal) {
+          // Simplified header for thermal
+          drawText('Detalhamento disponível apenas em A4', margins.left, y, {
+            size: 9,
+          })
+          y -= 15
+        } else {
+          // A4 Table Header
+          const startX = margins.left
+          const colX = (offset: number) => startX + offset
+
+          // Draw Header Background
+          page.drawRectangle({
+            x: startX,
+            y: y - 2,
+            width: width - margins.left - margins.right,
+            height: 14,
+            color: rgb(0.9, 0.9, 0.9),
+          })
+
+          drawText('Ped', colX(0), y, { size: 7, font: fontBold })
+          drawText('Data', colX(30), y, { size: 7, font: fontBold })
+          drawText('Func', colX(80), y, { size: 7, font: fontBold })
+          drawText('Cod', colX(140), y, { size: 7, font: fontBold })
+          drawText('Cliente', colX(170), y, { size: 7, font: fontBold })
+          drawText('Vl.Venda', colX(330), y, {
+            size: 7,
+            font: fontBold,
+            align: 'right',
+          })
+          drawText('Pgto(BD)', colX(340), y, { size: 7, font: fontBold })
+          drawText('Pgto(Rec)', colX(410), y, { size: 7, font: fontBold })
+          drawText('Vl.Pago', colX(515), y, {
+            size: 7,
+            font: fontBold,
+            align: 'right',
+          })
+
+          y -= 15
+
+          for (const s of settlements) {
+            checkPageBreak(15)
+            // Row Data
+            const dateStr = `${safeFormatDate(s.acertoDate)}`
+            const timeStr = s.acertoTime?.substring(0, 5) || ''
+            const empStr = (s.employee || '').split(' ')[0].substring(0, 10)
+            const clientStr = (s.clientName || '').substring(0, 18)
+            const payMethodBD = (s.paymentFormsBD || '').substring(0, 12)
+            const payMethodRec = s.payments
+              ? s.payments.map((p: any) => p.method).join(',')
+              : ''
+            const payMethodRecStr = payMethodRec.substring(0, 12)
+
+            drawText(`#${s.orderId}`, colX(0), y, { size: 7 })
+            drawText(`${dateStr} ${timeStr}`, colX(30), y, { size: 6 })
+            drawText(empStr, colX(80), y, { size: 7 })
+            drawText(String(s.clientCode), colX(140), y, { size: 7 })
+            drawText(clientStr, colX(170), y, { size: 7 })
+            drawText(formatCurrency(s.totalSalesValue), colX(330), y, {
+              size: 7,
+              align: 'right',
+            })
+            drawText(payMethodBD, colX(340), y, { size: 6 })
+            drawText(payMethodRecStr, colX(410), y, { size: 6 })
+            drawText(formatCurrency(s.totalPaid), colX(515), y, {
+              size: 7,
+              align: 'right',
+            })
+            y -= 12
+          }
+        }
+      }
     } else {
-      // Fallback for A4 or other types if necessary
-      // Assuming current logic is mostly Thermal 80mm based on User Story
-      drawText('Relatório não suportado neste formato.', margins.left, y)
+      drawText('Relatório não suportado.', margins.left, y)
     }
 
     const pdfBytes = await pdfDoc.save()

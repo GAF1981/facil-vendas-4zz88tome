@@ -28,7 +28,7 @@ import {
 import { inativarClientesService } from '@/services/inativarClientesService'
 import { InativarCliente } from '@/types/inativar_clientes'
 import { useToast } from '@/hooks/use-toast'
-import { Loader2, UserX, ArrowLeft, Trash2, CheckCircle } from 'lucide-react'
+import { Loader2, UserX, ArrowLeft, CheckCircle } from 'lucide-react'
 import { formatCurrency } from '@/lib/formatters'
 import { Link } from 'react-router-dom'
 import {
@@ -46,7 +46,6 @@ export default function InativarClientesPage() {
   const [historyData, setHistoryData] = useState<InativarCliente[]>([])
   const [loading, setLoading] = useState(true)
   const [targetClient, setTargetClient] = useState<InativarCliente | null>(null)
-  const [removeClient, setRemoveClient] = useState<InativarCliente | null>(null)
   const [modalClient, setModalClient] = useState<InativarCliente | null>(null)
   const { toast } = useToast()
 
@@ -163,28 +162,6 @@ export default function InativarClientesPage() {
     }
   }
 
-  const handleRemoveEntry = async () => {
-    if (!removeClient) return
-
-    try {
-      await inativarClientesService.removeEntry(removeClient.id)
-      toast({
-        title: 'Removido',
-        description:
-          'Registro removido da lista de pendências (Cliente não foi inativado).',
-      })
-      setRemoveClient(null)
-      loadData()
-    } catch (error) {
-      console.error(error)
-      toast({
-        title: 'Erro',
-        description: 'Falha ao remover registro.',
-        variant: 'destructive',
-      })
-    }
-  }
-
   // Helper to determine confirmation message
   const getConfirmationMessage = () => {
     if (!targetClient) return ''
@@ -220,8 +197,8 @@ export default function InativarClientesPage() {
             Lista de Inativação Pendente
           </CardTitle>
           <CardDescription>
-            Confirme a inativação ou remova da lista. Obrigatório confirmar a
-            retirada do expositor.
+            Confirme a inativação. Obrigatório confirmar a retirada do
+            expositor.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -245,9 +222,7 @@ export default function InativarClientesPage() {
                     <TableHead className="text-center w-[100px]">
                       Expositor
                     </TableHead>
-                    <TableHead className="text-center w-[120px]">
-                      Ações
-                    </TableHead>
+                    <TableHead className="text-center w-[80px]">Ação</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -292,7 +267,7 @@ export default function InativarClientesPage() {
                           </div>
                         </TableCell>
                         <TableCell className="text-center">
-                          <div className="flex justify-center gap-2">
+                          <div className="flex justify-center">
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
@@ -314,24 +289,6 @@ export default function InativarClientesPage() {
                                       ? 'Marque a retirada do expositor primeiro'
                                       : 'Confirmar Inativação'}
                                   </p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-8 w-8 text-muted-foreground hover:text-red-600"
-                                    onClick={() => setRemoveClient(row)}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Remover da Lista (Ignorar)</p>
                                 </TooltipContent>
                               </Tooltip>
                             </TooltipProvider>
@@ -385,30 +342,6 @@ export default function InativarClientesPage() {
               className="bg-red-600 hover:bg-red-700"
             >
               Sim, Confirmar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Remove Dialog */}
-      <AlertDialog
-        open={!!removeClient}
-        onOpenChange={(open) => !open && setRemoveClient(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remover da Lista?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Deseja remover <strong>{removeClient?.cliente_nome}</strong> da
-              lista de pendências
-              <strong> SEM inativar</strong> o cliente?
-              <br />O status do cliente permanecerá como está.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleRemoveEntry}>
-              Sim, Remover
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
