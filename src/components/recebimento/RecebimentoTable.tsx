@@ -7,12 +7,12 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Loader2, Printer } from 'lucide-react'
 import { formatCurrency, safeFormatDate } from '@/lib/formatters'
 import { RecebimentoInstallment } from '@/types/recebimento'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 
 interface RecebimentoTableProps {
   loading: boolean
@@ -47,20 +47,19 @@ export function RecebimentoTable({
             </TableHead>
             <TableHead className="w-[50px] text-center">Sel.</TableHead>
             <TableHead className="text-center">Status</TableHead>
-            <TableHead className="text-center">Ações</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {loading ? (
             <TableRow>
-              <TableCell colSpan={10} className="h-24 text-center">
+              <TableCell colSpan={9} className="h-24 text-center">
                 <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
               </TableCell>
             </TableRow>
           ) : installments.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={10}
+                colSpan={9}
                 className="h-24 text-center text-muted-foreground"
               >
                 Nenhuma parcela encontrada.
@@ -122,7 +121,23 @@ export function RecebimentoTable({
                     {formatCurrency(inst.valor_registrado || 0)}
                   </TableCell>
                   <TableCell className="text-right font-mono text-green-600">
-                    {formatCurrency(inst.valor_pago)}
+                    <div className="flex items-center justify-end gap-2">
+                      <span>{formatCurrency(inst.valor_pago)}</span>
+                      {inst.valor_pago > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 p-0 hover:bg-green-100 text-green-700"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onGenerateReceipt(inst)
+                          }}
+                          title="Imprimir Recibo 80mm"
+                        >
+                          <Printer className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-right font-mono font-bold text-red-600">
                     {formatCurrency(saldo)}
@@ -134,16 +149,6 @@ export function RecebimentoTable({
                     />
                   </TableCell>
                   <TableCell className="text-center">{statusBadge}</TableCell>
-                  <TableCell className="text-center">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => onGenerateReceipt(inst)}
-                      title="Gerar Comprovante"
-                    >
-                      <Printer className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-                    </Button>
-                  </TableCell>
                 </TableRow>
               )
             })

@@ -33,4 +33,5 @@ export interface RecebimentoRow {
 export interface RecebimentoInstallment extends RecebimentoRow {
   cliente_nome: string
   cliente_codigo: number
+  funcionario_nome?: string
 }

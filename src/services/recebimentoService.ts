@@ -142,7 +142,9 @@ export const recebimentoService = {
   ): Promise<RecebimentoInstallment[]> {
     let query = supabase
       .from('RECEBIMENTOS')
-      .select('*, CLIENTES(CODIGO, "NOME CLIENTE")')
+      .select(
+        '*, CLIENTES(CODIGO, "NOME CLIENTE"), FUNCIONARIOS(nome_completo)',
+      )
       .order('vencimento', { ascending: true })
       .limit(1000)
 
@@ -184,6 +186,7 @@ export const recebimentoService = {
       ...row,
       cliente_nome: row.CLIENTES?.['NOME CLIENTE'] || 'Desconhecido',
       cliente_codigo: row.CLIENTES?.CODIGO || 0,
+      funcionario_nome: row.FUNCIONARIOS?.nome_completo || 'N/D',
     })) as RecebimentoInstallment[]
 
     if (filters.status && filters.status !== 'TODOS') {
@@ -276,29 +279,37 @@ export const recebimentoService = {
   },
 
   async generateReceiptPdf(installment: RecebimentoInstallment) {
-    const balance = Math.max(
-      0,
-      (installment.valor_registrado || 0) - installment.valor_pago,
-    )
-
-    const receiptData = {
-      cliente_nome: installment.cliente_nome,
-      cliente_codigo: installment.cliente_codigo,
-      venda_id: installment.venda_id,
-      vencimento: installment.vencimento,
-      valor_registrado: installment.valor_registrado,
-      valor_pago: installment.valor_pago,
-      saldo: balance,
-      forma_pagamento: installment.forma_pagamento,
-      data_pagamento: installment.data_pagamento,
+    // Construct payload matching what generate-pdf expects for Thermal Receipts
+    const payload = {
+      reportType: 'receipt',
+      format: '80mm',
+      client: {
+        CODIGO: installment.cliente_codigo,
+        'NOME CLIENTE': installment.cliente_nome,
+      },
+      employee: {
+        nome_completo: installment.funcionario_nome || 'N/D',
+      },
+      date: installment.data_pagamento || installment.created_at,
+      orderNumber: installment.venda_id,
+      payments: [
+        {
+          method: installment.forma_pagamento,
+          paidValue: installment.valor_pago,
+        },
+      ],
+      valorPago: installment.valor_pago,
+      items: [], // Simplified receipt has no items
+      history: [],
+      // Use balance for remaining debt indication if needed
+      debito: Math.max(
+        0,
+        (installment.valor_registrado || 0) - installment.valor_pago,
+      ),
     }
 
     const { data, error } = await supabase.functions.invoke('generate-pdf', {
-      body: {
-        reportType: 'receipt',
-        format: '80mm',
-        data: receiptData,
-      },
+      body: payload,
     })
 
     if (error) throw error

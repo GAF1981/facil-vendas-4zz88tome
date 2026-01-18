@@ -25,6 +25,7 @@ import { cobrancaService } from '@/services/cobrancaService'
 import { useToast } from '@/hooks/use-toast'
 import { useState } from 'react'
 import { EditContactDialog } from './EditContactDialog'
+import { useNavigate } from 'react-router-dom'
 
 interface RotaMotoqueiroItem {
   clientId: number
@@ -57,12 +58,13 @@ export function RotaMotoqueiroCardItem({
   item,
   onConsult,
   onRegisterAction,
-  onRegisterReceipt,
+  // onRegisterReceipt prop is kept for interface compatibility but handler logic is replaced by navigation
 }: RotaMotoqueiroCardItemProps) {
   const isOverdue = item.status === 'VENCIDO'
   const isPaid = item.status === 'PAGO'
   const { toast } = useToast()
   const [generatingPdf, setGeneratingPdf] = useState(false)
+  const navigate = useNavigate()
 
   // Edit Dialog States
   const [editPhoneOpen, setEditPhoneOpen] = useState(false)
@@ -93,6 +95,10 @@ export function RotaMotoqueiroCardItem({
     } finally {
       setGeneratingPdf(false)
     }
+  }
+
+  const handleGoToReceipts = () => {
+    navigate(`/recebimento?search=${item.clientId}`)
   }
 
   return (
@@ -292,8 +298,8 @@ export function RotaMotoqueiroCardItem({
             <Button
               size="sm"
               className="flex-1 text-xs h-9 bg-green-600 hover:bg-green-700 px-0"
-              onClick={onRegisterReceipt}
-              title="Recebimento"
+              onClick={handleGoToReceipts}
+              title="Ir para Recebimentos"
             >
               <DollarSign className="w-4 h-4 mr-1.5" />
               Rec.

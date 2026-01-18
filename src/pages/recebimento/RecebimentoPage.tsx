@@ -11,10 +11,12 @@ import { useUserStore } from '@/stores/useUserStore'
 import { RecebimentoFilters } from '@/components/recebimento/RecebimentoFilters'
 import { RecebimentoTable } from '@/components/recebimento/RecebimentoTable'
 import { DateRange } from 'react-day-picker'
+import { useSearchParams } from 'react-router-dom'
 
 export default function RecebimentoPage() {
   const [loading, setLoading] = useState(true)
   const [installments, setInstallments] = useState<RecebimentoInstallment[]>([])
+  const [searchParams] = useSearchParams()
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('')
@@ -33,6 +35,15 @@ export default function RecebimentoPage() {
   const { toast } = useToast()
   const { user } = useAuth()
   const { employee } = useUserStore()
+
+  useEffect(() => {
+    const search = searchParams.get('search')
+    if (search) {
+      setSearchTerm(search)
+      // When coming from shortcut, usually one wants to see what is pending or everything for that client
+      // Default is PENDENTE, which is fine for 'paying'.
+    }
+  }, [searchParams])
 
   const loadData = async () => {
     setLoading(true)
@@ -146,16 +157,8 @@ export default function RecebimentoPage() {
       const blob = await recebimentoService.generateReceiptPdf(inst)
 
       const url = window.URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.setAttribute(
-        'download',
-        `Recibo_${inst.id}_${inst.cliente_nome}.pdf`,
-      )
-      document.body.appendChild(link)
-      link.click()
-      link.parentNode?.removeChild(link)
-      window.URL.revokeObjectURL(url)
+      window.open(url, '_blank') // Open in new tab/window for printing
+      setTimeout(() => window.URL.revokeObjectURL(url), 1000)
     } catch (error) {
       console.error(error)
       toast({
