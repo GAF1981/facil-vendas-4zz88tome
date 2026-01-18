@@ -1979,6 +1979,7 @@ export type Database = {
           created_at: string | null
           funcionario_id: number | null
           id: number
+          id_estoque_carro: number | null
           produto_id: number | null
           quantidade: number
           session_id: number | null
@@ -1988,6 +1989,7 @@ export type Database = {
           created_at?: string | null
           funcionario_id?: number | null
           id?: number
+          id_estoque_carro?: number | null
           produto_id?: number | null
           quantidade: number
           session_id?: number | null
@@ -1997,12 +1999,20 @@ export type Database = {
           created_at?: string | null
           funcionario_id?: number | null
           id?: number
+          id_estoque_carro?: number | null
           produto_id?: number | null
           quantidade?: number
           session_id?: number | null
           TIPO?: string
         }
         Relationships: [
+          {
+            foreignKeyName: 'fk_reposicao_estoque_carro'
+            columns: ['id_estoque_carro']
+            isOneToOne: false
+            referencedRelation: 'ID ESTOQUE CARRO'
+            referencedColumns: ['id']
+          },
           {
             foreignKeyName: 'REPOSIÇÃO E DEVOLUÇÃO_funcionario_id_fkey'
             columns: ['funcionario_id']

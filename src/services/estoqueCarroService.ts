@@ -169,12 +169,13 @@ export const estoqueCarroService = {
     repoData?.forEach((row) => {
       if (!row.produto_id) return
 
-      if (row.TIPO === 'REPOSIÇÃO') {
+      // Support both new (REPOSICAO) and legacy (REPOSIÇÃO) types
+      if (row.TIPO === 'REPOSIÇÃO' || row.TIPO === 'REPOSICAO') {
         stockToCarMap.set(
           row.produto_id,
           (stockToCarMap.get(row.produto_id) || 0) + row.quantidade,
         )
-      } else if (row.TIPO === 'DEVOLUÇÃO') {
+      } else if (row.TIPO === 'DEVOLUÇÃO' || row.TIPO === 'DEVOLUCAO') {
         carToStockMap.set(
           row.produto_id,
           (carToStockMap.get(row.produto_id) || 0) + row.quantidade,
@@ -273,17 +274,19 @@ export const estoqueCarroService = {
       .eq('id_estoque_carro', sessionId)
       .eq('produto_id', productId)
 
-    const inventoryMovements = (repoData || []).map((d) => ({
-      ...d,
-      movement_type:
-        d.TIPO === 'REPOSIÇÃO'
-          ? 'ENTRADAS_estoque_carro'
-          : 'SAIDAS_carro_estoque',
-      // Map quantity dynamically based on type for UI consistency if needed
-      [d.TIPO === 'REPOSIÇÃO'
+    const inventoryMovements = (repoData || []).map((d) => {
+      // Determine movement type safely handling accents and case
+      const isReposicao = d.TIPO === 'REPOSIÇÃO' || d.TIPO === 'REPOSICAO'
+      const typeKey = isReposicao
         ? 'ENTRADAS_estoque_carro'
-        : 'SAIDAS_carro_estoque']: d.quantidade,
-    }))
+        : 'SAIDAS_carro_estoque'
+
+      return {
+        ...d,
+        movement_type: typeKey,
+        [typeKey]: d.quantidade,
+      }
+    })
 
     return [...clientToCar, ...carToClient, ...inventoryMovements].sort(
       (a, b) =>

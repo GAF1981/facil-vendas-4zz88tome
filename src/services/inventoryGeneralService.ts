@@ -234,7 +234,7 @@ export const inventoryGeneralService = {
         await estoqueCarroService.getActiveSession(employeeId)
       if (!activeSession) {
         throw new Error(
-          'Ação não permitida: O funcionário selecionado não possui um ID ESTOQUE CARRO ativo.',
+          'Não é possível registrar movimentação: O funcionário não possui um ID ESTOQUE CARRO ativo.',
         )
       }
 
@@ -266,16 +266,15 @@ export const inventoryGeneralService = {
         funcionario_id: i.extra?.funcionarioId,
         produto_id: i.productId,
         quantidade: i.quantity,
-        TIPO: type === 'ESTOQUE_PARA_CARRO' ? 'REPOSIÇÃO' : 'DEVOLUÇÃO',
+        TIPO: type === 'ESTOQUE_PARA_CARRO' ? 'REPOSICAO' : 'DEVOLUCAO', // Uppercase, no accents
       }))
 
       const { error: repoError } = await supabase
         .from('REPOSIÇÃO E DEVOLUÇÃO')
-        .insert(repoItems as any) // Casting as types might not be regenerated immediately
+        .insert(repoItems as any)
 
       if (repoError) {
         console.error('Error syncing to REPOSIÇÃO E DEVOLUÇÃO:', repoError)
-        // Should we fail hard? Acceptance criteria implies robust sync.
         throw repoError
       }
     } else if (type === 'CONTAGEM') {
@@ -380,15 +379,6 @@ export const inventoryGeneralService = {
         if ('valor_unitario' in existing)
           insertData.valor_unitario = existing.valor_unitario
       }
-
-      // If we are updating Car/Stock movements, we should also check active session and update/insert to REPOSIÇÃO E DEVOLUÇÃO
-      // This is complex for updates as we might need to find the specific record in REPOSIÇÃO E DEVOLUÇÃO.
-      // However, typical flow via InventoryActionDialog uses registerMovement which we updated.
-      // updateItemQuantity is used for inline edits in the table.
-      // If we support inline edits for Car Movements, we should strictly speaking implement the logic here too.
-      // For now, based on the user story focusing on "submission" which usually implies the dialog/action flow, registerMovement is key.
-      // If needed, we can block updates here too if no active session, but for updates (edits) of past records, validation might be tricky.
-      // Assuming registerMovement covers the main "Action" flow described in the story.
 
       await supabase.from(table).insert(insertData)
     }
