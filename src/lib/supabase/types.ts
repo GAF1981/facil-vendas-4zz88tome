@@ -1418,6 +1418,7 @@ export type Database = {
       }
       fechamento_caixa: {
         Row: {
+          boleto_aprovado: boolean | null
           cheque_aprovado: boolean | null
           created_at: string
           desconto_total: number | null
@@ -1432,6 +1433,7 @@ export type Database = {
           saldo_acerto_aprovado: boolean | null
           status: string | null
           valor_a_receber: number | null
+          valor_boleto: number | null
           valor_cheque: number | null
           valor_despesas: number | null
           valor_dinheiro: number | null
@@ -1439,6 +1441,7 @@ export type Database = {
           venda_total: number | null
         }
         Insert: {
+          boleto_aprovado?: boolean | null
           cheque_aprovado?: boolean | null
           created_at?: string
           desconto_total?: number | null
@@ -1453,6 +1456,7 @@ export type Database = {
           saldo_acerto_aprovado?: boolean | null
           status?: string | null
           valor_a_receber?: number | null
+          valor_boleto?: number | null
           valor_cheque?: number | null
           valor_despesas?: number | null
           valor_dinheiro?: number | null
@@ -1460,6 +1464,7 @@ export type Database = {
           venda_total?: number | null
         }
         Update: {
+          boleto_aprovado?: boolean | null
           cheque_aprovado?: boolean | null
           created_at?: string
           desconto_total?: number | null
@@ -1474,6 +1479,7 @@ export type Database = {
           saldo_acerto_aprovado?: boolean | null
           status?: string | null
           valor_a_receber?: number | null
+          valor_boleto?: number | null
           valor_cheque?: number | null
           valor_despesas?: number | null
           valor_dinheiro?: number | null

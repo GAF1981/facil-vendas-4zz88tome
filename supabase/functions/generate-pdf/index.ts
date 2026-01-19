@@ -80,29 +80,34 @@ Deno.serve(async (req) => {
         const settlementsCount = body.settlements ? body.settlements.length : 0
         // Base size + dynamic items
         estimatedHeight = 500 + expensesCount * 25 + settlementsCount * 80
-      } else if (reportType === 'receipt') {
-        estimatedHeight = 400
-      } else if (!reportType || reportType === 'acerto') {
+      } else if (
+        !reportType ||
+        reportType === 'acerto' ||
+        reportType === 'receipt'
+      ) {
         const itemsCount = body.items ? body.items.length : 0
         const historyCount = body.history ? body.history.length : 0
-        const paymentsCount = body.payments ? body.payments.length : 0
+        const payments = body.payments || []
+
+        // Calculate flattened installments count for height
         let installmentsCount = 0
-        if (body.payments) {
-          body.payments.forEach((p: any) => {
-            if (p.details) installmentsCount += p.details.length
-            else installmentsCount += 1
-          })
-        }
+        payments.forEach((p: any) => {
+          if (p.details && Array.isArray(p.details)) {
+            installmentsCount += p.details.length
+          } else {
+            installmentsCount += 1
+          }
+        })
+
         estimatedHeight =
-          450 +
-          itemsCount * 100 +
-          paymentsCount * 40 +
-          installmentsCount * 30 +
-          historyCount * 160 +
-          300
+          500 + // Base header/footer
+          itemsCount * 80 + // Product items (approx 5-6 lines each)
+          installmentsCount * 20 + // Payment lines
+          historyCount * 120 + // History blocks
+          300 // Buffer
 
         // Add extra space for signature if present
-        if (signature) estimatedHeight += 100
+        if (signature) estimatedHeight += 150
       }
 
       page = pdfDoc.addPage([226, Math.max(400, estimatedHeight)])
@@ -140,7 +145,7 @@ Deno.serve(async (req) => {
         maxWidth = undefined,
       } = options
 
-      const finalFont = isThermal ? fontBold : font
+      const finalFont = isThermal ? fontBold : font // Use Bold for thermal for clarity
       const finalColor = isThermal ? rgb(0, 0, 0) : color
       const cleanText = removeAccents(text || '')
       let textToDraw = cleanText
@@ -184,6 +189,8 @@ Deno.serve(async (req) => {
     const checkPageBreak = (spaceNeeded: number) => {
       if (y - spaceNeeded < margins.bottom) {
         if (isThermal) {
+          // For thermal, we usually extend the page or just let it be long,
+          // but if we must break, add new page with same width
           page = pdfDoc.addPage([width, height])
         } else {
           page = pdfDoc.addPage()
@@ -198,6 +205,7 @@ Deno.serve(async (req) => {
       reportType === 'closing-confirmation' ||
       reportType === 'employee-cash-summary'
     ) {
+      // ... (Existing closing confirmation logic remains unchanged) ...
       const { fechamento, date: closingDate, expenses, settlements } = body
       const closingData = fechamento || body.data
       if (!closingData) throw new Error('No closing data provided')
@@ -340,7 +348,7 @@ Deno.serve(async (req) => {
       isThermal &&
       (!reportType || reportType === 'acerto' || reportType === 'receipt')
     ) {
-      // Existing Thermal Receipt Logic
+      // NEW "ACERTO" RECEIPT LOGIC
       const {
         client,
         employee,
@@ -350,18 +358,20 @@ Deno.serve(async (req) => {
         totalVendido = 0,
         valorDesconto = 0,
         valorAcerto = 0,
-        valorPago = 0,
-        debito = 0,
+        valorPago = 0, // "Valor Total Pago (Hoje)"
+        debito = 0, // "RESTANTE (DEBITO)"
         payments = [],
         history = [],
+        issuerName,
       } = body
 
-      const sellerName = employee?.nome_completo || 'N/D'
+      const sellerName = issuerName || employee?.nome_completo || 'N/D'
       const clientName = client?.['NOME CLIENTE'] || 'Consumidor'
       const clientCode = client?.CODIGO || '0'
       const clientAddress = `${client?.ENDEREÇO || ''}, ${client?.BAIRRO || ''}`
       const clientCity = `${client?.MUNICÍPIO || ''}`
 
+      // --- HEADER ---
       drawText('FACIL VENDAS', width / 2, y, {
         size: 16,
         font: fontBold,
@@ -377,6 +387,7 @@ Deno.serve(async (req) => {
       drawLine(y)
       y -= 15
 
+      // --- CLIENT INFO ---
       const infoSize = 9
       drawText(`Cliente: ${clientCode} - ${clientName}`, margins.left, y, {
         size: infoSize,
@@ -406,7 +417,7 @@ Deno.serve(async (req) => {
       drawLine(y)
       y -= 15
 
-      // ITEMS
+      // --- ITENS DO PEDIDO ---
       drawText('ITENS DO PEDIDO', width / 2, y, {
         size: 10,
         font: fontBold,
@@ -416,16 +427,14 @@ Deno.serve(async (req) => {
 
       for (const item of items) {
         checkPageBreak(100)
+        // Product Name and Price line
+        // Format: NAME R$ PRICE R$ PRICE(Total?? No, format in image: "LIVRO... R$ 99,99")
+        // Just Name and Unit Price usually sufficient, or Name + Unit Price
         const priceStr = `R$ ${formatCurrency(item.precoUnitario)}`
-        drawText(`${item.produtoNome}`, margins.left, y, {
+        drawText(`${item.produtoNome} ${priceStr}`, margins.left, y, {
           size: 9,
           font: fontBold,
-          maxWidth: width - 80,
-        })
-        drawText(priceStr, width - margins.right, y, {
-          size: 9,
-          font: fontBold,
-          align: 'right',
+          maxWidth: width - 20,
         })
         y -= 12
 
@@ -455,7 +464,7 @@ Deno.serve(async (req) => {
       drawLine(y)
       y -= 15
 
-      // TOTALS
+      // --- TOTALS ---
       const drawTotal = (label: string, val: number, isBig = false) => {
         const f = isBig ? fontBold : fontRegular
         drawText(label, margins.left, y, { size: 9, font: f })
@@ -475,32 +484,115 @@ Deno.serve(async (req) => {
       drawLine(y)
       y -= 15
 
-      // PAGAMENTOS (Simplified for receipt)
+      // --- PAGAMENTOS (IMMEDIATE) ---
+      drawText('PAGAMENTOS', width / 2, y, {
+        size: 10,
+        font: fontBold,
+        align: 'center',
+      })
+      y -= 15
+
+      // Flatten logic: Extract all payment details/parts
+      // Identify immediate vs future
+      const immediatePayments: any[] = []
+      const futureInstallments: any[] = []
+
+      // Normalize payments input
+      const allPaymentParts: any[] = []
       if (payments && payments.length > 0) {
-        drawText('PAGAMENTOS', width / 2, y, {
-          size: 10,
-          font: fontBold,
-          align: 'center',
-        })
-        y -= 15
         payments.forEach((p: any) => {
-          if (p.paidValue > 0) {
-            drawText(`${p.method}`, margins.left, y, { size: 9 })
-            drawText(
-              `R$ ${formatCurrency(p.paidValue)}`,
-              width - margins.right,
-              y,
-              { size: 9, align: 'right' },
-            )
-            y -= 12
+          if (p.details && Array.isArray(p.details) && p.details.length > 0) {
+            p.details.forEach((d: any) => {
+              allPaymentParts.push({ ...d, method: p.method })
+            })
+          } else {
+            // Flat entry
+            allPaymentParts.push(p)
           }
         })
-        y -= 5
-        drawLine(y)
-        y -= 15
       }
 
-      // SUMMARY
+      allPaymentParts.forEach((p) => {
+        if ((p.paidValue || 0) > 0) {
+          immediatePayments.push(p)
+        }
+        // If it has registered value (value > 0), it's part of the plan (A PAGAR)
+        // Usually "A PAGAR" lists the full schedule.
+        if ((p.value || 0) > 0) {
+          futureInstallments.push(p)
+        }
+      })
+
+      if (immediatePayments.length > 0) {
+        immediatePayments.forEach((p) => {
+          drawText(
+            `${p.method} - ${safeFormatDate(p.dueDate || date)}`,
+            margins.left,
+            y,
+            { size: 9 },
+          )
+          drawText(
+            `R$ ${formatCurrency(p.paidValue)}`,
+            width - margins.right,
+            y,
+            { size: 9, align: 'right' },
+          )
+          y -= 12
+        })
+      } else {
+        drawText('Nenhum pagamento imediato.', margins.left, y, { size: 9 })
+        y -= 12
+      }
+      y -= 5
+      drawLine(y)
+      y -= 15
+
+      // --- A PAGAR (INSTALLMENTS) ---
+      drawText('A PAGAR', width / 2, y, {
+        size: 10,
+        font: fontBold,
+        align: 'center',
+      })
+      y -= 15
+
+      if (futureInstallments.length > 0) {
+        // Group by method to determine (X/Y)
+        const grouped: Record<string, any[]> = {}
+        futureInstallments.forEach((p) => {
+          if (!grouped[p.method]) grouped[p.method] = []
+          grouped[p.method].push(p)
+        })
+
+        // Iterate groups and sort by date
+        Object.entries(grouped).forEach(([method, parts]) => {
+          parts.sort((a, b) => {
+            const dA = new Date(a.dueDate || '2099-01-01').getTime()
+            const dB = new Date(b.dueDate || '2099-01-01').getTime()
+            return dA - dB
+          })
+
+          parts.forEach((p, idx) => {
+            // Format: "Boleto (1/1) - 17/01/2026"
+            const label = `${method} (${idx + 1}/${parts.length}) - ${safeFormatDate(p.dueDate)}`
+            drawText(label, margins.left, y, { size: 9, font: fontBold })
+            drawText(
+              `R$ ${formatCurrency(p.value)}`,
+              width - margins.right,
+              y,
+              { size: 9, align: 'right', font: fontBold },
+            )
+            y -= 12
+          })
+        })
+      } else {
+        drawText('Nenhuma parcela futura.', margins.left, y, { size: 9 })
+        y -= 12
+      }
+      y -= 5
+      drawLine(y)
+      y -= 15
+
+      // --- RESUMO FINANCEIRO (HOJE) ---
       drawText('RESUMO FINANCEIRO', margins.left, y, {
         size: 9,
         font: fontBold,
@@ -529,8 +621,78 @@ Deno.serve(async (req) => {
       drawLine(y)
       y -= 15
 
-      // SIGNATURE LOGIC
-      // If signature is provided, embed and draw it
+      // --- RESUMO DE ACERTOS (HISTORICO) ---
+      drawText('RESUMO DE ACERTOS (HISTORICO)', width / 2, y, {
+        size: 10,
+        font: fontBold,
+        align: 'center',
+      })
+      y -= 15
+
+      if (history && history.length > 0) {
+        history.forEach((h: any) => {
+          checkPageBreak(120) // Ensure block fits
+          // Data: 17/01/2026 (Right aligned)
+          drawText('Data:', margins.left, y, { size: 9, font: fontBold })
+          drawText(
+            safeFormatDate(h.data),
+            width - margins.right,
+            y,
+            { size: 9, align: 'right', font: fontBold }, // Bold Date
+          )
+          y -= 12
+
+          const drawHistRow = (label: string, val: any, boldVal = false) => {
+            drawText(label, margins.left, y, { size: 9 })
+            drawText(
+              typeof val === 'number'
+                ? `R$ ${formatCurrency(val)}`
+                : String(val),
+              width - margins.right,
+              y,
+              {
+                size: 9,
+                align: 'right',
+                font: boldVal ? fontBold : fontRegular,
+              },
+            )
+            y -= 12
+          }
+
+          drawHistRow('Venda:', h.valorVendaTotal)
+          drawHistRow('Desconto:', h.desconto)
+          drawHistRow('A pagar:', h.saldoAPagar)
+          drawHistRow('Pago:', h.valorPago)
+          drawHistRow('Debito:', h.debito)
+
+          // Seller line
+          drawText('Vendedor:', margins.left, y, { size: 9 })
+          drawText(h.vendedor || '-', width - margins.right, y, {
+            size: 9,
+            align: 'right',
+            maxWidth: 120,
+          })
+          y -= 12
+
+          drawHistRow('Media Mensal:', h.mediaMensal)
+
+          // Order ID
+          drawText('Pedido:', margins.left, y, { size: 9, font: fontBold })
+          drawText(`#${h.id}`, width - margins.right, y, {
+            size: 9,
+            align: 'right',
+            font: fontBold,
+          })
+          y -= 15 // Spacing between blocks
+        })
+      } else {
+        drawText('Nenhum histórico disponível.', margins.left, y, { size: 9 })
+        y -= 15
+      }
+      drawLine(y)
+      y -= 25
+
+      // --- SIGNATURE ---
       checkPageBreak(100) // Ensure space for signature
 
       if (signature) {
