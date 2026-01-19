@@ -55,7 +55,7 @@ export interface DebitoReportRow {
 }
 
 export const reportsService = {
-  // ... (keep existing methods like getProjectionsReport, getTopSellingItems, getInitialBalanceAdjustments)
+  // ... (keep existing methods like getProjectionsReport, getInitialBalanceAdjustments)
   async getProjectionsReport(): Promise<ProjectionReportRow[]> {
     const { data, error } = await supabase
       .from('BANCO_DE_DADOS')
@@ -178,13 +178,51 @@ export const reportsService = {
     startDate: string,
     endDate: string,
   ): Promise<TopSellingItem[]> {
-    const { data, error } = await supabase.rpc('get_top_selling_items', {
-      start_date: startDate,
-      end_date: endDate,
-    })
+    // Implementing client-side aggregation to ensure robust string-to-number casting
+    // as per acceptance criteria, instead of relying on a potentially outdated RPC.
+
+    const { data, error } = await supabase
+      .from('BANCO_DE_DADOS')
+      .select(
+        '"COD. PRODUTO", MERCADORIA, "QUANTIDADE VENDIDA", "VALOR VENDIDO", "DATA DO ACERTO"',
+      )
+      .gte('"DATA DO ACERTO"', startDate)
+      .lte('"DATA DO ACERTO"', endDate)
+      .not('"COD. PRODUTO"', 'is', null)
 
     if (error) throw error
-    return data as TopSellingItem[]
+
+    const aggregationMap = new Map<number, TopSellingItem>()
+
+    data?.forEach((row: any) => {
+      const codigo = row['COD. PRODUTO']
+      if (!codigo) return
+
+      const qtdStr = String(row['QUANTIDADE VENDIDA'] || '0')
+      const valStr = String(row['VALOR VENDIDO'] || '0')
+
+      // Robust casting logic
+      const qtd = parseFloat(qtdStr.replace(',', '.') || '0') || 0
+      const val = parseCurrency(valStr)
+
+      if (!aggregationMap.has(codigo)) {
+        aggregationMap.set(codigo, {
+          produto_codigo: codigo,
+          produto_nome: row.MERCADORIA || 'Produto Desconhecido',
+          quantidade_total: 0,
+          valor_total: 0,
+        })
+      }
+
+      const item = aggregationMap.get(codigo)!
+      item.quantidade_total += qtd
+      item.valor_total += val
+    })
+
+    // Convert map to array and sort by Total Value descending
+    return Array.from(aggregationMap.values()).sort(
+      (a, b) => b.valor_total - a.valor_total,
+    )
   },
 
   async getInitialBalanceAdjustments(): Promise<AdjustmentReportRow[]> {
@@ -203,7 +241,6 @@ export const reportsService = {
     if (error) throw error
   },
 
-  // Crucial function for Immediate Order Synchronization
   async updateDebtHistoryForOrder(orderId: number) {
     const { error } = await supabase.rpc('update_debito_historico_order', {
       p_pedido_id: orderId,
@@ -213,7 +250,6 @@ export const reportsService = {
         `Failed to auto-update debt history for order ${orderId}`,
         error,
       )
-      // Throwing error to allow caller to handle it (e.g., showing a warning toast)
       throw error
     }
   },

@@ -55,9 +55,10 @@ export const acertoService = {
       {
         body: {
           ...data,
+          reportType: 'acerto', // Explicitly type as acerto for edge function routing
           preview: options?.preview ?? false,
           signature: options?.signature ?? null,
-          format: options?.format ?? 'A4',
+          format: options?.format ?? '80mm',
         },
         responseType: 'blob', // Important for file download
       } as any,
@@ -70,7 +71,7 @@ export const acertoService = {
   async reprintOrder(
     orderId: number,
     issuerName?: string,
-    format: 'A4' | '80mm' = '80mm', // Default to 80mm as per requirement
+    format: 'A4' | '80mm' = '80mm',
   ) {
     return this.generateDocument(
       orderId,
@@ -121,24 +122,14 @@ export const acertoService = {
       funcionarioName = first['FUNCIONÁRIO'] || 'Não identificado'
       descontoStr = first['DESCONTO POR GRUPO'] || '0'
 
-      // Robust Date Logic to prevent Timezone Shifts
-      // Priority 1: Use DATA E HORA (ISO String) if available
       if (first['DATA E HORA']) {
         dateStr = first['DATA E HORA']
-      }
-      // Priority 2: Construct ISO from legacy Date + Time columns
-      else if (first['DATA DO ACERTO']) {
+      } else if (first['DATA DO ACERTO']) {
         const d = first['DATA DO ACERTO']
         const t = first['HORA DO ACERTO'] || '12:00:00'
         try {
-          // Combining Date and Time string creates a local time representation in browser
-          // toISOString() then correctly converts it to UTC, preserving the moment in time
           dateStr = new Date(`${d}T${t}`).toISOString()
         } catch (e) {
-          console.warn(
-            'Error constructing date from parts, defaulting to now',
-            e,
-          )
           dateStr = new Date().toISOString()
         }
       }
@@ -158,7 +149,6 @@ export const acertoService = {
 
     // Fetch History
     const history = await bancoDeDadosService.getHistoryForPdf(clientId)
-    // Filter out current order if it appears in history to avoid duplication in "Previous History" section
     const recentHistory = history.filter((h) => h.id !== orderId)
     const lastOrder = recentHistory.length > 0 ? recentHistory[0] : null
 
@@ -179,21 +169,15 @@ export const acertoService = {
       saldoFinal: item['SALDO FINAL'] || 0,
     }))
 
-    const payments: PaymentEntry[] = dbPayments.map((p) => {
+    // Important: Reconstruct payments structure from DB records
+    // Group by method to re-create structure or pass flat
+    const payments: any[] = dbPayments.map((p) => {
       return {
         method: p.forma_pagamento as any,
         value: p.valor_registrado || 0,
         paidValue: p.valor_pago || 0,
-        installments: 1, // Defaulting to 1 for flat list, but if logic allows deduction...
         dueDate: p.vencimento ? p.vencimento.split('T')[0] : '',
-        details: [
-          {
-            number: 1,
-            value: p.valor_registrado || 0,
-            paidValue: p.valor_pago || 0,
-            dueDate: p.vencimento ? p.vencimento.split('T')[0] : '',
-          },
-        ],
+        details: [], // Flat structure for reprinting usually fine for template
       }
     })
 

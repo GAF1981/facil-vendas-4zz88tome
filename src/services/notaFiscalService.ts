@@ -182,34 +182,39 @@ export const notaFiscalService = {
     const valorDesconto = totalVendido * discountFactor
     const totalAPagar = totalVendido - valorDesconto
 
-    // Process Payments
-    let payments: PaymentEntry[] = []
-    if (first.DETALHES_PAGAMENTO && Array.isArray(first.DETALHES_PAGAMENTO)) {
-      payments = first.DETALHES_PAGAMENTO as PaymentEntry[]
-    }
-    const valorPago = payments.reduce((acc, p) => acc + (p.paidValue || 0), 0)
-    const debito = Math.max(0, totalAPagar - valorPago)
-
     // Map data to expected format for PDF
     const items = itemsData.map((item) => {
+      const saldoInicial = item['SALDO INICIAL'] || 0
+      const contagem = item['CONTAGEM'] || 0
+      const saldoFinal = item['SALDO FINAL'] || 0
+      const diff = saldoFinal - contagem
+
+      let novasConsignacoes = 0
+      let recolhido = 0
+
+      if (diff > 0) {
+        novasConsignacoes = diff
+      } else {
+        recolhido = Math.abs(diff)
+      }
+
       return {
         codigo: item['COD. PRODUTO'],
         produtoNome: item['MERCADORIA'] || 'Produto sem nome',
-        precoUnitario: parseCurrency(item['PREÇO VENDIDO']),
-        saldoInicial: item['SALDO INICIAL'] || 0,
-        contagem: item['CONTAGEM'] || 0,
+        tipo: item['TIPO'] || '-',
+        saldoInicial: saldoInicial,
+        contagem: contagem,
         quantVendida: parseCurrency(item['QUANTIDADE VENDIDA']),
         valorVendido: parseCurrency(item['VALOR VENDIDO']),
-        saldoFinal: item['SALDO FINAL'] || 0,
-        tipo: item['TIPO'] || '-',
-        novasConsignacoes: parseCurrency(item['NOVAS CONSIGNAÇÕES']),
-        recolhido: parseCurrency(item['RECOLHIDO']),
+        saldoFinal: saldoFinal,
+        novasConsignacoes: novasConsignacoes,
+        recolhido: recolhido,
       }
     })
 
     // Construct Payload for Edge Function
     const payload = {
-      reportType: 'detailed-order-report', // CHANGED to specific report type
+      reportType: 'detailed-order-report', // A4 Detailed Report
       format: 'A4',
       client: {
         'NOME CLIENTE': clientData?.['NOME CLIENTE'] || first['CLIENTE'],
@@ -230,11 +235,7 @@ export const notaFiscalService = {
       orderNumber: orderId,
       totalVendido,
       valorDesconto,
-      valorAcerto: totalAPagar,
-      valorPago,
-      debito,
-      payments,
-      history: [],
+      totalAPagar, // Changed field name to match requirement
     }
 
     const { data: pdfBlob, error: pdfError } = await supabase.functions.invoke(

@@ -55,18 +55,16 @@ export function AcertoPaymentSummary({
     hasZeroDownPayment: boolean,
   ): number => {
     if (isReceiptMode) {
-      // In receipt mode, restricted methods are strictly fully paid or strictly valid
       if (isRestrictedMethod(method)) return value
-      return value // Default assumption for receipts
+      return value
     } else {
       // Acerto (Sales) Mode
       if (method === 'Boleto') return 0
 
-      // NEW LOGIC: Cheque is always treated as Paid Value regardless of date
+      // Cheque Rule: Consider full amount as Paid Value immediately
       if (method === 'Cheque') return value
 
-      // For Pix, Dinheiro
-      // Check if Future Date
+      // For Pix, Dinheiro: Check if Future Date
       const today = startOfDay(new Date())
       const due = parseISO(dueDateStr)
       // If due date is strictly after today, it is NOT paid immediately
@@ -96,17 +94,13 @@ export function AcertoPaymentSummary({
     let effectiveCount = count
 
     // Logic for Sales (Acerto) - NOT Receipt Mode
+    // For Cash/Pix, reduce effective count if zero down payment
     if (
       !isReceiptMode &&
       hasZeroDownPayment &&
       (method === 'Pix' || method === 'Dinheiro')
     ) {
       effectiveCount = count - 1
-    }
-
-    // In Receipt Mode for restricted methods, count is always 1 (enforced by caller/UI)
-    if (isRestrictedMethod(method)) {
-      effectiveCount = 1
     }
 
     if (effectiveCount < 1) effectiveCount = 1
@@ -117,8 +111,10 @@ export function AcertoPaymentSummary({
     const totalDistributed = installmentValue * effectiveCount
     const remainder = Number((totalValue - totalDistributed).toFixed(2))
 
+    // For Cheque: We assume installments divide the total value equally regardless of "Paid" status
+    // Since Cheque is "Paid Immediately", the installments just represent the checks themselves.
+
     // Determine initial date logic
-    // Ensure we use Noon to avoid timezone issues when converting to string
     const start = new Date(baseDate + 'T12:00:00')
 
     return Array.from({ length: count }, (_, i) => {
@@ -136,27 +132,17 @@ export function AcertoPaymentSummary({
         }
       } else {
         // Sales (Acerto) Mode Logic
-        if (isEntry && (method === 'Pix' || method === 'Dinheiro')) {
+        if (method === 'Cheque') {
+          // Cheque installments: Just regular division, add remainder to last
+          if (i === count - 1) value += remainder
+        } else if (isEntry && (method === 'Pix' || method === 'Dinheiro')) {
           if (hasZeroDownPayment) {
             value = 0
           }
         } else {
-          if (
-            hasZeroDownPayment &&
-            (method === 'Pix' || method === 'Dinheiro')
-          ) {
-            // Distribute remainder on last
-            if (i === count - 1) value += remainder
-          } else {
-            if (i === count - 1) value += remainder
-          }
+          // Add remainder to last
+          if (i === count - 1) value += remainder
         }
-      }
-
-      // Special handling for Cheque distribution of remainder if not handled above
-      // For Cheque, we just distribute normally (equal parts + remainder on last)
-      if (method === 'Cheque' && !isReceiptMode) {
-        if (i === count - 1) value += remainder
       }
 
       // Calculate Paid Value dynamically
@@ -185,8 +171,7 @@ export function AcertoPaymentSummary({
       const today = new Date()
       const dueDate = format(today, 'yyyy-MM-dd')
 
-      // Receipt Mode Constraint: Force 1x
-      const installments = isRestrictedMethod(method) ? 1 : 1
+      const installments = 1
 
       const details = generateInstallments(
         defaultValue,
@@ -234,27 +219,24 @@ export function AcertoPaymentSummary({
     onPaymentsChange(
       payments.map((p) => {
         if (p.method !== method) return p
-        if (field === 'paidValue') return p // Paid value is calculated
+        if (field === 'paidValue') return p
 
-        // Receipt Mode Constraint: Installments
         if (
           field === 'installments' &&
           isRestrictedMethod(method) &&
           value > 1
         ) {
-          return p // Ignore attempts to increase installments
+          return p
         }
 
         let updatedValue = value
 
-        // Receipt Mode Constraint: Date
         if (field === 'dueDate' && isRestrictedMethod(method)) {
           updatedValue = validateDate(value as string, method)
         }
 
         const updated = { ...p, [field]: updatedValue }
 
-        // Recalculate details if any structural field changes
         if (
           field === 'dueDate' ||
           field === 'value' ||
@@ -293,7 +275,6 @@ export function AcertoPaymentSummary({
             newDetails.reduce((acc, d) => acc + d.paidValue, 0).toFixed(2),
           )
 
-          // Sync first installment date to main date if applicable
           if ((count === 1 || zeroDown) && newDetails.length > 0) {
             updated.dueDate = newDetails[0].dueDate
           }
@@ -317,12 +298,10 @@ export function AcertoPaymentSummary({
         if (p.method !== method || !p.details) return p
 
         let updatedValue = value
-        // Receipt Mode Constraint: Date
         if (field === 'dueDate' && isRestrictedMethod(method)) {
           updatedValue = validateDate(value as string, method)
         }
 
-        // If updating main date via first installment (when synced)
         if (field === 'dueDate' && index === 0) {
           const shouldSyncMain =
             (method === 'Boleto' ||
@@ -332,10 +311,7 @@ export function AcertoPaymentSummary({
           const isSemEntrada = p.hasZeroDownPayment
 
           if (shouldSyncMain || isSemEntrada) {
-            // Need to regenerate all to keep shifts correct if logic depended on start date
-            // For simplicity, just update logic here
             const updated = { ...p, dueDate: updatedValue as string }
-            // Let's regenerate to be safe and consistent with generateInstallments logic
             const newDetails = generateInstallments(
               p.value,
               p.installments,
@@ -354,7 +330,6 @@ export function AcertoPaymentSummary({
         const newDetails = [...p.details]
         const currentDetail = { ...newDetails[index], [field]: updatedValue }
 
-        // Recalculate paidValue for this installment if date changed
         if (field === 'dueDate') {
           currentDetail.paidValue = calculatePaidValue(
             method,
@@ -365,7 +340,6 @@ export function AcertoPaymentSummary({
           )
         }
 
-        // If value changed, update paidValue too
         if (field === 'value') {
           currentDetail.paidValue = calculatePaidValue(
             method,
@@ -506,17 +480,13 @@ export function AcertoPaymentSummary({
                 const isDinheiro = entry.method === 'Dinheiro'
                 const isRestricted = isRestrictedMethod(entry.method)
 
-                // Update: Allow installments for Dinheiro by default (Requirement)
-                // Installments are disabled only if:
-                // 1. Global disabled is true
-                // 2. It is Pix AND not marked as zero down payment
-                // 3. It is a restricted method in receipt mode
+                // Requirement: Enable installments for Cash (Dinheiro)
+                // Installments only disabled for Pix unless zero down payment, or global restricted
                 const isInstallmentsDisabled =
                   disabled ||
                   (isPix && !entry.hasZeroDownPayment) ||
                   isRestricted
 
-                // Visual cue if payment is future dated (paidValue = 0 but value > 0)
                 const isFuture = entry.value > 0 && entry.paidValue === 0
 
                 return (
@@ -535,7 +505,6 @@ export function AcertoPaymentSummary({
                           </div>
                         </div>
 
-                        {/* Show 'Sem ENTRADA' for Pix OR Dinheiro */}
                         {(isPix || isDinheiro) && !isRestricted && (
                           <div className="flex items-center gap-2 pt-1">
                             <Checkbox
@@ -700,7 +669,7 @@ export function AcertoPaymentSummary({
                                 idx === 0 && (isPix || isDinheiro)
                               const isZeroEntry =
                                 isEntrada && entry.hasZeroDownPayment
-                              const isPaidDisabled = true // Paid value is calculated automatically now based on date
+                              const isPaidDisabled = true
 
                               return (
                                 <div

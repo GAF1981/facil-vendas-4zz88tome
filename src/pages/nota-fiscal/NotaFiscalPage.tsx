@@ -134,33 +134,13 @@ export default function NotaFiscalPage() {
     fetchAllSettlements()
   }
 
-  // Actions
-  const handleDownloadPdf = async (orderId: number) => {
-    try {
-      const blob = await acertoService.reprintOrder(orderId)
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `Acerto-${orderId}.pdf`
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-    } catch (error) {
-      console.error(error)
-      toast({
-        title: 'Erro no download',
-        description: 'Não foi possível gerar o PDF.',
-        variant: 'destructive',
-      })
-    }
-  }
-
+  // Red Icon -> Detailed A4 Report
   const handleDownloadDetailedReport = async (orderId: number) => {
     if (generatingPdf === orderId) return
     setGeneratingPdf(orderId)
     try {
       toast({
-        title: 'Gerando relatório...',
+        title: 'Gerando relatório detalhado...',
         description: 'Aguarde um momento.',
       })
       const blob = await notaFiscalService.generateDetailedReport(orderId)
@@ -181,6 +161,27 @@ export default function NotaFiscalPage() {
       })
     } finally {
       setGeneratingPdf(null)
+    }
+  }
+
+  // Green Icon -> 80mm Thermal Report
+  const handleDownloadThermalReport = async (orderId: number) => {
+    try {
+      const blob = await acertoService.reprintOrder(orderId, undefined, '80mm')
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `Acerto-Termico-${orderId}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error(error)
+      toast({
+        title: 'Erro no download',
+        description: 'Não foi possível gerar o PDF térmico.',
+        variant: 'destructive',
+      })
     }
   }
 
@@ -403,19 +404,11 @@ export default function NotaFiscalPage() {
                       </TableCell>
                       <TableCell className="text-center">
                         <div className="flex items-center justify-center gap-1">
+                          {/* Red Icon -> Detailed A4 */}
                           <Button
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
-                            onClick={() => handleDownloadPdf(item.orderId)}
-                            title="Baixar PDF (Térmica)"
-                          >
-                            <FileText className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
                             onClick={() =>
                               handleDownloadDetailedReport(item.orderId)
                             }
@@ -425,8 +418,20 @@ export default function NotaFiscalPage() {
                             {generatingPdf === item.orderId ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
-                              <Printer className="h-4 w-4" />
+                              <FileText className="h-4 w-4" />
                             )}
+                          </Button>
+                          {/* Green Icon -> Thermal 80mm */}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
+                            onClick={() =>
+                              handleDownloadThermalReport(item.orderId)
+                            }
+                            title="Baixar PDF Térmico (80mm)"
+                          >
+                            <Printer className="h-4 w-4" />
                           </Button>
                         </div>
                       </TableCell>

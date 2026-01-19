@@ -38,6 +38,7 @@ export default function TopSellingReportsPage() {
   const fetchData = async () => {
     setLoading(true)
     try {
+      // Using the updated service method which aggregates data in JS
       const result = await reportsService.getTopSellingItems(startDate, endDate)
       setData(result)
     } catch (error) {
@@ -188,7 +189,7 @@ export default function TopSellingReportsPage() {
                         {item.produto_nome}
                       </TableCell>
                       <TableCell className="text-right font-bold text-blue-600">
-                        {item.quantidade_total}
+                        {item.quantidade_total.toFixed(2).replace('.', ',')}
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         R$ {formatCurrency(item.valor_total)}
