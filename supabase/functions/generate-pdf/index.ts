@@ -91,7 +91,7 @@ Deno.serve(async (req) => {
         100 + // Totals
         (installmentsCount > 0 ? 50 + installmentsCount * 20 : 0) + // Installments
         50 + // Signature
-        (historyCount > 0 ? 50 + historyCount * 60 : 0) + // History
+        (historyCount > 0 ? 50 + historyCount * 80 : 0) + // History (increased height estimate)
         100 // Footer padding
 
       page = pdfDoc.addPage([226, Math.max(400, estimatedHeight)])
@@ -196,11 +196,18 @@ Deno.serve(async (req) => {
         totalVendido = 0,
         valorDesconto = 0,
         valorAcerto = 0,
+        installments = [],
       } = body
 
       // 1. Header Title
+      drawText('FACIL VENDAS', width / 2, y, {
+        size: 16,
+        font: fontBold,
+        align: 'center',
+      })
+      y -= 20
       drawText('RELATORIO DETALHADO DE PEDIDO', width / 2, y, {
-        size: 18,
+        size: 14,
         font: fontBold,
         align: 'center',
       })
@@ -265,8 +272,6 @@ Deno.serve(async (req) => {
       y = startInfoY - lineHeight * 6 - 20
 
       // 3. Table Headers
-      // We need to reserve space for the vertical headers that will be drawn UPWARDS from the baseline.
-      // Vertical text height approx 100-120.
       const headerHeightSpace = 120
       y -= headerHeightSpace // Move baseline down
 
@@ -302,7 +307,6 @@ Deno.serve(async (req) => {
       // Draw Headers
       cols.forEach((col) => {
         if (col.vertical) {
-          // Center vertically relative to column width (horizontally in page coords)
           const xOffset = col.x + col.w / 2 - 3
           drawText(col.label, xOffset, headerBaseline, {
             size: 9,
@@ -310,8 +314,6 @@ Deno.serve(async (req) => {
             rotate: degrees(90),
           })
         } else {
-          // Horizontal text (Mercadoria)
-          // Draw slightly above baseline to align with the "start" of vertical text visually
           drawText(col.label, col.x + 5, headerBaseline + 5, {
             size: 9,
             font: fontBold,
@@ -384,9 +386,8 @@ Deno.serve(async (req) => {
       drawLine(y)
       y -= 30
 
-      // 5. Financial Summary
-      // Ensure space for footer
-      if (y < margins.bottom + 120) {
+      // 5. Financial Summary (With Improved Spacing)
+      if (y < margins.bottom + 150) {
         page = pdfDoc.addPage([842, 595])
         y = height - margins.top
       }
@@ -396,7 +397,7 @@ Deno.serve(async (req) => {
         font: fontBold,
         align: 'right',
       })
-      y -= 25
+      y -= 35 // Increased spacing
 
       const summaryLabelX = width - margins.right - 180
       const summaryValueX = width - margins.right
@@ -408,7 +409,7 @@ Deno.serve(async (req) => {
         font: fontBold,
         align: 'right',
       })
-      y -= 20
+      y -= 25 // Increased spacing
 
       // Desconto
       drawText('Desconto:', summaryLabelX, y, { size: 12, font: fontBold })
@@ -418,7 +419,7 @@ Deno.serve(async (req) => {
         align: 'right',
         color: rgb(0.8, 0, 0),
       })
-      y -= 25
+      y -= 35 // Increased spacing
 
       // Total a Pagar
       drawText('TOTAL A PAGAR:', summaryLabelX, y, { size: 16, font: fontBold })
@@ -427,6 +428,46 @@ Deno.serve(async (req) => {
         font: fontBold,
         align: 'right',
       })
+      y -= 40
+
+      // 6. Installments (Added to detailed report)
+      if (installments && installments.length > 0) {
+        checkPageBreak(80)
+        drawText('VALORES A PAGAR (PARCELAS)', margins.left, y, {
+          size: 12,
+          font: fontBold,
+          align: 'left',
+        })
+        y -= 20
+
+        // Headers
+        const iCol1 = margins.left
+        const iCol2 = margins.left + 150
+        const iCol3 = margins.left + 300
+
+        drawText('Forma', iCol1, y, { size: 10, font: fontBold })
+        drawText('Vencimento', iCol2, y, { size: 10, font: fontBold })
+        drawText('Valor', iCol3, y, {
+          size: 10,
+          font: fontBold,
+          align: 'right',
+        })
+        y -= 5
+        drawLine(y, 0.5)
+        y -= 15
+
+        installments.forEach((p: any) => {
+          checkPageBreak(20)
+          const method = p.method || '-'
+          const dateStr = safeFormatDate(p.dueDate)
+          const val = formatCurrency(p.value)
+
+          drawText(method, iCol1, y, { size: 10 })
+          drawText(dateStr, iCol2, y, { size: 10 })
+          drawText(`R$ ${val}`, iCol3, y, { size: 10, align: 'right' })
+          y -= 15
+        })
+      }
     } else if (reportType === 'thermal-history') {
       // --- THERMAL SETTLEMENT SUMMARY (RED) ---
       const {
@@ -449,13 +490,13 @@ Deno.serve(async (req) => {
 
       // Header
       drawText('FACIL VENDAS', width / 2, y, {
-        size: 14,
+        size: 16,
         font: fontBold,
         align: 'center',
       })
-      y -= 18
+      y -= 20
       drawText(`PEDIDO ${orderNumber}`, width / 2, y, {
-        size: 12,
+        size: 14,
         font: fontBold,
         align: 'center',
       })
@@ -611,7 +652,7 @@ Deno.serve(async (req) => {
       }
 
       y -= 30
-      // Signature Line
+      // Signature Line (BEFORE HISTORY as requested)
       const sigLineY = y
       page.drawLine({
         start: { x: margins.left + 20, y: sigLineY },
@@ -641,12 +682,13 @@ Deno.serve(async (req) => {
           checkPageBreak(60)
 
           // Line 1: Date #Pedido Vendedor
+          // Example: 29/01/2026 #462 Guilherme
           const dateStr = safeFormatDate(h.data)
           const orderId = h.id ? `#${h.id}` : '-'
           const vendor = h.vendedor ? h.vendedor.split(' ')[0] : '-'
 
           drawText(`${dateStr}`, margins.left, y, { size: 8, font: fontBold })
-          drawText(`${orderId}`, margins.left + 60, y, {
+          drawText(`${orderId}`, margins.left + 55, y, {
             size: 8,
             font: fontBold,
           })
@@ -655,22 +697,24 @@ Deno.serve(async (req) => {
             font: fontBold,
             align: 'right',
           })
-          y -= 10
+          y -= 11
 
           // Line 2: V: ... A Pagar: ...
-          const venda = formatCurrency(h.valorVendaTotal)
-          const aPagar = formatCurrency(h.saldoAPagar)
+          // Example: V: 4.799,52  A Pagar: 4.799,52
+          const venda = formatCurrency(h.valorVendaTotal || 0)
+          const aPagar = formatCurrency(h.saldoAPagar || 0)
 
-          drawText(`V: ${venda}`, margins.left, y, { size: 8 })
+          drawText(`V: ${venda}`, margins.left, y, { size: 8, font: fontBold })
           drawText(`A Pagar: ${aPagar}`, width - margins.right, y, {
             size: 8,
             font: fontBold,
             align: 'right',
           })
-          y -= 10
+          y -= 11
 
           // Line 3: Pg: ... Deb: ... Med: ...
-          const pago = formatCurrency(h.valorPago)
+          // Example: Pg: 1.335,00 Deb: 3.464,52 Med: 0,00
+          const pago = formatCurrency(h.valorPago || 0)
           const debitoVal = h.debito || 0
           const mediaVal = h.mediaMensal || 0
 
@@ -678,14 +722,14 @@ Deno.serve(async (req) => {
 
           // Color Logic: Debito > 1.00 -> Dark Red
           const debitoColor = debitoVal > 1.0 ? rgb(0.6, 0, 0) : rgb(0, 0, 0)
+          const medColor = rgb(0, 0, 0.6)
+
           drawText(`Deb: ${formatCurrency(debitoVal)}`, margins.left + 70, y, {
             size: 8,
             font: fontBold,
             color: debitoColor,
           })
 
-          // Color Logic: Media -> Dark Blue
-          const mediaColor = rgb(0, 0, 0.6)
           drawText(
             `Med: ${formatCurrency(mediaVal)}`,
             width - margins.right,
@@ -693,7 +737,7 @@ Deno.serve(async (req) => {
             {
               size: 8,
               font: fontBold,
-              color: mediaColor,
+              color: medColor,
               align: 'right',
             },
           )
@@ -704,6 +748,7 @@ Deno.serve(async (req) => {
         })
       }
     } else {
+      // ... existing default case ...
       if (
         reportType === 'closing-confirmation' ||
         reportType === 'employee-cash-summary'

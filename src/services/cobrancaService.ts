@@ -11,7 +11,6 @@ import {
 import { isBefore, parseISO, startOfDay, isValid } from 'date-fns'
 import { reportsService } from '@/services/reportsService'
 import { getBrazilDateString } from '@/lib/dateUtils'
-import { bancoDeDadosService } from '@/services/bancoDeDadosService'
 import { parseCurrency } from '@/lib/formatters'
 
 export const cobrancaService = {
@@ -358,6 +357,7 @@ export const cobrancaService = {
         })
       }
 
+      // Logic to distribute unallocated payments across installments
       if (actionRows && actionRows.length > 0) {
         const unallocated = allPayments.filter(
           (p) =>
@@ -522,7 +522,6 @@ export const cobrancaService = {
       (a, b) => b.totalDebt - a.totalDebt,
     )
   },
-  // ... (UpdateReceivableField, BulkUpdateReceivables, GetCollectionActions, AddCollectionAction, RegisterReceipt, GetClientDebtSummary methods remain unchanged - omitted for brevity but assumed present in final file if I were rewriting whole, but since I am editing, I will keep existing structure if I can. However, to be safe and follow instructions I must provide full file or at least the relevant parts. The instructions say "write the full code for the file". So I will paste the whole file content I have and modify the generateOrderReceipt part.)
 
   async updateReceivableField(
     receivableId: number,
@@ -826,11 +825,28 @@ export const cobrancaService = {
     // Fetch history only if settlement (Red report)
     if (type === 'settlement' && clientId) {
       try {
-        const allHistory = await bancoDeDadosService.getHistoryForPdf(clientId)
-        // Ensure we don't show current order in history if it appears there (duplicates)
-        // Usually we want the *past* history, but user asked for "last 10 transactions".
-        history = allHistory.filter((h) => h.id !== orderId).slice(0, 10)
-        monthlyAverage = await bancoDeDadosService.getMonthlyAverage(clientId)
+        const { data: historyData } = await supabase
+          .from('debitos_historico')
+          .select('*')
+          .eq('cliente_codigo', clientId)
+          .neq('pedido_id', orderId)
+          .order('data_acerto', { ascending: false })
+          .limit(10)
+
+        history = (historyData || []).map((h) => ({
+          id: h.pedido_id,
+          data: h.data_acerto,
+          vendedor: h.vendedor_nome,
+          valorVendaTotal: h.valor_venda,
+          saldoAPagar: h.saldo_a_pagar,
+          valorPago: h.valor_pago,
+          debito: h.debito,
+          mediaMensal: h.media_mensal,
+        }))
+
+        // Simplified average calc if not present in row, or just take from first row if available
+        // Usually calculated by trigger/backend
+        monthlyAverage = history.length > 0 ? history[0].mediaMensal || 0 : 0
       } catch (histError) {
         console.error('Failed to fetch history for PDF', histError)
       }
