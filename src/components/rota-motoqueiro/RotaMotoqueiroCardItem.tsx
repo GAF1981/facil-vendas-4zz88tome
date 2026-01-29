@@ -366,7 +366,7 @@ export function RotaMotoqueiroCardItem({
               title="Ir para Recebimentos"
             >
               <DollarSign className="w-4 h-4 mr-1.5" />
-              Rec.
+              Recebimento
             </Button>
             <Button
               size="sm"

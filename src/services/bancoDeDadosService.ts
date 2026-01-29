@@ -355,7 +355,7 @@ export const bancoDeDadosService = {
       .eq('cliente_codigo', clienteId)
       .order('data_acerto', { ascending: false })
       .order('pedido_id', { ascending: false })
-      .limit(10)
+      .limit(12) // Limit increased to 12 to allow client side filtering if current order included
 
     if (error) throw error
     return data.map((row) => ({

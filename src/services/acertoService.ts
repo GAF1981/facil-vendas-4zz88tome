@@ -149,7 +149,7 @@ export const acertoService = {
 
     // Fetch History
     const history = await bancoDeDadosService.getHistoryForPdf(clientId)
-    const recentHistory = history.filter((h) => h.id !== orderId)
+    const recentHistory = history.filter((h) => h.id !== orderId).slice(0, 10) // Limit to 10 most recent excluding current
     const lastOrder = recentHistory.length > 0 ? recentHistory[0] : null
 
     // Fetch Monthly Average for the PDF report
