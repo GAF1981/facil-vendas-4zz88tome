@@ -12,6 +12,7 @@ import { isBefore, parseISO, startOfDay, isValid } from 'date-fns'
 import { reportsService } from '@/services/reportsService'
 import { getBrazilDateString } from '@/lib/dateUtils'
 import { bancoDeDadosService } from '@/services/bancoDeDadosService'
+import { parseCurrency } from '@/lib/formatters'
 
 export const cobrancaService = {
   async getDebts(): Promise<ClientDebt[]> {
@@ -521,6 +522,7 @@ export const cobrancaService = {
       (a, b) => b.totalDebt - a.totalDebt,
     )
   },
+  // ... (UpdateReceivableField, BulkUpdateReceivables, GetCollectionActions, AddCollectionAction, RegisterReceipt, GetClientDebtSummary methods remain unchanged - omitted for brevity but assumed present in final file if I were rewriting whole, but since I am editing, I will keep existing structure if I can. However, to be safe and follow instructions I must provide full file or at least the relevant parts. The instructions say "write the full code for the file". So I will paste the whole file content I have and modify the generateOrderReceipt part.)
 
   async updateReceivableField(
     receivableId: number,
@@ -682,7 +684,7 @@ export const cobrancaService = {
     value: number
     method: string
     date: string
-    receivableId?: number // Optional specific installment ID
+    receivableId?: number
   }): Promise<void> {
     const insertPayload = {
       venda_id: payload.orderId,
@@ -703,19 +705,13 @@ export const cobrancaService = {
     try {
       await reportsService.updateDebtHistoryForOrder(payload.orderId)
 
-      // Post-payment Logic: Check if specific receivable or whole order is paid
-      // If paid, clear `forma_cobranca` to remove from Rota Motoqueiro
-
-      // 1. Fetch current status of this installment/receivable if provided
       if (payload.receivableId && payload.receivableId > 0) {
-        // Fetch specific receivable
         const { data: recData } = await supabase
           .from('RECEBIMENTOS')
           .select('valor_registrado, valor_pago')
           .eq('id', payload.receivableId)
           .single()
 
-        // Also need to sum all payments linked to this receivable (ID_da_fêmea)
         const { data: linkedPayments } = await supabase
           .from('RECEBIMENTOS')
           .select('valor_pago')
@@ -729,7 +725,6 @@ export const cobrancaService = {
 
         const registered = recData?.valor_registrado || 0
         if (totalPaid >= registered - 0.05) {
-          // Fully Paid -> Clear fields
           await supabase
             .from('RECEBIMENTOS')
             .update({ forma_cobranca: null, rota_id: null } as any)
@@ -791,33 +786,49 @@ export const cobrancaService = {
       .select('*')
       .eq('venda_id', orderId)
 
+    // Prepare items with all necessary fields for the detailed report
     const items = orderData.map((d) => ({
       produtoNome: d.MERCADORIA,
+      produtoCodigo: d['COD. PRODUTO'], // Needed for Detailed
+      tipo: d['TIPO'], // Needed for Detailed
       precoUnitario: d['PREÇO VENDIDO'] || 0,
       saldoInicial: Number(d['SALDO INICIAL']) || 0,
       contagem: Number(d.CONTAGEM) || 0,
       quantVendida: Number(d['QUANTIDADE VENDIDA']) || 0,
       saldoFinal: Number(d['SALDO FINAL']) || 0,
       valorVendido: Number(d['VALOR VENDIDO']) || 0,
+      novasConsignacoes: d['NOVAS CONSIGNAÇÕES']
+        ? parseCurrency(d['NOVAS CONSIGNAÇÕES'])
+        : 0, // Needed for Detailed
+      recolhido: d['RECOLHIDO'] ? parseCurrency(d['RECOLHIDO']) : 0, // Needed for Detailed
     }))
 
     const totalVendido = items.reduce(
       (acc, item) => acc + (item.valorVendido || 0),
       0,
     )
-    const totalPago = (paymentsData || []).reduce(
-      (acc, p) => acc + (Number(p.valor_pago) || 0),
-      0,
-    )
+    const valorDevido = Number(firstItem['VALOR DEVIDO']) || 0
+    // Simplified Discount Calculation: Total - Net Amount
+    const calculatedDiscount = Math.max(0, totalVendido - valorDevido)
 
-    // NEW: Fetch history if settlement report
+    // Prepare Installments (Parcelas) - typically those with valor_registrado > 0
+    const installments = (paymentsData || [])
+      .filter((p) => (p.valor_registrado || 0) > 0)
+      .map((p) => ({
+        method: p.forma_pagamento,
+        dueDate: p.vencimento,
+        value: p.valor_registrado,
+      }))
+
     let history: any[] = []
     let monthlyAverage = 0
 
+    // Fetch history only if settlement (Red report)
     if (type === 'settlement' && clientId) {
       try {
         const allHistory = await bancoDeDadosService.getHistoryForPdf(clientId)
-        // Limit to 10 most recent excluding current if needed, or just 10 most recent
+        // Ensure we don't show current order in history if it appears there (duplicates)
+        // Usually we want the *past* history, but user asked for "last 10 transactions".
         history = allHistory.filter((h) => h.id !== orderId).slice(0, 10)
         monthlyAverage = await bancoDeDadosService.getMonthlyAverage(clientId)
       } catch (histError) {
@@ -826,25 +837,23 @@ export const cobrancaService = {
     }
 
     const payload = {
-      reportType: 'acerto',
-      format: '80mm',
+      // Differentiate the report type for the edge function
+      // 'standard' -> Green Button -> Detailed Order (A4)
+      // 'settlement' -> Red Button -> Thermal with History
+      reportType: type === 'standard' ? 'detailed-order' : 'thermal-history',
+      format: type === 'standard' ? 'a4' : '80mm',
       client: clientData,
       employee: employeeData,
       items: items,
       date: firstItem['DATA DO ACERTO'] || new Date().toISOString(),
       orderNumber: orderId,
       totalVendido: totalVendido,
-      valorDesconto: 0,
-      valorAcerto: Number(firstItem['VALOR DEVIDO']) || 0,
-      valorPago: totalPago,
-      debito: (Number(firstItem['VALOR DEVIDO']) || 0) - totalPago,
-      payments: (paymentsData || []).map((p) => ({
-        method: p.forma_pagamento,
-        paidValue: Number(p.valor_pago),
-        dueDate: p.vencimento,
-      })),
+      valorDesconto: calculatedDiscount,
+      valorAcerto: valorDevido,
+      installments: installments, // For "VALORES A PAGAR (PARCELAS)"
       history,
       monthlyAverage,
+      payments: [], // Only used if we want to show paid amounts list (optional in new layouts)
     }
 
     const { data: pdfBlob, error: pdfError } = await supabase.functions.invoke(
