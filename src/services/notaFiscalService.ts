@@ -9,7 +9,6 @@ export const notaFiscalService = {
     let orderIds: number[] | null = null
 
     // 1. If rotaId provided, find relevant order IDs from RECEBIMENTOS
-    // This logic ensures we only get orders associated with the selected route
     if (rotaId) {
       const { data: recData, error: recError } = await supabase
         .from('RECEBIMENTOS')
@@ -19,10 +18,8 @@ export const notaFiscalService = {
       if (recError) throw recError
 
       if (recData && recData.length > 0) {
-        // Use Set to dedup IDs
         orderIds = Array.from(new Set(recData.map((r) => r.venda_id)))
       } else {
-        // Route provided but no data matches
         return []
       }
     }
@@ -37,10 +34,8 @@ export const notaFiscalService = {
       .order('"DATA DO ACERTO"', { ascending: false })
 
     if (orderIds) {
-      // Filter by fetched order IDs (from Rota filter)
       query = query.in('"NÚMERO DO PEDIDO"', orderIds)
     } else {
-      // If no filter, limit to recent to avoid performance hit
       query = query.limit(2000)
     }
 
@@ -61,9 +56,7 @@ export const notaFiscalService = {
       emittedMap.set(e.pedido_id, e.numero_nota_fiscal)
     })
 
-    // 4. Fetch Route Info for these orders (to display in column)
-    // We need to fetch from RECEBIMENTOS again for ALL fetched orders to assign Rota ID
-    // We take the first rota_id found for the order (typically consistent)
+    // 4. Fetch Route Info
     const { data: routesData } = await supabase
       .from('RECEBIMENTOS')
       .select('venda_id, rota_id')
@@ -77,20 +70,40 @@ export const notaFiscalService = {
       }
     })
 
-    return data.map((row) => ({
-      orderId: row['NÚMERO DO PEDIDO'] || 0,
-      clientCode: row['CÓDIGO DO CLIENTE'] || 0,
-      clientName: row['CLIENTE'] || 'N/D',
-      dataAcerto: row['DATA DO ACERTO'] || '',
-      valorTotalVendido: parseCurrency(row['VALOR VENDIDO']),
-      notaFiscalCadastro: row.nota_fiscal_cadastro || 'NÃO',
-      notaFiscalVenda: row.nota_fiscal_venda || 'NÃO',
-      solicitacaoNf: row.solicitacao_nf || 'NÃO',
-      notaFiscalEmitida: row.nota_fiscal_emitida || 'Pendente',
-      numeroNotaFiscal:
-        emittedMap.get(row['NÚMERO DO PEDIDO'] || 0) || undefined,
-      rotaId: routeMap.get(row['NÚMERO DO PEDIDO'] || 0) || null,
-    }))
+    return data.map((row) => {
+      const nfCadastro = row.nota_fiscal_cadastro
+      const nfVenda = row.nota_fiscal_venda
+      const solicitacao = row.solicitacao_nf || 'NÃO'
+      const dbStatus = row.nota_fiscal_emitida
+
+      // Automated Status Logic
+      // Resolvido: If (0, 0, 0) -> All NO/0
+      // Pendente: If ANY is SIM
+      let calculatedStatus = 'Resolvida'
+      if (nfCadastro === 'SIM' || nfVenda === 'SIM' || solicitacao === 'SIM') {
+        calculatedStatus = 'Pendente'
+      }
+
+      // Preserve 'Emitida' if strictly emitted
+      if (dbStatus === 'Emitida') {
+        calculatedStatus = 'Emitida'
+      }
+
+      return {
+        orderId: row['NÚMERO DO PEDIDO'] || 0,
+        clientCode: row['CÓDIGO DO CLIENTE'] || 0,
+        clientName: row['CLIENTE'] || 'N/D',
+        dataAcerto: row['DATA DO ACERTO'] || '',
+        valorTotalVendido: parseCurrency(row['VALOR VENDIDO']),
+        notaFiscalCadastro: nfCadastro || 'NÃO',
+        notaFiscalVenda: nfVenda || 'NÃO',
+        solicitacaoNf: solicitacao,
+        notaFiscalEmitida: calculatedStatus, // Using the calculated status
+        numeroNotaFiscal:
+          emittedMap.get(row['NÚMERO DO PEDIDO'] || 0) || undefined,
+        rotaId: routeMap.get(row['NÚMERO DO PEDIDO'] || 0) || null,
+      }
+    })
   },
 
   async emitInvoice(
@@ -124,6 +137,15 @@ export const notaFiscalService = {
     const { error } = await supabase
       .from('BANCO_DE_DADOS')
       .update({ nota_fiscal_emitida: status } as any)
+      .eq('"NÚMERO DO PEDIDO"', orderId)
+
+    if (error) throw error
+  },
+
+  async updateSolicitacao(orderId: number, value: 'SIM' | 'NÃO') {
+    const { error } = await supabase
+      .from('BANCO_DE_DADOS')
+      .update({ solicitacao_nf: value } as any)
       .eq('"NÚMERO DO PEDIDO"', orderId)
 
     if (error) throw error

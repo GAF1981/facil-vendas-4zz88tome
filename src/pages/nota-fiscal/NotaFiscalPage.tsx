@@ -29,9 +29,9 @@ import {
   FileText,
   Search,
   Filter,
-  CheckCircle2,
   RefreshCw,
   Printer,
+  Edit2,
 } from 'lucide-react'
 import { notaFiscalService } from '@/services/notaFiscalService'
 import { rotaService } from '@/services/rotaService'
@@ -174,17 +174,36 @@ export default function NotaFiscalPage() {
     }
   }
 
-  const handleMarkResolved = async (item: NotaFiscalSettlement) => {
-    if (!confirm('Marcar como Resolvida (sem emissão)?')) return
+  const handleUpdateSolicitacao = async (
+    item: NotaFiscalSettlement,
+    newValue: string,
+  ) => {
     try {
-      await notaFiscalService.updateStatus(item.orderId, 'Resolvida')
+      // Optimistic update
+      const updatedData = data.map((d) =>
+        d.orderId === item.orderId ? { ...d, solicitacaoNf: newValue } : d,
+      )
+      setData(updatedData)
+
+      await notaFiscalService.updateSolicitacao(
+        item.orderId,
+        newValue as 'SIM' | 'NÃO',
+      )
       toast({
         title: 'Atualizado',
-        description: 'Status atualizado para Resolvida.',
+        description: 'Solicitação de emissão atualizada.',
       })
+
+      // Reload to ensure calculated status is correct based on DB/Service logic
       loadData()
     } catch (error) {
       console.error(error)
+      toast({
+        title: 'Erro',
+        description: 'Falha ao atualizar solicitação.',
+        variant: 'destructive',
+      })
+      loadData() // Revert
     }
   }
 
@@ -288,12 +307,15 @@ export default function NotaFiscalPage() {
             <TableHeader className="bg-muted/50">
               <TableRow>
                 <TableHead>Pedido</TableHead>
-                <TableHead>Rota</TableHead> {/* New Column */}
+                <TableHead>Rota</TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Data Acerto</TableHead>
                 <TableHead className="text-right">Valor Venda</TableHead>
                 <TableHead className="text-center">NF Cadastro</TableHead>
                 <TableHead className="text-center">NF Venda</TableHead>
+                <TableHead className="text-center w-[120px]">
+                  Solicitação
+                </TableHead>
                 <TableHead className="text-center">Status</TableHead>
                 <TableHead className="text-center">PDF</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
@@ -302,14 +324,14 @@ export default function NotaFiscalPage() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="h-24 text-center">
+                  <TableCell colSpan={11} className="h-24 text-center">
                     <Loader2 className="mx-auto h-6 w-6 animate-spin text-primary" />
                   </TableCell>
                 </TableRow>
               ) : filteredData.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={10}
+                    colSpan={11}
                     className="h-24 text-center text-muted-foreground"
                   >
                     Nenhum registro encontrado.
@@ -365,6 +387,22 @@ export default function NotaFiscalPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-center">
+                      <Select
+                        value={item.solicitacaoNf}
+                        onValueChange={(val) =>
+                          handleUpdateSolicitacao(item, val)
+                        }
+                      >
+                        <SelectTrigger className="h-8 w-[90px] mx-auto">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="SIM">SIM</SelectItem>
+                          <SelectItem value="NÃO">NÃO</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell className="text-center">
                       <Badge
                         variant="outline"
                         className={
@@ -410,14 +448,6 @@ export default function NotaFiscalPage() {
                     <TableCell className="text-right">
                       {item.notaFiscalEmitida === 'Pendente' && (
                         <div className="flex justify-end gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleMarkResolved(item)}
-                            title="Resolver sem emitir"
-                          >
-                            <CheckCircle2 className="h-4 w-4 text-gray-500" />
-                          </Button>
                           <Button
                             size="sm"
                             onClick={() => handleEmitClick(item)}
