@@ -325,25 +325,15 @@ export function AcertoPaymentSummary({
         ) {
           const newFirstValue = updatedValue as number
           // Re-generate installments with new first value distribution
-          const newDetails = generateInstallments(
-            p.value,
-            p.installments,
-            method,
-            isParcelar,
-            p.dueDate,
-            newFirstValue,
-          )
+          // BUT for total summation logic, we actually just update this single value first,
+          // then recalculate the total.
+          // However, `generateInstallments` is used for DISTRIBUTION (changing count or total).
+          // Here we are editing specific installment.
+          // So we should NOT regenerate all, but update this one and update total.
+          // EXCEPT if we want to redistribute remaining?
+          // User story implies "Sum of Entrada + Others". So independent edit is fine.
 
-          const newPaidValue = newDetails.reduce(
-            (acc, d) => acc + d.paidValue,
-            0,
-          )
-
-          return {
-            ...p,
-            details: newDetails,
-            paidValue: newPaidValue,
-          }
+          // Let's just fall through to standard update logic below, and then update total sum.
         }
 
         if (field === 'dueDate' && isRestrictedMethod(method)) {
@@ -378,7 +368,9 @@ export function AcertoPaymentSummary({
         let newValue = p.value
         let newPaidValue = p.paidValue
 
-        if (!isParcelar || field !== 'value') {
+        // If Parcelar, Total is sum of details.
+        // If Not Parcelar, Total usually drives details, but if we edit single detail, we update total too.
+        if (isParcelar || field === 'value') {
           newValue = Number(
             newDetails.reduce((acc, curr) => acc + curr.value, 0).toFixed(2),
           )
@@ -566,10 +558,16 @@ export function AcertoPaymentSummary({
                             type="number"
                             step="0.01"
                             min="0"
-                            className="pl-9 font-bold text-lg h-10"
+                            className={cn(
+                              'pl-9 font-bold text-lg h-10',
+                              isParcelar &&
+                                'bg-gray-100 text-gray-500 opacity-90 cursor-not-allowed',
+                            )}
                             value={entry.value}
                             disabled={disabled}
+                            readOnly={isParcelar}
                             onChange={(e) =>
+                              !isParcelar &&
                               handleUpdateEntry(
                                 entry.method,
                                 'value',

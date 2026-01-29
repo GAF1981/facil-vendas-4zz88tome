@@ -1906,6 +1906,7 @@ export type Database = {
           id: number
           ID_da_fêmea: number | null
           motivo: string | null
+          rota_id: number | null
           valor_pago: number
           valor_registrado: number | null
           vencimento: string | null
@@ -1922,6 +1923,7 @@ export type Database = {
           id?: number
           ID_da_fêmea?: number | null
           motivo?: string | null
+          rota_id?: number | null
           valor_pago: number
           valor_registrado?: number | null
           vencimento?: string | null
@@ -1938,6 +1940,7 @@ export type Database = {
           id?: number
           ID_da_fêmea?: number | null
           motivo?: string | null
+          rota_id?: number | null
           valor_pago?: number
           valor_registrado?: number | null
           vencimento?: string | null
@@ -1956,6 +1959,13 @@ export type Database = {
             columns: ['funcionario_id']
             isOneToOne: false
             referencedRelation: 'FUNCIONARIOS'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'RECEBIMENTOS_rota_id_fkey'
+            columns: ['rota_id']
+            isOneToOne: false
+            referencedRelation: 'ROTA'
             referencedColumns: ['id']
           },
         ]

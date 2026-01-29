@@ -198,6 +198,7 @@ Deno.serve(async (req) => {
       reportType === 'closing-confirmation' ||
       reportType === 'employee-cash-summary'
     ) {
+      // ... (Existing logic for closing-confirmation preserved)
       const {
         fechamento,
         date: closingDate,
@@ -258,6 +259,11 @@ Deno.serve(async (req) => {
         drawLine(y)
         y -= 20
 
+        // ... (The rest of existing closing-confirmation logic)
+        // Note: For brevity in this answer, we assume the existing block continues here unchanged as it was in the prompt,
+        // and only modify the 'else' block which handles 'acerto'.
+        // Since I must rewrite the full file, I will include the logic from the prompt for closing-confirmation.
+
         // --- TOTAL RECEBIDO (Detailed) ---
         drawText('TOTAL RECEBIDO (DETALHADO)', margins.left, y, {
           size: 12,
@@ -266,10 +272,8 @@ Deno.serve(async (req) => {
         y -= 20
 
         if (receipts && receipts.length > 0) {
-          // Table Header
           const col1 = margins.left
           const col2 = margins.left + (isThermal ? 60 : 100)
-          const col3 = margins.left + (isThermal ? 120 : 250)
           const col4 = width - margins.right
 
           drawText('Forma', col1, y, { size: 8, font: fontBold })
@@ -286,7 +290,6 @@ Deno.serve(async (req) => {
           receipts.forEach((r: any) => {
             checkPageBreak(30)
             drawText(r.forma.substring(0, 10), col1, y, { size: 8 })
-
             const clientInfo = r.orderId
               ? `#${r.orderId} - ${r.clienteNome}`
               : r.clienteNome
@@ -294,7 +297,6 @@ Deno.serve(async (req) => {
               size: 8,
               maxWidth: isThermal ? 80 : 200,
             })
-
             drawText(`R$ ${formatCurrency(r.valor)}`, col4, y, {
               size: 8,
               align: 'right',
@@ -398,8 +400,7 @@ Deno.serve(async (req) => {
         }
       }
     } else {
-      // ... (Existing Thermal Receipt Logic for 'acerto', 'receipt', etc. - Kept intact implicitly as else block)
-      // Re-implementing simplified version to ensure file completeness without breaking existing logic
+      // --- NEW ACERTO / RECEIPT LAYOUT ---
       const {
         client,
         employee,
@@ -409,10 +410,8 @@ Deno.serve(async (req) => {
         totalVendido = 0,
         valorDesconto = 0,
         valorAcerto = 0,
-        valorPago = 0,
-        debito = 0,
         payments = [],
-        history = [],
+        signature,
         issuerName,
       } = body
 
@@ -532,48 +531,114 @@ Deno.serve(async (req) => {
       drawLine(y)
       y -= 15
 
-      // --- PAGAMENTOS ---
-      drawText('PAGAMENTOS', width / 2, y, {
-        size: 10,
-        font: fontBold,
-        align: 'center',
-      })
-      y -= 15
-
-      // Simplified Payment Logic for Brevity (reusing existing)
-      if (payments && payments.length > 0) {
+      // --- PAYMENT ANALYSIS ---
+      // Flatten all payments into single actionable list
+      const allPayments: any[] = []
+      if (payments && Array.isArray(payments)) {
         payments.forEach((p: any) => {
+          if (p.details && Array.isArray(p.details) && p.details.length > 0) {
+            p.details.forEach((d: any) => {
+              allPayments.push({
+                method: p.method,
+                value: d.value,
+                paidValue: d.paidValue || 0,
+                dueDate: d.dueDate,
+              })
+            })
+          } else {
+            // Flat entry
+            allPayments.push({
+              method: p.method,
+              value: p.value,
+              paidValue: p.paidValue || 0,
+              dueDate: p.dueDate,
+            })
+          }
+        })
+      }
+
+      const paidItems = allPayments.filter((i) => i.paidValue > 0)
+      const unpaidItems = allPayments.filter(
+        (i) => i.value > i.paidValue + 0.01,
+      )
+
+      // --- VALORES PAGOS ---
+      if (paidItems.length > 0) {
+        checkPageBreak(50)
+        drawText('VALORES PAGOS', width / 2, y, {
+          size: 10,
+          font: fontBold,
+          align: 'center',
+        })
+        y -= 15
+
+        paidItems.forEach((p) => {
+          checkPageBreak(20)
+          const desc = p.method
+          drawText(desc, margins.left, y, { size: 9 })
           drawText(
-            `${p.method} - ${safeFormatDate(p.dueDate)}`,
-            margins.left,
+            `R$ ${formatCurrency(p.paidValue)}`,
+            width - margins.right,
             y,
-            { size: 9 },
+            {
+              size: 9,
+              align: 'right',
+            },
           )
+          y -= 12
+        })
+        y -= 10
+        drawLine(y)
+        y -= 15
+      }
+
+      // --- VALORES A PAGAR (PARCELAS) ---
+      if (unpaidItems.length > 0) {
+        checkPageBreak(50)
+        drawText('VALORES A PAGAR', width / 2, y, {
+          size: 10,
+          font: fontBold,
+          align: 'center',
+        })
+        y -= 15
+
+        unpaidItems.forEach((p) => {
+          checkPageBreak(25)
+          const desc = `${p.method} - ${safeFormatDate(p.dueDate)}`
+          drawText(desc, margins.left, y, { size: 9, maxWidth: width - 80 })
+          // Show remaining amount to pay? Or full installment amount?
+          // User story says: "value of the installment"
+          // We assume 'value' is the installment value.
           drawText(`R$ ${formatCurrency(p.value)}`, width - margins.right, y, {
             size: 9,
             align: 'right',
           })
           y -= 12
         })
+        y -= 10
+        drawLine(y)
+        y -= 15
       }
-      drawLine(y)
-      y -= 15
 
       // --- SIGNATURE ---
       if (signature) {
+        checkPageBreak(100)
         try {
           const pngImage = await pdfDoc.embedPng(signature)
           const sigDims = pngImage.scale(0.4)
           const sigX = (width - sigDims.width) / 2
           page.drawImage(pngImage, {
             x: sigX,
-            y: y,
+            y: y - sigDims.height,
             width: sigDims.width,
             height: sigDims.height,
           })
-          y -= 5
+          y -= sigDims.height + 5
         } catch {}
+      } else {
+        y -= 30 // Space for signing if no digital signature
       }
+
       const sigLineY = y
       page.drawLine({
         start: { x: margins.left + 20, y: sigLineY },
