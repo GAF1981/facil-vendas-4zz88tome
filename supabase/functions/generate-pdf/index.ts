@@ -87,8 +87,8 @@ Deno.serve(async (req) => {
 
       const estimatedHeight =
         400 + // Header
-        itemsCount * 80 + // Items
-        100 + // Totals
+        itemsCount * 120 + // Items (Increased for Unit Price)
+        120 + // Totals
         (installmentsCount > 0 ? 50 + installmentsCount * 20 : 0) + // Installments
         50 + // Signature
         (historyCount > 0 ? 50 + historyCount * 80 : 0) + // History (increased height estimate)
@@ -384,10 +384,10 @@ Deno.serve(async (req) => {
 
       y -= 10
       drawLine(y)
-      y -= 30
+      y -= 40
 
       // 5. Financial Summary (With Improved Spacing)
-      if (y < margins.bottom + 150) {
+      if (y < margins.bottom + 180) {
         page = pdfDoc.addPage([842, 595])
         y = height - margins.top
       }
@@ -397,9 +397,9 @@ Deno.serve(async (req) => {
         font: fontBold,
         align: 'right',
       })
-      y -= 35 // Increased spacing
+      y -= 40 // Increased spacing
 
-      const summaryLabelX = width - margins.right - 180
+      const summaryLabelX = width - margins.right - 200
       const summaryValueX = width - margins.right
 
       // Total Vendido
@@ -409,7 +409,7 @@ Deno.serve(async (req) => {
         font: fontBold,
         align: 'right',
       })
-      y -= 25 // Increased spacing
+      y -= 30 // Increased spacing
 
       // Desconto
       drawText('Desconto:', summaryLabelX, y, { size: 12, font: fontBold })
@@ -419,7 +419,7 @@ Deno.serve(async (req) => {
         align: 'right',
         color: rgb(0.8, 0, 0),
       })
-      y -= 35 // Increased spacing
+      y -= 40 // Increased spacing
 
       // Total a Pagar
       drawText('TOTAL A PAGAR:', summaryLabelX, y, { size: 16, font: fontBold })
@@ -428,7 +428,7 @@ Deno.serve(async (req) => {
         font: fontBold,
         align: 'right',
       })
-      y -= 40
+      y -= 50
 
       // 6. Installments (Added to detailed report)
       if (installments && installments.length > 0) {
@@ -548,7 +548,7 @@ Deno.serve(async (req) => {
       y -= 15
 
       for (const item of items) {
-        checkPageBreak(80)
+        checkPageBreak(100) // Increased for Unit Price
         drawText(`${item.produtoNome}`, margins.left, y, {
           size: 9,
           font: fontBold,
@@ -564,6 +564,16 @@ Deno.serve(async (req) => {
           })
           y -= 11
         }
+
+        // ADDED: Unit Price for Clarity/Verification
+        drawText('Preço Unit.:', margins.left, y, { size: 9 })
+        drawText(
+          `R$ ${formatCurrency(item.precoUnitario || 0)}`,
+          width - margins.right,
+          y,
+          { size: 9, align: 'right' },
+        )
+        y -= 11
 
         drawDetail('Saldo Inicial:', item.saldoInicial)
         drawDetail('Contagem:', item.contagem)
@@ -583,19 +593,26 @@ Deno.serve(async (req) => {
       y -= 15
 
       // ORDER TOTALS
-      const drawTotal = (label: string, val: number, isBig = false) => {
+      const drawTotal = (
+        label: string,
+        val: number,
+        isBig = false,
+        color = rgb(0, 0, 0),
+      ) => {
         const f = isBig ? fontBold : fontRegular
-        drawText(label, margins.left, y, { size: 9, font: f })
+        const s = isBig ? 11 : 9
+        drawText(label, margins.left, y, { size: s, font: f, color })
         drawText(`R$ ${formatCurrency(val)}`, width - margins.right, y, {
-          size: 9,
+          size: s,
           font: f,
           align: 'right',
+          color,
         })
-        y -= 15 // Improved spacing
+        y -= 18 // Improved spacing
       }
 
       drawTotal('Total Vendido:', totalVendido)
-      drawTotal('Desconto:', valorDesconto)
+      drawTotal('Desconto:', valorDesconto, false, rgb(0.8, 0, 0))
       y -= 5 // Extra spacing
       drawTotal('TOTAL A PAGAR:', valorAcerto, true)
       y -= 15

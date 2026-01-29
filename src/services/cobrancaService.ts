@@ -790,25 +790,33 @@ export const cobrancaService = {
       produtoNome: d.MERCADORIA,
       produtoCodigo: d['COD. PRODUTO'], // Needed for Detailed
       tipo: d['TIPO'], // Needed for Detailed
-      precoUnitario: d['PREÇO VENDIDO'] || 0,
+      precoUnitario: d['PREÇO VENDIDO'] ? parseCurrency(d['PREÇO VENDIDO']) : 0, // Ensure price is parsed
       saldoInicial: Number(d['SALDO INICIAL']) || 0,
       contagem: Number(d.CONTAGEM) || 0,
       quantVendida: Number(d['QUANTIDADE VENDIDA']) || 0,
       saldoFinal: Number(d['SALDO FINAL']) || 0,
-      valorVendido: Number(d['VALOR VENDIDO']) || 0,
+      valorVendido: parseCurrency(d['VALOR VENDIDO']), // Ensure robust parsing
       novasConsignacoes: d['NOVAS CONSIGNAÇÕES']
         ? parseCurrency(d['NOVAS CONSIGNAÇÕES'])
         : 0, // Needed for Detailed
       recolhido: d['RECOLHIDO'] ? parseCurrency(d['RECOLHIDO']) : 0, // Needed for Detailed
     }))
 
+    // Calculate total sold (Gross)
     const totalVendido = items.reduce(
       (acc, item) => acc + (item.valorVendido || 0),
       0,
     )
-    const valorDevido = Number(firstItem['VALOR DEVIDO']) || 0
-    // Simplified Discount Calculation: Total - Net Amount
-    const calculatedDiscount = Math.max(0, totalVendido - valorDevido)
+
+    // Calculate total payable (Net) by summing 'VALOR DEVIDO' column from all items
+    // This column stores the net value (Price * Qty - Discount) for each item transaction
+    const valorAcerto = orderData.reduce(
+      (acc, d) => acc + (Number(d['VALOR DEVIDO']) || 0),
+      0,
+    )
+
+    // Calculate effective discount for display
+    const valorDesconto = Math.max(0, totalVendido - valorAcerto)
 
     // Prepare Installments (Parcelas) - typically those with valor_registrado > 0
     const installments = (paymentsData || [])
@@ -864,8 +872,8 @@ export const cobrancaService = {
       date: firstItem['DATA DO ACERTO'] || new Date().toISOString(),
       orderNumber: orderId,
       totalVendido: totalVendido,
-      valorDesconto: calculatedDiscount,
-      valorAcerto: valorDevido,
+      valorDesconto: valorDesconto, // Using calculated discount
+      valorAcerto: valorAcerto, // Using calculated net total
       installments: installments, // For "VALORES A PAGAR (PARCELAS)"
       history,
       monthlyAverage,
