@@ -76,6 +76,7 @@ export const caixaService = {
       prestador_servico: despesa.prestador_servico,
       tipo_servico: despesa.tipo_servico,
       tipo_combustivel: despesa.tipo_combustivel,
+      rota_id: despesa.rota_id, // Save rota_id
     })
 
     if (error) throw error

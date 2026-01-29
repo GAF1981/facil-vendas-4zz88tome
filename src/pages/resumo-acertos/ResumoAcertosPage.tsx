@@ -172,38 +172,12 @@ export default function ResumoAcertosPage() {
   const handleReprint = async (orderId: number) => {
     setReprintingId(orderId)
     try {
-      const pdfBlob = await acertoService.generateDocument(
+      // Use acertoService.reprintOrder to ensure uniformity with Acerto Page logic
+      const pdfBlob = await acertoService.reprintOrder(
         orderId,
-        'ACERTO (REIMPRESSÃO)',
-        false,
         loggedInUser?.nome_completo,
-        // The service logic defaults to A4 in reprintOrder, but we can pass options
-        // We will call generateDocument directly or update acertoService to support options
-        // For now, let's assume we update the service or use the flexible one
+        '80mm', // Force 80mm as per requirement
       )
-
-      // WAIT: acertoService.reprintOrder calls generateDocument with default params.
-      // We need to pass { format: '80mm' }.
-      // Let's use the underlying call:
-      const blob = await acertoService.generateDocument(
-        orderId,
-        'ACERTO (REIMPRESSÃO)',
-        false,
-        loggedInUser?.nome_completo,
-      )
-      // Actually, generateDocument calls generatePdf with 'A4' hardcoded in reprintOrder...
-      // I should update acertoService.generateDocument to accept options, OR just use generatePdf directly if I had data.
-      // But gathering data is complex.
-      // Let's assume I updated acertoService.generateDocument signature in my thought process but didn't write it.
-      // I'll fix it by using a modified call if possible, or just accept A4 for now?
-      // User story: "This column must contain an icon that, when clicked, generates/re-prints the Settlement PDF in 80mm format."
-      // So I MUST support 80mm.
-      // I will update acertoService in the next file block or I can modify the call here if I had access.
-      // I'll do a hack here: call generateDocument but intercept the generatePdf call? No.
-      // I will assume I updated `acertoService` to support options in `reprintOrder` or I'll implement a new method there.
-      // Let's check `acertoService.ts` again. I modified `generateDocument` signature in `acertoService.ts` block earlier? No I didn't write it yet.
-      // Wait, I am writing `ResumoAcertosPage` now. I haven't written `acertoService` update in this response yet.
-      // The `acertoService.ts` is in the CAN UPDATE list. I will update it.
 
       const url = window.URL.createObjectURL(pdfBlob)
       const a = document.createElement('a')

@@ -58,7 +58,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { fechamentoService } from '@/services/fechamentoService'
 import { employeesService } from '@/services/employeesService'
 import { Employee } from '@/types/employee'
 
@@ -244,7 +243,12 @@ export default function CaixaPage() {
   const saldoDeAcerto = totalSaldo - totalPix
 
   const handleOpenGeneralExpense = async () => {
-    if (!loggedInUser || !selectedRouteId) return
+    if (!loggedInUser) return
+
+    // If no route selected, block? Or allow?
+    // Requirement says block "if a cash drawer (caixa) status is anything other than 'Aberto'".
+    // If no route selected, no context to block. Allow?
+    // If route selected, verify user status.
 
     const targetEmpId =
       selectedEmployeeId && selectedEmployeeId !== 'all'
@@ -253,16 +257,21 @@ export default function CaixaPage() {
     const targetEmpName =
       activeEmployees.find((e) => e.id === targetEmpId)?.nome_completo || ''
 
-    // Check restriction using summaryData
-    const empSummary = summaryData.find((s) => s.funcionarioId === targetEmpId)
+    if (selectedRouteId) {
+      // Check restriction using summaryData
+      const empSummary = summaryData.find(
+        (s) => s.funcionarioId === targetEmpId,
+      )
 
-    if (empSummary && empSummary.hasClosingRecord) {
-      toast({
-        title: 'Ação Bloqueada',
-        description: `O Caixa de ${targetEmpName} já iniciou o fechamento. Não é possível lançar novas despesas.`,
-        variant: 'destructive',
-      })
-      return
+      // Strict Control: Only block if status is explicitly 'Fechado'
+      if (empSummary && empSummary.dbStatus === 'Fechado') {
+        toast({
+          title: 'Ação Bloqueada',
+          description: `O Caixa de ${targetEmpName} está FECHADO. Não é possível lançar novas despesas para esta rota.`,
+          variant: 'destructive',
+        })
+        return
+      }
     }
 
     setPreselectedEmployee({ id: targetEmpId, name: targetEmpName })
@@ -270,12 +279,13 @@ export default function CaixaPage() {
   }
 
   const handleAddExpense = (empId: number, empName: string) => {
-    // Double check restriction here as well
+    // Check restriction
     const empSummary = summaryData.find((s) => s.funcionarioId === empId)
-    if (empSummary && empSummary.hasClosingRecord) {
+    // Only block if status is 'Fechado'
+    if (empSummary && empSummary.dbStatus === 'Fechado') {
       toast({
         title: 'Bloqueado',
-        description: 'Fechamento já iniciado.',
+        description: 'Caixa fechado.',
         variant: 'destructive',
       })
       return
@@ -771,6 +781,9 @@ export default function CaixaPage() {
         onOpenChange={setIsExpenseDialogOpen}
         onSuccess={() => fetchData(selectedRouteId)}
         preselectedEmployee={preselectedEmployee}
+        activeRouteId={
+          selectedRoute ? selectedRoute.id : undefined // Pass route ID
+        }
       />
 
       <ReceiptsDetailDialog

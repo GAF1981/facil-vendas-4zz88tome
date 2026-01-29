@@ -43,6 +43,7 @@ interface ExpenseFormDialogProps {
   onSuccess: () => void
   preselectedEmployee?: { id: number; name: string } | null
   preselectedVehicleId?: number | null
+  activeRouteId?: number // Added
 }
 
 export function ExpenseFormDialog({
@@ -51,6 +52,7 @@ export function ExpenseFormDialog({
   onSuccess,
   preselectedEmployee,
   preselectedVehicleId,
+  activeRouteId,
 }: ExpenseFormDialogProps) {
   const [loading, setLoading] = useState(false)
   const [employees, setEmployees] = useState<Employee[]>([])
@@ -233,6 +235,7 @@ export function ExpenseFormDialog({
         prestador_servico: data.prestador_servico || null,
         tipo_servico: data.tipo_servico || null,
         tipo_combustivel: isFuel ? data.tipo_combustivel : null,
+        rota_id: activeRouteId, // Use the active route ID
       })
 
       toast({

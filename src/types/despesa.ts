@@ -19,6 +19,7 @@ export interface Despesa {
   prestador_servico?: string | null
   tipo_servico?: string | null
   tipo_combustivel?: 'alcool' | 'gasolina' | null
+  rota_id?: number | null // Added
   // Joined
   funcionario_nome?: string
   veiculo_placa?: string

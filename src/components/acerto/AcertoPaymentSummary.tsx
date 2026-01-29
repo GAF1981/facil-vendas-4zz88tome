@@ -340,6 +340,13 @@ export function AcertoPaymentSummary({
           )
         }
 
+        // When value changes, recalculate Paid Value based on dates logic
+        // But also, if manual editing is enabled (which it is for Parcelar), we might want to respect user input?
+        // Current logic: calculatePaidValue is strict based on Due Date > Today = 0.
+        // If we want manual override, we might need another field/flag.
+        // For now, let's assume the strict date logic applies unless we specifically change paidValue too.
+        // BUT: User story says "Flexible Installment Editing... edit the 'valor registrado'".
+        // This refers to `value`.
         if (field === 'value') {
           currentDetail.paidValue = calculatePaidValue(
             method,
@@ -355,19 +362,15 @@ export function AcertoPaymentSummary({
         let newValue = p.value
         let newPaidValue = p.paidValue
 
-        if (field === 'value') {
-          newValue = Number(
-            newDetails.reduce((acc, curr) => acc + curr.value, 0).toFixed(2),
-          )
-        }
+        // Recalculate main values based on details sum
+        newValue = Number(
+          newDetails.reduce((acc, curr) => acc + curr.value, 0).toFixed(2),
+        )
 
-        if (!p.hasZeroDownPayment) {
-          newPaidValue = Number(
-            newDetails
-              .reduce((acc, curr) => acc + curr.paidValue, 0)
-              .toFixed(2),
-          )
-        }
+        // For paidValue, sum up all details paid values
+        newPaidValue = Number(
+          newDetails.reduce((acc, curr) => acc + curr.paidValue, 0).toFixed(2),
+        )
 
         return {
           ...p,
@@ -717,7 +720,8 @@ export function AcertoPaymentSummary({
                                       step="0.01"
                                       className="h-8 pl-7 text-sm"
                                       value={inst.value}
-                                      disabled={disabled || isParcelar}
+                                      // Enable editing if isParcelar is true (Flexible Installment Editing)
+                                      disabled={disabled}
                                       onChange={(e) =>
                                         handleUpdateInstallment(
                                           entry.method,

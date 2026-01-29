@@ -11,6 +11,7 @@ import {
   Save,
   AlertTriangle,
   Clock,
+  ShieldAlert,
 } from 'lucide-react'
 import { usePermissions } from '@/hooks/use-permissions'
 import { useUserStore } from '@/stores/useUserStore'
@@ -21,6 +22,7 @@ import {
 } from '@/components/ui/popover'
 import { useEffect, useState } from 'react'
 import { caixaService, CaixaSummaryRow } from '@/services/caixaService'
+import { rotaService } from '@/services/rotaService'
 
 interface RotaHeaderProps {
   activeRota: Rota | null
@@ -41,24 +43,36 @@ export function RotaHeader({
   onExport,
   loading,
   hasPendingUpdates = false,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   pendingClosures: legacyPendingClosures = [],
 }: RotaHeaderProps) {
   const displayRota = activeRota || lastRota
   const { canAccess } = usePermissions()
   const { employee } = useUserStore()
   const [summaryData, setSummaryData] = useState<CaixaSummaryRow[]>([])
+  const [activeSellers, setActiveSellers] = useState<Set<number>>(new Set())
   const [alertsLoading, setAlertsLoading] = useState(false)
 
   useEffect(() => {
     if (activeRota) {
       setAlertsLoading(true)
-      caixaService
-        .getFinancialSummary(activeRota)
-        .then(setSummaryData)
+      Promise.all([
+        caixaService.getFinancialSummary(activeRota),
+        rotaService.getRotaItems(activeRota.id),
+      ])
+        .then(([summary, items]) => {
+          setSummaryData(summary)
+          const sellers = new Set<number>()
+          items.forEach((item) => {
+            if (item.vendedor_id) sellers.add(item.vendedor_id)
+          })
+          setActiveSellers(sellers)
+        })
         .catch(console.error)
         .finally(() => setAlertsLoading(false))
     } else {
       setSummaryData([])
+      setActiveSellers(new Set())
     }
   }, [activeRota])
 
@@ -78,6 +92,7 @@ export function RotaHeader({
   })()
 
   // ALERT 1: Pendencia de Fechamento (Open/Active without record)
+  // This checks employees found in 'summaryData' (which usually comes from Receipts/Expenses activity)
   const pendingClosingEmployees = summaryData
     .filter((row) => !row.hasClosingRecord) // Not closed
     .map((row) => row.funcionarioNome)
@@ -87,8 +102,39 @@ export function RotaHeader({
     .filter((row) => row.hasClosingRecord && row.dbStatus === 'Aberto')
     .map((row) => row.funcionarioNome)
 
+  // ALERT 3: Pendencia de Rota (Sellers in RotaItems who don't have a record)
+  // This is stricter: checks ALL sellers assigned to the route, even if no sales.
+  const pendingRouteEmployees: string[] = []
+  if (!alertsLoading) {
+    const closedSellerIds = new Set(
+      summaryData
+        .filter((row) => row.hasClosingRecord)
+        .map((row) => row.funcionarioId),
+    )
+
+    // We need employee names for the IDs in activeSellers
+    // summaryData might not have them if they had NO sales/expenses/record.
+    // So we rely on mapping logic or fetch?
+    // Optimization: The alert text just needs names. If summaryData has it fine.
+    // If not, we might need a lookup map.
+    // For now, let's assume summaryData catches most active ones.
+    // If a seller is inactive (no sales), they might not be in summaryData unless we fetch ALL employees.
+    // caixaService.getFinancialSummary fetches ALL employees. So summaryData has everyone.
+    activeSellers.forEach((sellerId) => {
+      if (!closedSellerIds.has(sellerId)) {
+        const emp = summaryData.find((s) => s.funcionarioId === sellerId)
+        if (emp) {
+          pendingRouteEmployees.push(emp.funcionarioNome)
+        } else {
+          pendingRouteEmployees.push(`Vendedor #${sellerId}`)
+        }
+      }
+    })
+  }
+
   const hasPendingClosing = pendingClosingEmployees.length > 0
   const hasPendingConfirmation = pendingConfirmationEmployees.length > 0
+  const hasPendingRoute = pendingRouteEmployees.length > 0
 
   return (
     <Card className="w-full border-l-4 border-l-primary shadow-sm bg-muted/20">
@@ -161,8 +207,44 @@ export function RotaHeader({
           ) : (
             canFinalize && (
               <>
-                {/* Alert: Pendência de Fechamento */}
-                {hasPendingClosing && (
+                {/* Alert: Pendência de Rota (Yellow) */}
+                {hasPendingRoute && (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 gap-2 h-9 border border-yellow-200 animate-pulse"
+                      >
+                        <ShieldAlert className="h-4 w-4" />
+                        Pendência de Rota
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="w-80 bg-yellow-50 border-yellow-200"
+                      align="end"
+                    >
+                      <div className="space-y-2">
+                        <h4 className="font-semibold text-yellow-900 flex items-center gap-2">
+                          <ShieldAlert className="h-4 w-4" />
+                          Vendedores Pendentes
+                        </h4>
+                        <p className="text-xs text-yellow-800">
+                          Todos os vendedores da rota devem fechar o caixa para
+                          prosseguir:
+                        </p>
+                        <ul className="list-disc pl-4 text-sm text-yellow-900 max-h-40 overflow-y-auto">
+                          {pendingRouteEmployees.map((name, idx) => (
+                            <li key={idx}>{name}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                )}
+
+                {/* Alert: Pendência de Fechamento (Red) - Kept for visibility of active cashiers */}
+                {!hasPendingRoute && hasPendingClosing && (
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
@@ -197,7 +279,7 @@ export function RotaHeader({
                   </Popover>
                 )}
 
-                {/* Alert: Pendência de Confirmação */}
+                {/* Alert: Pendência de Confirmação (Orange) */}
                 {hasPendingConfirmation && (
                   <Popover>
                     <PopoverTrigger asChild>
@@ -240,7 +322,7 @@ export function RotaHeader({
                     disabled={
                       loading ||
                       hasPendingUpdates ||
-                      hasPendingClosing ||
+                      hasPendingRoute || // Strict check
                       hasPendingConfirmation
                     }
                     variant="destructive"
@@ -253,9 +335,9 @@ export function RotaHeader({
                     )}
                     Finalizar Rota
                   </Button>
-                  {(hasPendingClosing || hasPendingConfirmation) && (
+                  {(hasPendingRoute || hasPendingConfirmation) && (
                     <div className="absolute top-full right-0 mt-1 w-64 p-2 bg-black/80 text-white text-xs rounded hidden group-hover:block z-50 text-center">
-                      Não é possível finalizar. Existem caixas abertos ou
+                      Não é possível finalizar. Existem caixas não fechados ou
                       pendentes de confirmação.
                     </div>
                   )}
