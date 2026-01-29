@@ -31,6 +31,16 @@ export const rotaService = {
     return data as Rota | null
   },
 
+  async getAllRotas() {
+    const { data, error } = await supabase
+      .from('ROTA')
+      .select('*')
+      .order('id', { ascending: false })
+
+    if (error) throw error
+    return data as Rota[]
+  },
+
   async startRota() {
     const { data: maxIdData } = await supabase
       .from('ROTA')

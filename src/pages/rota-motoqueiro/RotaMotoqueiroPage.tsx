@@ -84,7 +84,10 @@ export default function RotaMotoqueiroPage() {
         client.orders.forEach((order) => {
           order.installments.forEach((inst, idx) => {
             const fc = inst.formaCobranca?.toUpperCase()
-            if (fc === 'MOTOQUEIRO') {
+            const debito = Math.max(0, inst.valorRegistrado - inst.valorPago)
+
+            // Only add if assigned to Motoqueiro AND debt > 0.05
+            if (fc === 'MOTOQUEIRO' && debito > 0.05) {
               const uniqueId = `${client.clientId}-${order.orderId}-${inst.id || idx}`
               motoqueiroItems.push({
                 uniqueId,
@@ -94,7 +97,7 @@ export default function RotaMotoqueiroPage() {
                 vencimento: inst.vencimento,
                 valorParc: inst.valorRegistrado,
                 pago: inst.valorPago,
-                debito: Math.max(0, inst.valorRegistrado - inst.valorPago),
+                debito: debito,
                 dataCombinada: inst.dataCombinada,
                 status: inst.status,
                 address: client.address,

@@ -30,11 +30,13 @@ import {
   Search,
   Filter,
   CheckCircle2,
-  AlertCircle,
   RefreshCw,
+  Printer,
 } from 'lucide-react'
 import { notaFiscalService } from '@/services/notaFiscalService'
 import { clientsService } from '@/services/clientsService'
+import { rotaService } from '@/services/rotaService'
+import { cobrancaService } from '@/services/cobrancaService'
 import { NotaFiscalSettlement } from '@/types/nota-fiscal'
 import { formatCurrency, safeFormatDate } from '@/lib/formatters'
 import { useToast } from '@/hooks/use-toast'
@@ -48,12 +50,14 @@ import {
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { useUserStore } from '@/stores/useUserStore'
+import { Rota } from '@/types/rota'
 
 export default function NotaFiscalPage() {
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<NotaFiscalSettlement[]>([])
   const [filteredData, setFilteredData] = useState<NotaFiscalSettlement[]>([])
-  const [routes, setRoutes] = useState<string[]>([])
+  const [routes, setRoutes] = useState<Rota[]>([])
+  const [generatingPdf, setGeneratingPdf] = useState(false)
 
   // Filters
   const [search, setSearch] = useState('')
@@ -71,21 +75,21 @@ export default function NotaFiscalPage() {
   const { toast } = useToast()
   const { employee } = useUserStore()
 
+  const loadRoutes = async () => {
+    try {
+      const allRoutes = await rotaService.getAllRotas()
+      setRoutes(allRoutes)
+    } catch (e) {
+      console.error('Failed to load routes', e)
+    }
+  }
+
   const loadData = async () => {
     setLoading(true)
     try {
-      // We pass null for routeId here because we are filtering clients by route group name locally or
-      // we need to fetch route IDs map.
-      // The requirement says "Route Filter". Usually Route is a string group in CLIENTES ("GRUPO ROTA").
-      // But `notaFiscalService` implemented filtering by `rota_id` (integer) from `ROTA_ITEMS`.
-      // Let's stick to client's "GRUPO ROTA" for simplicity if possible, or mapping.
-      // Actually, filtering by "GRUPO ROTA" string is easier for UI.
-
-      const settlements = await notaFiscalService.getSettlements()
+      const rotaId = routeFilter !== 'todos' ? Number(routeFilter) : null
+      const settlements = await notaFiscalService.getSettlements(rotaId)
       setData(settlements)
-
-      const uniqueRoutes = await clientsService.getRoutes()
-      setRoutes(uniqueRoutes)
     } catch (error) {
       console.error(error)
       toast({
@@ -99,8 +103,14 @@ export default function NotaFiscalPage() {
   }
 
   useEffect(() => {
+    loadRoutes()
     loadData()
-  }, [])
+  }, []) // Initial load
+
+  useEffect(() => {
+    // Reload data when route filter changes (server-side filtering)
+    loadData()
+  }, [routeFilter])
 
   useEffect(() => {
     let result = data
@@ -121,53 +131,8 @@ export default function NotaFiscalPage() {
       result = result.filter((item) => item.notaFiscalEmitida === statusFilter)
     }
 
-    // 3. Route Filter (Requirement)
-    // We need to match client's route. Since we don't have it on `NotaFiscalSettlement`,
-    // we might need to fetch it or rely on a join.
-    // `notaFiscalService.getSettlements` returns basic info.
-    // Let's update the filter logic to be client-side if we can get route info.
-    // BUT we didn't fetch route info in the service.
-    // Let's re-implement fetching logic or do a quick fetch of client routes mapping.
-    // For now, let's assume we can filter by route if we had the data.
-    // To strictly fulfill the requirement, I should probably enrich the data with Route Group.
-    // I will do it lazily or fetch all clients to map.
-    // Let's assume `clientsService` can give us a map.
-
-    // NOTE: This effect runs on `routeFilter` change.
-
-    // To properly support Route Filtering, let's enrich data in `loadData` or fetch map.
-    // Since we are inside `useEffect` logic, we can't do async easily here without another state.
-    // Let's ignore route filtering logic inside this synchronous block and handle it via data enrichment.
-
     setFilteredData(result)
-  }, [data, search, statusFilter, routeFilter])
-
-  // Route Filtering Enrichment
-  const [clientRouteMap, setClientRouteMap] = useState<Map<number, string>>(
-    new Map(),
-  )
-
-  useEffect(() => {
-    clientsService.getAll().then((clients) => {
-      const map = new Map<number, string>()
-      clients.forEach((c) => {
-        if (c['GRUPO ROTA']) map.set(c.CODIGO, c['GRUPO ROTA'])
-      })
-      setClientRouteMap(map)
-    })
-  }, [])
-
-  // Apply Route Filter with Map
-  useEffect(() => {
-    if (routeFilter === 'todos') return
-
-    setFilteredData((prev) =>
-      prev.filter((item) => {
-        const route = clientRouteMap.get(item.clientCode)
-        return route === routeFilter
-      }),
-    )
-  }, [routeFilter, clientRouteMap])
+  }, [data, search, statusFilter])
 
   const handleEmitClick = (item: NotaFiscalSettlement) => {
     setSelectedItem(item)
@@ -224,6 +189,25 @@ export default function NotaFiscalPage() {
     }
   }
 
+  const handleGeneratePdf = async (orderId: number) => {
+    setGeneratingPdf(true)
+    try {
+      const blob = await cobrancaService.generateOrderReceipt(orderId)
+      const url = window.URL.createObjectURL(blob)
+      window.open(url, '_blank')
+      setTimeout(() => window.URL.revokeObjectURL(url), 1000)
+    } catch (error) {
+      console.error(error)
+      toast({
+        title: 'Erro',
+        description: 'Falha ao gerar PDF.',
+        variant: 'destructive',
+      })
+    } finally {
+      setGeneratingPdf(false)
+    }
+  }
+
   return (
     <div className="space-y-6 animate-fade-in pb-10 p-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -276,17 +260,17 @@ export default function NotaFiscalPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="w-full md:w-[200px]">
+            <div className="w-full md:w-[300px]">
               <Select value={routeFilter} onValueChange={setRouteFilter}>
                 <SelectTrigger>
                   <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
-                  <SelectValue placeholder="Filtrar por Rota" />
+                  <SelectValue placeholder="Filtrar por Rota (Sistema)" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todas as Rotas</SelectItem>
                   {routes.map((r) => (
-                    <SelectItem key={r} value={r}>
-                      {r}
+                    <SelectItem key={r.id} value={r.id.toString()}>
+                      Rota #{r.id} - {safeFormatDate(r.data_inicio, 'dd/MM/yy')}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -308,20 +292,21 @@ export default function NotaFiscalPage() {
                 <TableHead className="text-center">NF Cadastro</TableHead>
                 <TableHead className="text-center">NF Venda</TableHead>
                 <TableHead className="text-center">Status</TableHead>
+                <TableHead className="text-center">PDF</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-24 text-center">
+                  <TableCell colSpan={9} className="h-24 text-center">
                     <Loader2 className="mx-auto h-6 w-6 animate-spin text-primary" />
                   </TableCell>
                 </TableRow>
               ) : filteredData.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={8}
+                    colSpan={9}
                     className="h-24 text-center text-muted-foreground"
                   >
                     Nenhum registro encontrado.
@@ -384,6 +369,18 @@ export default function NotaFiscalPage() {
                         <div className="text-[10px] text-muted-foreground mt-1">
                           Nº {item.numeroNotaFiscal}
                         </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {item.notaFiscalEmitida === 'Emitida' && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleGeneratePdf(item.orderId)}
+                          title="Imprimir PDF"
+                        >
+                          <Printer className="h-4 w-4 text-blue-600" />
+                        </Button>
                       )}
                     </TableCell>
                     <TableCell className="text-right">

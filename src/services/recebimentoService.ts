@@ -450,6 +450,39 @@ export const recebimentoService = {
     // 4. Update Debt History
     try {
       await reportsService.updateDebtHistoryForOrder(orderId)
+
+      // 5. Automatic Clearing Logic for fully paid installments
+      if (installmentId && installmentId > 0) {
+        // Fetch current status of this installment
+        const { data: recData } = await supabase
+          .from('RECEBIMENTOS')
+          .select('valor_registrado')
+          .eq('id', installmentId)
+          .single()
+
+        // Sum all payments linked to this receivable (ID_da_fêmea)
+        const { data: linkedPayments } = await supabase
+          .from('RECEBIMENTOS')
+          .select('valor_pago')
+          .eq('ID_da_fêmea', installmentId)
+
+        const totalPaid =
+          linkedPayments?.reduce(
+            (acc, curr) => acc + (curr.valor_pago || 0),
+            0,
+          ) || 0
+
+        const registered = recData?.valor_registrado || 0
+
+        // If fully paid (allowing small float tolerance)
+        if (totalPaid >= registered - 0.05) {
+          await supabase
+            .from('RECEBIMENTOS')
+            .update({ forma_cobranca: null, rota_id: null } as any)
+            .eq('id', installmentId)
+        }
+      }
+
       return { success: true }
     } catch (syncError) {
       console.error('Sync failed for order:', orderId, syncError)
