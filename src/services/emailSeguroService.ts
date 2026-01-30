@@ -3,9 +3,9 @@ import { supabase } from '@/lib/supabase/client'
 export const emailSeguroService = {
   async getRecipientEmail() {
     const { data, error } = await supabase
-      .from('configuracoes' as any)
+      .from('configuracoes')
       .select('valor')
-      .eq('chave', 'email_relatorio_rota')
+      .eq('chave', 'destinatario_email')
       .single()
 
     if (error) {
@@ -18,10 +18,10 @@ export const emailSeguroService = {
 
   async updateRecipientEmail(email: string) {
     const { data, error } = await supabase
-      .from('configuracoes' as any)
+      .from('configuracoes')
       .upsert(
         {
-          chave: 'email_relatorio_rota',
+          chave: 'destinatario_email',
           valor: email,
         },
         { onConflict: 'chave' },
@@ -32,14 +32,25 @@ export const emailSeguroService = {
     return data
   },
 
-  async sendReport() {
+  async sendReport(userEmail?: string) {
     const { data, error } = await supabase.functions.invoke(
       'send-route-report',
       {
+        body: { userEmail },
         method: 'POST',
       },
     )
-    if (error) throw error
+
+    // Check for function invocation error (network, 500, etc)
+    if (error) {
+      throw new Error(error.message || 'Erro ao comunicar com o servidor.')
+    }
+
+    // Check for logical error returned by the function
+    if (data && data.error) {
+      throw new Error(data.error)
+    }
+
     return data
   },
 }

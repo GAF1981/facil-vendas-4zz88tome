@@ -448,6 +448,24 @@ export type Database = {
         }
         Relationships: []
       }
+      configuracoes: {
+        Row: {
+          chave: string
+          id: number
+          valor: string | null
+        }
+        Insert: {
+          chave: string
+          id?: number
+          valor?: string | null
+        }
+        Update: {
+          chave?: string
+          id?: number
+          valor?: string | null
+        }
+        Relationships: []
+      }
       configuracoes_sistema: {
         Row: {
           chave: string

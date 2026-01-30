@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { emailSeguroService } from '@/services/emailSeguroService'
+import { supabase } from '@/lib/supabase/client'
 
 export default function EmailSeguroPage() {
   const [loading, setLoading] = useState(false)
@@ -27,11 +28,20 @@ export default function EmailSeguroPage() {
   const [recipientEmail, setRecipientEmail] = useState('')
   const [originalEmail, setOriginalEmail] = useState('')
   const [emailError, setEmailError] = useState('')
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | undefined>()
   const { toast } = useToast()
 
   useEffect(() => {
     loadConfig()
+    loadUser()
   }, [])
+
+  const loadUser = async () => {
+    const { data } = await supabase.auth.getUser()
+    if (data.user?.email) {
+      setCurrentUserEmail(data.user.email)
+    }
+  }
 
   const loadConfig = async () => {
     try {
@@ -96,17 +106,19 @@ export default function EmailSeguroPage() {
   const handleSendReport = async () => {
     setLoading(true)
     try {
-      await emailSeguroService.sendReport()
+      await emailSeguroService.sendReport(currentUserEmail)
       toast({
         title: 'Sucesso',
-        description: 'Relatório enviado com sucesso!',
+        description: `Relatório enviado com sucesso para ${originalEmail}`,
         className: 'bg-green-600 text-white',
       })
-    } catch (error) {
+    } catch (error: any) {
       console.error(error)
+      const errorMessage =
+        error instanceof Error ? error.message : 'Falha desconhecida'
       toast({
-        title: 'Erro',
-        description: 'Falha ao enviar o relatório. Tente novamente.',
+        title: 'Erro ao enviar',
+        description: errorMessage,
         variant: 'destructive',
       })
     } finally {
