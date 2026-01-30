@@ -88,7 +88,10 @@ export const emailSeguroService = {
     // Check for logical error returned by the function in a 200 OK response (legacy support or if function handles it)
     if (data) {
       if (data.error) throw new Error(data.error)
-      if (data.message && !data.success) throw new Error(data.message)
+      // Check for success: false pattern
+      if (data.message && data.success === false) throw new Error(data.message)
+      // If there is a message and no success indicator, it might be an error if status wasn't 200 (handled above by error)
+      // But if status was 200, we assume success unless explicit error field
     }
 
     return data

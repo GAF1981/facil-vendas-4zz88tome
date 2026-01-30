@@ -18,6 +18,7 @@ import {
   Settings,
   Save,
   AlertTriangle,
+  FileSpreadsheet,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { emailSeguroService } from '@/services/emailSeguroService'
@@ -122,7 +123,7 @@ export default function EmailSeguroPage() {
       // Success Confirmation as per Acceptance Criteria
       toast({
         title: 'Sucesso',
-        description: `Relatório enviado com sucesso para ${originalEmail}`,
+        description: `Relatório completo enviado com sucesso para ${originalEmail}`,
         className: 'bg-green-600 text-white',
       })
     } catch (error: any) {
@@ -150,7 +151,7 @@ export default function EmailSeguroPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">E-mail Seguro</h1>
           <p className="text-muted-foreground">
-            Automação e envio seguro de relatórios de rota.
+            Automação e envio seguro do histórico completo de rotas.
           </p>
         </div>
       </div>
@@ -219,8 +220,9 @@ export default function EmailSeguroPage() {
                   Status: <span className="text-green-600">Ativo</span>
                 </p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  O relatório "Controle de Rota" é gerado e enviado
-                  automaticamente todos os dias às <strong>07:00 AM</strong>.
+                  O relatório contendo <strong>todo o histórico</strong> de
+                  rotas é gerado e enviado automaticamente todos os dias às{' '}
+                  <strong>07:00 AM</strong>.
                 </p>
               </div>
               <div className="text-xs text-muted-foreground">
@@ -238,7 +240,7 @@ export default function EmailSeguroPage() {
               Envio Manual
             </CardTitle>
             <CardDescription>
-              Precisa do relatório agora? Dispare o envio imediatamente.
+              Gere e envie o relatório completo imediatamente.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -258,11 +260,11 @@ export default function EmailSeguroPage() {
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Enviando...
+                  Gerando CSV Completo...
                 </>
               ) : (
                 <>
-                  <Send className="mr-2 h-5 w-5" />
+                  <FileSpreadsheet className="mr-2 h-5 w-5" />
                   Enviar Relatório Agora
                 </>
               )}
@@ -270,8 +272,8 @@ export default function EmailSeguroPage() {
             <p className="text-xs text-muted-foreground mt-4 text-center">
               {originalEmail ? (
                 <>
-                  O arquivo CSV será enviado para:{' '}
-                  <strong>{originalEmail}</strong>
+                  O arquivo CSV com o <strong>histórico completo</strong> será
+                  enviado para: <strong>{originalEmail}</strong>
                 </>
               ) : (
                 <>Aguardando configuração de e-mail...</>

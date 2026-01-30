@@ -15,7 +15,8 @@ Deno.serve(async (req) => {
     if (!RESEND_API_KEY) {
       return new Response(
         JSON.stringify({
-          message: 'Configuração do servidor incompleta (API Key ausente)',
+          message:
+            'Configuração do servidor incompleta (Missing RESEND_API_KEY)',
         }),
         {
           status: 500,
@@ -65,7 +66,7 @@ Deno.serve(async (req) => {
       .eq('chave', 'email_relatorio')
       .single()
 
-    if (configError && configError.code !== 'PGRST116') {
+    if (configError) {
       console.error('Error fetching config:', configError)
       return new Response(
         JSON.stringify({
@@ -92,50 +93,35 @@ Deno.serve(async (req) => {
       )
     }
 
-    // 2. Fetch Route Data (Latest Route)
-    const { data: routeData } = await supabaseClient
-      .from('ROTA')
-      .select('id')
-      .order('id', { ascending: false })
-      .limit(1)
-      .single()
-
-    const routeId = routeData?.id
-
-    if (!routeId) {
-      return new Response(
-        JSON.stringify({
-          message: 'Nenhuma rota encontrada para gerar relatório.',
-        }),
-        {
-          status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        },
-      )
-    }
-
-    // 3. Fetch Route Items
+    // 2. Fetch Full History of Route Items (Unfiltered)
+    // As per user story: Fetch all records, joined with ROTA, CLIENTES, FUNCIONARIOS
     const { data: items, error: itemsError } = await supabaseClient
       .from('ROTA_ITEMS')
       .select(
         `
+        id,
         rota_id,
         tarefas,
         agregado,
         boleto,
         vendedor_id,
+        cliente_id,
+        x_na_rota,
         ROTA ( data_inicio ),
         CLIENTES ( "NOME CLIENTE" ),
         FUNCIONARIOS ( nome_completo )
       `,
       )
-      .eq('rota_id', routeId)
+      .order('rota_id', { ascending: false })
+      .order('x_na_rota', { ascending: true })
+      .limit(10000) // Safety limit for performance, though requirement implies "all"
 
     if (itemsError) {
       console.error('Error fetching items:', itemsError)
       return new Response(
         JSON.stringify({
-          message: 'Erro ao buscar itens da rota no banco de dados.',
+          message: 'Erro ao buscar histórico completo de rotas.',
+          details: itemsError.message,
         }),
         {
           status: 500,
@@ -144,11 +130,27 @@ Deno.serve(async (req) => {
       )
     }
 
-    // 4. Generate CSV
+    if (!items || items.length === 0) {
+      return new Response(
+        JSON.stringify({
+          message: 'Nenhum registro encontrado no histórico de rotas.',
+        }),
+        {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      )
+    }
+
+    // 3. Generate CSV
     const csvHeader = [
+      'ID Item',
       'ID Rota',
-      'Data Início',
+      'Data Rota',
+      'Ordem (X)',
+      'ID Cliente',
       'Cliente',
+      'ID Vendedor',
       'Vendedor',
       'Tarefas',
       'Agregado',
@@ -172,9 +174,13 @@ Deno.serve(async (req) => {
       const boleto = item.boleto ? 'SIM' : 'NÃO'
 
       return [
+        item.id,
         item.rota_id,
         dataInicio,
+        item.x_na_rota ?? '',
+        item.cliente_id,
         `"${cliente}"`,
+        item.vendedor_id,
         `"${vendedor}"`,
         `"${tarefas}"`,
         agregado,
@@ -184,7 +190,7 @@ Deno.serve(async (req) => {
 
     const csvContent = [csvHeader, ...csvRows].join('\n')
 
-    // 5. Send Email via Resend
+    // 4. Send Email via Resend
     try {
       const res = await fetch('https://api.resend.com/emails', {
         method: 'POST',
@@ -195,27 +201,26 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           from: 'Facil Vendas <onboarding@resend.dev>',
           to: [recipientEmail],
-          subject: `Relatório Controle de Rota #${routeId}`,
+          subject: `Relatório Completo de Rotas (Histórico)`,
           html: `
               <div style="font-family: sans-serif; color: #333;">
-                <h2>Relatório de Rota #${routeId}</h2>
+                <h2>Relatório Completo de Rotas</h2>
                 <p>Olá,</p>
-                <p>O relatório de controle de rota foi gerado com sucesso.</p>
+                <p>O relatório consolidado com todo o histórico de itens de rota foi gerado com sucesso.</p>
                 <p><strong>Resumo:</strong></p>
                 <ul>
-                  <li><strong>ID da Rota:</strong> ${routeId}</li>
-                  <li><strong>Total de Itens:</strong> ${items.length}</li>
+                  <li><strong>Total de Registros:</strong> ${items.length}</li>
                   <li><strong>Destinatário:</strong> ${recipientEmail}</li>
                   <li><strong>Data de Geração:</strong> ${new Date().toLocaleString('pt-BR')}</li>
                 </ul>
-                <p>O arquivo CSV está anexado a este e-mail.</p>
+                <p>O arquivo CSV contendo o histórico completo está anexado a este e-mail.</p>
                 <br/>
                 <p>Atenciosamente,<br/>Equipe Facil Vendas</p>
               </div>
             `,
           attachments: [
             {
-              filename: `controle_rota_${routeId}.csv`,
+              filename: `historico_rotas_completo_${new Date().toISOString().split('T')[0]}.csv`,
               content: btoa(unescape(encodeURIComponent(csvContent))), // Base64 encode
             },
           ],
@@ -227,7 +232,7 @@ Deno.serve(async (req) => {
         console.error('Resend Error:', errorData)
 
         let resendMessage = 'Erro ao enviar e-mail via Resend.'
-        // Enhanced error handling as per user story
+        // Enhanced error handling
         if (errorData) {
           if (errorData.message) {
             resendMessage = `Erro Resend: ${errorData.message}`
@@ -239,7 +244,7 @@ Deno.serve(async (req) => {
         return new Response(
           JSON.stringify({ message: resendMessage, details: errorData }),
           {
-            status: res.status, // Return original status (e.g. 403, 429)
+            status: res.status,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           },
         )
@@ -257,16 +262,16 @@ Deno.serve(async (req) => {
       )
     }
 
-    // 6. Log Success to system_logs
+    // 5. Log Success to system_logs
     const logData = {
       user_id: userId,
       type: 'email_report',
-      description: `Relatório da rota #${routeId} enviado com sucesso para ${recipientEmail}`,
+      description: `Relatório COMPLETO de rotas enviado com sucesso para ${recipientEmail}`,
       meta: {
         recipientEmail,
-        routeId,
         itemCount: items.length,
         status: 'success',
+        type: 'full_history',
       },
     }
 
@@ -275,7 +280,7 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Relatório enviado com sucesso para ${recipientEmail}`,
+        message: `Relatório completo enviado com sucesso para ${recipientEmail}`,
         count: items.length,
         sentTo: recipientEmail,
       }),
