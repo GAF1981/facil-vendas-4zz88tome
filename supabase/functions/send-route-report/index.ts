@@ -14,18 +14,18 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     )
 
-    // 0. Fetch configured email recipient
+    // 0. Fetch configured email recipient from 'configuracoes' table
     const { data: configData, error: configError } = await supabaseClient
-      .from('configuracoes_sistema')
+      .from('configuracoes')
       .select('valor')
-      .eq('chave', 'email_destinatario_relatorio')
+      .eq('chave', 'email_relatorio_rota')
       .single()
 
     if (configError && configError.code !== 'PGRST116') {
       console.error('Error fetching config:', configError)
-      // Fallback or continue? We'll assume admin if missing, but logging is important.
     }
 
+    // Default to a fallback if not configured
     const recipientEmail = configData?.valor || 'admin@example.com'
 
     // Fetch data for the report

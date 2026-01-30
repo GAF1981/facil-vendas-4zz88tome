@@ -3,9 +3,9 @@ import { supabase } from '@/lib/supabase/client'
 export const emailSeguroService = {
   async getRecipientEmail() {
     const { data, error } = await supabase
-      .from('configuracoes_sistema' as any)
+      .from('configuracoes' as any)
       .select('valor')
-      .eq('chave', 'email_destinatario_relatorio')
+      .eq('chave', 'email_relatorio_rota')
       .single()
 
     if (error) {
@@ -17,14 +17,12 @@ export const emailSeguroService = {
   },
 
   async updateRecipientEmail(email: string) {
-    // First try to find the record to get the ID, or just upsert by key
     const { data, error } = await supabase
-      .from('configuracoes_sistema' as any)
+      .from('configuracoes' as any)
       .upsert(
         {
-          chave: 'email_destinatario_relatorio',
+          chave: 'email_relatorio_rota',
           valor: email,
-          updated_at: new Date().toISOString(),
         },
         { onConflict: 'chave' },
       )

@@ -39,6 +39,10 @@ export default function EmailSeguroPage() {
       if (email) {
         setRecipientEmail(email)
         setOriginalEmail(email)
+      } else {
+        // Fallback default from migration if fetching failed or empty
+        setRecipientEmail('admin@example.com')
+        setOriginalEmail('admin@example.com')
       }
     } catch (error) {
       console.error('Failed to load email config', error)
@@ -74,7 +78,7 @@ export default function EmailSeguroPage() {
       setOriginalEmail(recipientEmail)
       toast({
         title: 'Sucesso',
-        description: 'E-mail atualizado com sucesso!',
+        description: 'E-mail atualizado com sucesso',
         className: 'bg-green-600 text-white',
       })
     } catch (error) {
@@ -145,7 +149,10 @@ export default function EmailSeguroPage() {
                   type="email"
                   placeholder="exemplo@empresa.com"
                   value={recipientEmail}
-                  onChange={(e) => setRecipientEmail(e.target.value)}
+                  onChange={(e) => {
+                    setRecipientEmail(e.target.value)
+                    if (emailError) setEmailError('')
+                  }}
                   className={emailError ? 'border-red-500' : ''}
                 />
                 {emailError && (
@@ -156,10 +163,7 @@ export default function EmailSeguroPage() {
               </div>
               <Button
                 onClick={handleSaveConfig}
-                disabled={
-                  savingConfig ||
-                  (recipientEmail === originalEmail && !emailError)
-                }
+                disabled={savingConfig}
                 className="w-full sm:w-auto min-w-[120px]"
               >
                 {savingConfig ? (
@@ -167,7 +171,7 @@ export default function EmailSeguroPage() {
                 ) : (
                   <Save className="mr-2 h-4 w-4" />
                 )}
-                Salvar
+                Salvar e-mail
               </Button>
             </div>
           </CardContent>
