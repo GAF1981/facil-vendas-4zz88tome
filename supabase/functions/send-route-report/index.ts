@@ -10,6 +10,20 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // 0. Validate Environment Variables (API Key check as per AC)
+    const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
+    if (!RESEND_API_KEY) {
+      return new Response(
+        JSON.stringify({
+          message: 'Configuração do servidor incompleta (API Key ausente)',
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      )
+    }
+
     // Initialize Supabase Client with Service Role Key for DB access
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -44,18 +58,18 @@ Deno.serve(async (req) => {
     }
 
     // 1. Fetch recipient email configuration
-    // Using 'email_seguro' as per user story requirements
+    // Using 'email_relatorio' as per user story requirements
     const { data: configData, error: configError } = await supabaseClient
       .from('configuracoes')
       .select('valor')
-      .eq('chave', 'email_seguro')
+      .eq('chave', 'email_relatorio')
       .single()
 
     if (configError && configError.code !== 'PGRST116') {
       console.error('Error fetching config:', configError)
       return new Response(
         JSON.stringify({
-          error: 'Erro ao buscar configuração de e-mail no banco de dados.',
+          message: 'Erro ao buscar configuração de e-mail no banco de dados.',
         }),
         {
           status: 500,
@@ -69,8 +83,7 @@ Deno.serve(async (req) => {
     if (!recipientEmail) {
       return new Response(
         JSON.stringify({
-          error:
-            'E-mail de destinatário não configurado (chave: email_seguro).',
+          message: 'E-mail do destinatário não configurado',
         }),
         {
           status: 400,
@@ -92,7 +105,7 @@ Deno.serve(async (req) => {
     if (!routeId) {
       return new Response(
         JSON.stringify({
-          error: 'Nenhuma rota encontrada para gerar relatório.',
+          message: 'Nenhuma rota encontrada para gerar relatório.',
         }),
         {
           status: 404,
@@ -122,7 +135,7 @@ Deno.serve(async (req) => {
       console.error('Error fetching items:', itemsError)
       return new Response(
         JSON.stringify({
-          error: 'Erro ao buscar itens da rota no banco de dados.',
+          message: 'Erro ao buscar itens da rota no banco de dados.',
         }),
         {
           status: 500,
@@ -172,20 +185,6 @@ Deno.serve(async (req) => {
     const csvContent = [csvHeader, ...csvRows].join('\n')
 
     // 5. Send Email via Resend
-    const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
-
-    if (!RESEND_API_KEY) {
-      return new Response(
-        JSON.stringify({
-          error: 'Erro: API Key do Resend não configurada no servidor.',
-        }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        },
-      )
-    }
-
     try {
       const res = await fetch('https://api.resend.com/emails', {
         method: 'POST',
@@ -194,7 +193,7 @@ Deno.serve(async (req) => {
           Authorization: `Bearer ${RESEND_API_KEY}`,
         },
         body: JSON.stringify({
-          from: 'Facil Vendas <onboarding@resend.dev>', // Using valid sender as per requirements
+          from: 'Facil Vendas <onboarding@resend.dev>',
           to: [recipientEmail],
           subject: `Relatório Controle de Rota #${routeId}`,
           html: `
@@ -228,14 +227,19 @@ Deno.serve(async (req) => {
         console.error('Resend Error:', errorData)
 
         let resendMessage = 'Erro ao enviar e-mail via Resend.'
-        if (errorData && errorData.message) {
-          resendMessage = `Erro Resend: ${errorData.message}`
+        // Enhanced error handling as per user story
+        if (errorData) {
+          if (errorData.message) {
+            resendMessage = `Erro Resend: ${errorData.message}`
+          } else if (errorData.name) {
+            resendMessage = `Erro Resend: ${errorData.name}`
+          }
         }
 
         return new Response(
-          JSON.stringify({ error: resendMessage, details: errorData }),
+          JSON.stringify({ message: resendMessage, details: errorData }),
           {
-            status: res.status,
+            status: res.status, // Return original status (e.g. 403, 429)
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           },
         )
@@ -244,7 +248,7 @@ Deno.serve(async (req) => {
       console.error('Resend Exception:', resendError)
       return new Response(
         JSON.stringify({
-          error: `Falha na conexão com Resend: ${resendError.message}`,
+          message: `Falha na conexão com Resend: ${resendError.message}`,
         }),
         {
           status: 500,
@@ -285,7 +289,7 @@ Deno.serve(async (req) => {
       error instanceof Error ? error.message : 'Erro desconhecido'
     console.error('Function Error:', errorMessage)
 
-    return new Response(JSON.stringify({ error: errorMessage }), {
+    return new Response(JSON.stringify({ message: errorMessage }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
     })

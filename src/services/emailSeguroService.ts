@@ -1,11 +1,14 @@
 import { supabase } from '@/lib/supabase/client'
 
+// Use the new key 'email_relatorio' as per user story
+const CONFIG_KEY = 'email_relatorio'
+
 export const emailSeguroService = {
   async getRecipientEmail() {
     const { data, error } = await supabase
       .from('configuracoes')
       .select('valor')
-      .eq('chave', 'email_seguro')
+      .eq('chave', CONFIG_KEY)
       .single()
 
     if (error) {
@@ -21,7 +24,7 @@ export const emailSeguroService = {
       .from('configuracoes')
       .upsert(
         {
-          chave: 'email_seguro',
+          chave: CONFIG_KEY,
           valor: email,
         },
         { onConflict: 'chave' },
@@ -41,44 +44,51 @@ export const emailSeguroService = {
       },
     )
 
-    // Check for function invocation error (network, 500, etc)
+    // Check for function invocation error (network, 500, 400 etc captured by supabase-js)
     if (error) {
       console.error('Supabase Function Invoke Error:', error)
 
       let msg = 'Falha ao comunicar com o servidor de envio.'
 
-      // Try to extract detailed error message from response body if available
-      if (typeof error === 'object' && error !== null && 'message' in error) {
+      // Enhanced error parsing to support 'message' field from backend
+      if (typeof error === 'object' && error !== null) {
+        // FunctionsHttpError often puts the response body in `context` or parses it if possible
+        // But commonly error.message is the stringified JSON body if it failed HTTP check
         try {
-          // Sometimes the message is the JSON string from the backend
-          const parsed = JSON.parse(error.message)
-          if (parsed && parsed.error) {
-            msg = parsed.error
-          } else {
+          let parsed: any = null
+          // Try to parse the message if it looks like JSON
+          if ('message' in error) {
+            try {
+              parsed = JSON.parse(error.message)
+            } catch {
+              // message is not JSON, use it directly if valid
+              parsed = null
+            }
+          }
+
+          if (parsed) {
+            if (parsed.message) {
+              msg = parsed.message
+            } else if (parsed.error) {
+              msg = parsed.error
+            }
+          } else if ('message' in error) {
+            // Fallback to the raw message if it's not JSON
             msg = error.message
           }
         } catch {
-          msg = error.message
-        }
-      } else if (typeof error === 'string') {
-        try {
-          const parsed = JSON.parse(error)
-          if (parsed && parsed.error) {
-            msg = parsed.error
-          } else {
-            msg = error
-          }
-        } catch {
-          msg = error
+          // Fallback if parsing fails totally
+          if ('message' in error) msg = error.message
         }
       }
 
       throw new Error(msg)
     }
 
-    // Check for logical error returned by the function in a 200 OK response (if any)
-    if (data && data.error) {
-      throw new Error(data.error)
+    // Check for logical error returned by the function in a 200 OK response (legacy support or if function handles it)
+    if (data) {
+      if (data.error) throw new Error(data.error)
+      if (data.message && !data.success) throw new Error(data.message)
     }
 
     return data

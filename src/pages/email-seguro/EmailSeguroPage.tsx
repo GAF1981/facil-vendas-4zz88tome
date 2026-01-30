@@ -104,6 +104,7 @@ export default function EmailSeguroPage() {
   }
 
   const handleSendReport = async () => {
+    // UI Validation as per Acceptance Criteria
     if (!originalEmail) {
       toast({
         title: 'Configuração ausente',
@@ -117,6 +118,8 @@ export default function EmailSeguroPage() {
     setLoading(true)
     try {
       await emailSeguroService.sendReport(currentUserEmail)
+
+      // Success Confirmation as per Acceptance Criteria
       toast({
         title: 'Sucesso',
         description: `Relatório enviado com sucesso para ${originalEmail}`,
@@ -124,8 +127,10 @@ export default function EmailSeguroPage() {
       })
     } catch (error: any) {
       console.error(error)
+      // Dynamic Error Messages as per Acceptance Criteria
       const errorMessage =
         error instanceof Error ? error.message : 'Falha desconhecida'
+
       toast({
         title: 'Erro ao enviar',
         description: errorMessage,
@@ -247,6 +252,7 @@ export default function EmailSeguroPage() {
               className="w-full bg-blue-600 hover:bg-blue-700 text-white"
               size="lg"
               onClick={handleSendReport}
+              // Loading State as per Acceptance Criteria (disabled + spinner)
               disabled={loading || !originalEmail}
             >
               {loading ? (
