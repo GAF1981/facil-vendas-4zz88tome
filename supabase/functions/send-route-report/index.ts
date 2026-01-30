@@ -11,8 +11,6 @@ Deno.serve(async (req) => {
 
   try {
     // Initialize Supabase Client with Service Role Key for DB access
-    // This allows us to access configuracoes, system_logs and ROTA tables bypassing RLS if needed,
-    // which is necessary for background tasks or when context is limited.
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -46,24 +44,38 @@ Deno.serve(async (req) => {
     }
 
     // 1. Fetch recipient email configuration
-    // Using 'destinatario_email' as per user story
+    // Using 'email_seguro' as per user story requirements
     const { data: configData, error: configError } = await supabaseClient
       .from('configuracoes')
       .select('valor')
-      .eq('chave', 'destinatario_email')
+      .eq('chave', 'email_seguro')
       .single()
 
     if (configError && configError.code !== 'PGRST116') {
       console.error('Error fetching config:', configError)
-      throw new Error('Falha ao buscar configuração de email.')
+      return new Response(
+        JSON.stringify({
+          error: 'Erro ao buscar configuração de e-mail no banco de dados.',
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      )
     }
 
-    // Default to a fallback if not configured, though it should be.
     const recipientEmail = configData?.valor
 
     if (!recipientEmail) {
-      throw new Error(
-        'Email de destinatário não configurado (chave: destinatario_email).',
+      return new Response(
+        JSON.stringify({
+          error:
+            'E-mail de destinatário não configurado (chave: email_seguro).',
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
       )
     }
 
@@ -78,7 +90,15 @@ Deno.serve(async (req) => {
     const routeId = routeData?.id
 
     if (!routeId) {
-      throw new Error('Nenhuma rota encontrada para gerar relatório.')
+      return new Response(
+        JSON.stringify({
+          error: 'Nenhuma rota encontrada para gerar relatório.',
+        }),
+        {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      )
     }
 
     // 3. Fetch Route Items
@@ -100,7 +120,15 @@ Deno.serve(async (req) => {
 
     if (itemsError) {
       console.error('Error fetching items:', itemsError)
-      throw new Error('Erro ao buscar itens da rota.')
+      return new Response(
+        JSON.stringify({
+          error: 'Erro ao buscar itens da rota no banco de dados.',
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      )
     }
 
     // 4. Generate CSV
@@ -147,56 +175,87 @@ Deno.serve(async (req) => {
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
 
     if (!RESEND_API_KEY) {
-      throw new Error('Chave de API do Resend não configurada.')
+      return new Response(
+        JSON.stringify({
+          error: 'Erro: API Key do Resend não configurada no servidor.',
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      )
     }
 
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${RESEND_API_KEY}`,
-      },
-      body: JSON.stringify({
-        from: 'Facil Vendas <onboarding@resend.dev>', // Using a valid/generic sender for reliability
-        to: [recipientEmail],
-        subject: `Relatório Controle de Rota #${routeId}`,
-        html: `
-          <div style="font-family: sans-serif; color: #333;">
-            <h2>Relatório de Rota #${routeId}</h2>
-            <p>Olá,</p>
-            <p>O relatório de controle de rota foi gerado com sucesso.</p>
-            <p><strong>Resumo:</strong></p>
-            <ul>
-              <li><strong>ID da Rota:</strong> ${routeId}</li>
-              <li><strong>Total de Itens:</strong> ${items.length}</li>
-              <li><strong>Destinatário:</strong> ${recipientEmail}</li>
-              <li><strong>Data de Geração:</strong> ${new Date().toLocaleString('pt-BR')}</li>
-            </ul>
-            <p>O arquivo CSV está anexado a este e-mail.</p>
-            <br/>
-            <p>Atenciosamente,<br/>Equipe Facil Vendas</p>
-          </div>
-        `,
-        attachments: [
-          {
-            filename: `controle_rota_${routeId}.csv`,
-            content: btoa(unescape(encodeURIComponent(csvContent))), // Base64 encode
-          },
-        ],
-      }),
-    })
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${RESEND_API_KEY}`,
+        },
+        body: JSON.stringify({
+          from: 'Facil Vendas <onboarding@resend.dev>', // Using valid sender as per requirements
+          to: [recipientEmail],
+          subject: `Relatório Controle de Rota #${routeId}`,
+          html: `
+              <div style="font-family: sans-serif; color: #333;">
+                <h2>Relatório de Rota #${routeId}</h2>
+                <p>Olá,</p>
+                <p>O relatório de controle de rota foi gerado com sucesso.</p>
+                <p><strong>Resumo:</strong></p>
+                <ul>
+                  <li><strong>ID da Rota:</strong> ${routeId}</li>
+                  <li><strong>Total de Itens:</strong> ${items.length}</li>
+                  <li><strong>Destinatário:</strong> ${recipientEmail}</li>
+                  <li><strong>Data de Geração:</strong> ${new Date().toLocaleString('pt-BR')}</li>
+                </ul>
+                <p>O arquivo CSV está anexado a este e-mail.</p>
+                <br/>
+                <p>Atenciosamente,<br/>Equipe Facil Vendas</p>
+              </div>
+            `,
+          attachments: [
+            {
+              filename: `controle_rota_${routeId}.csv`,
+              content: btoa(unescape(encodeURIComponent(csvContent))), // Base64 encode
+            },
+          ],
+        }),
+      })
 
-    if (!res.ok) {
-      const errorData = await res.json()
-      console.error('Resend Error:', errorData)
-      throw new Error(
-        `Erro Resend: ${errorData.message || errorData.name || 'Falha desconhecida'}`,
+      if (!res.ok) {
+        const errorData = await res.json()
+        console.error('Resend Error:', errorData)
+
+        let resendMessage = 'Erro ao enviar e-mail via Resend.'
+        if (errorData && errorData.message) {
+          resendMessage = `Erro Resend: ${errorData.message}`
+        }
+
+        return new Response(
+          JSON.stringify({ error: resendMessage, details: errorData }),
+          {
+            status: res.status,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          },
+        )
+      }
+    } catch (resendError: any) {
+      console.error('Resend Exception:', resendError)
+      return new Response(
+        JSON.stringify({
+          error: `Falha na conexão com Resend: ${resendError.message}`,
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
       )
     }
 
     // 6. Log Success to system_logs
     const logData = {
-      user_id: userId, // Can be null if auto triggered or user not found
+      user_id: userId,
       type: 'email_report',
       description: `Relatório da rota #${routeId} enviado com sucesso para ${recipientEmail}`,
       meta: {
@@ -226,25 +285,9 @@ Deno.serve(async (req) => {
       error instanceof Error ? error.message : 'Erro desconhecido'
     console.error('Function Error:', errorMessage)
 
-    // Attempt to log failure
-    try {
-      const supabaseClient = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      )
-
-      await supabaseClient.from('system_logs').insert({
-        type: 'email_report_error',
-        description: `Falha ao enviar relatório: ${errorMessage}`,
-        meta: { error: errorMessage, status: 'error' },
-      })
-    } catch (logError) {
-      console.error('Failed to log error:', logError)
-    }
-
     return new Response(JSON.stringify({ error: errorMessage }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 400,
+      status: 500,
     })
   }
 })

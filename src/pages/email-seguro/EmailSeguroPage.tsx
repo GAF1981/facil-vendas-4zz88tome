@@ -17,6 +17,7 @@ import {
   Send,
   Settings,
   Save,
+  AlertTriangle,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { emailSeguroService } from '@/services/emailSeguroService'
@@ -50,9 +51,8 @@ export default function EmailSeguroPage() {
         setRecipientEmail(email)
         setOriginalEmail(email)
       } else {
-        // Fallback default from migration if fetching failed or empty
-        setRecipientEmail('admin@example.com')
-        setOriginalEmail('admin@example.com')
+        setRecipientEmail('')
+        setOriginalEmail('')
       }
     } catch (error) {
       console.error('Failed to load email config', error)
@@ -104,6 +104,16 @@ export default function EmailSeguroPage() {
   }
 
   const handleSendReport = async () => {
+    if (!originalEmail) {
+      toast({
+        title: 'Configuração ausente',
+        description:
+          'Por favor, configure e salve um e-mail de destinatário antes de enviar.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     setLoading(true)
     try {
       await emailSeguroService.sendReport(currentUserEmail)
@@ -210,7 +220,7 @@ export default function EmailSeguroPage() {
               </div>
               <div className="text-xs text-muted-foreground">
                 Destinatário atual:{' '}
-                <strong>{originalEmail || 'Carregando...'}</strong>
+                <strong>{originalEmail || 'Não configurado'}</strong>
               </div>
             </div>
           </CardContent>
@@ -227,16 +237,22 @@ export default function EmailSeguroPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {!originalEmail && (
+              <div className="mb-4 p-3 bg-yellow-100 border border-yellow-200 rounded-md flex items-center gap-2 text-yellow-800 text-sm">
+                <AlertTriangle className="h-4 w-4" />
+                Configure um destinatário para enviar.
+              </div>
+            )}
             <Button
               className="w-full bg-blue-600 hover:bg-blue-700 text-white"
               size="lg"
               onClick={handleSendReport}
-              disabled={loading}
+              disabled={loading || !originalEmail}
             >
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Processando...
+                  Enviando...
                 </>
               ) : (
                 <>
@@ -246,8 +262,14 @@ export default function EmailSeguroPage() {
               )}
             </Button>
             <p className="text-xs text-muted-foreground mt-4 text-center">
-              O arquivo CSV será enviado para:{' '}
-              <strong>{originalEmail || '...'}</strong>
+              {originalEmail ? (
+                <>
+                  O arquivo CSV será enviado para:{' '}
+                  <strong>{originalEmail}</strong>
+                </>
+              ) : (
+                <>Aguardando configuração de e-mail...</>
+              )}
             </p>
           </CardContent>
         </Card>

@@ -5,7 +5,7 @@ export const emailSeguroService = {
     const { data, error } = await supabase
       .from('configuracoes')
       .select('valor')
-      .eq('chave', 'destinatario_email')
+      .eq('chave', 'email_seguro')
       .single()
 
     if (error) {
@@ -21,7 +21,7 @@ export const emailSeguroService = {
       .from('configuracoes')
       .upsert(
         {
-          chave: 'destinatario_email',
+          chave: 'email_seguro',
           valor: email,
         },
         { onConflict: 'chave' },
@@ -43,10 +43,40 @@ export const emailSeguroService = {
 
     // Check for function invocation error (network, 500, etc)
     if (error) {
-      throw new Error(error.message || 'Erro ao comunicar com o servidor.')
+      console.error('Supabase Function Invoke Error:', error)
+
+      let msg = 'Falha ao comunicar com o servidor de envio.'
+
+      // Try to extract detailed error message from response body if available
+      if (typeof error === 'object' && error !== null && 'message' in error) {
+        try {
+          // Sometimes the message is the JSON string from the backend
+          const parsed = JSON.parse(error.message)
+          if (parsed && parsed.error) {
+            msg = parsed.error
+          } else {
+            msg = error.message
+          }
+        } catch {
+          msg = error.message
+        }
+      } else if (typeof error === 'string') {
+        try {
+          const parsed = JSON.parse(error)
+          if (parsed && parsed.error) {
+            msg = parsed.error
+          } else {
+            msg = error
+          }
+        } catch {
+          msg = error
+        }
+      }
+
+      throw new Error(msg)
     }
 
-    // Check for logical error returned by the function
+    // Check for logical error returned by the function in a 200 OK response (if any)
     if (data && data.error) {
       throw new Error(data.error)
     }
