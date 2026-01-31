@@ -18,11 +18,14 @@ import {
   Fuel,
   Upload,
   Gift,
+  Mail,
+  Loader2,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useUserStore } from '@/stores/useUserStore'
 import { rotaService } from '@/services/rotaService'
 import { caixaService } from '@/services/caixaService'
+import { reportsService } from '@/services/reportsService'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,11 +37,13 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { useToast } from '@/hooks/use-toast'
+import { Button } from '@/components/ui/button'
 
 const RelatorioDashboard = () => {
   const { employee } = useUserStore()
   const [showNewRoutePrompt, setShowNewRoutePrompt] = useState(false)
   const [currentRouteId, setCurrentRouteId] = useState<number | null>(null)
+  const [sendingEmail, setSendingEmail] = useState(false)
   const { toast } = useToast()
 
   // Check if admin for Import Card visibility
@@ -90,6 +95,36 @@ const RelatorioDashboard = () => {
         description: 'Não foi possível iniciar uma nova rota.',
         variant: 'destructive',
       })
+    }
+  }
+
+  const handleSendEmailReport = async () => {
+    if (!employee?.email) {
+      toast({
+        title: 'Erro',
+        description: 'Usuário não possui e-mail configurado.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setSendingEmail(true)
+    try {
+      await reportsService.sendConsolidatedEmail(employee.email)
+      toast({
+        title: 'Sucesso',
+        description: 'Relatórios enviados por e-mail com sucesso!',
+        className: 'bg-green-600 text-white',
+      })
+    } catch (error: any) {
+      console.error(error)
+      toast({
+        title: 'Erro ao enviar relatórios',
+        description: error.message || 'Ocorreu um erro inesperado.',
+        variant: 'destructive',
+      })
+    } finally {
+      setSendingEmail(false)
     }
   }
 
@@ -190,13 +225,32 @@ const RelatorioDashboard = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">
-          Relatórios Gerenciais
-        </h1>
-        <p className="text-muted-foreground">
-          Selecione um módulo de relatório para visualizar dados detalhados.
-        </p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Relatórios Gerenciais
+          </h1>
+          <p className="text-muted-foreground">
+            Selecione um módulo de relatório para visualizar dados detalhados.
+          </p>
+        </div>
+        <Button
+          onClick={handleSendEmailReport}
+          disabled={sendingEmail}
+          className="w-full md:w-auto"
+        >
+          {sendingEmail ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Enviando...
+            </>
+          ) : (
+            <>
+              <Mail className="mr-2 h-4 w-4" />
+              Enviar Relatório Agora
+            </>
+          )}
+        </Button>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

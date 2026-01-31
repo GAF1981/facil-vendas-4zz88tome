@@ -345,4 +345,15 @@ export const reportsService = {
 
     return enrichedData as DebitoReportRow[]
   },
+
+  async sendConsolidatedEmail(userEmail: string) {
+    const { data, error } = await supabase.functions.invoke(
+      'send-route-report',
+      {
+        body: { userEmail },
+      },
+    )
+    if (error) throw error
+    return data
+  },
 }

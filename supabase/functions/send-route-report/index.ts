@@ -1,7 +1,8 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import JSZip from 'jszip'
 import { corsHeaders } from '../_shared/cors.ts'
 
-console.log('Send Route Report function up and running (Multi-Report Update)')
+console.log('Send Route Report function up and running (Zip Consolidated)')
 
 // Helper for formatting currency (BRL)
 const formatCurrency = (value: number) => {
@@ -159,7 +160,7 @@ Deno.serve(async (req) => {
     date180.setDate(date180.getDate() - 180)
     const cutoffDateBrazil = brazilFormatter.format(date180)
 
-    // --- Parallel Data Fetching ---
+    // --- Parallel Data Fetching (UNLIMITED) ---
 
     // REPORT 1: Active Clients (Route Control)
     const fetchActiveClients = supabaseClient
@@ -167,48 +168,38 @@ Deno.serve(async (req) => {
       .select('*')
       .ilike('situacao', '%Ativo%')
       .order('NOME CLIENTE')
-      .limit(20000)
 
     const fetchDebts = supabaseClient
       .from('debitos_com_total_view')
       .select('cliente_codigo, debito_total')
-      .limit(20000)
 
     const fetchProjections = supabaseClient.rpc('get_client_projections')
 
     const fetchConsigned = supabaseClient
       .from('view_client_latest_consigned_value')
       .select('client_id, total_consigned_value')
-      .limit(20000)
 
     const fetchStats = supabaseClient
       .from('client_stats_view')
       .select('client_id, max_pedido, max_data_acerto')
-      .limit(20000)
 
     const fetchReceivables = supabaseClient
       .from('RECEBIMENTOS')
       .select('cliente_id, vencimento, valor_pago, valor_registrado')
       .order('vencimento', { ascending: true })
-      .limit(50000)
 
     const fetchVendors = supabaseClient
       .from('ROTA_ITEMS')
       .select('cliente_id, vendedor_id, FUNCIONARIOS(nome_completo)')
-      .limit(20000)
 
     // REPORT 2: All Clients (Full Dump)
-    const fetchAllClients = supabaseClient
-      .from('CLIENTES')
-      .select('*')
-      .limit(50000)
+    const fetchAllClients = supabaseClient.from('CLIENTES').select('*')
 
     // REPORT 3: Database History (Last 180 Days)
     const fetchDBHistory = supabaseClient
       .from('BANCO_DE_DADOS')
       .select('*')
       .gte('DATA DO ACERTO', cutoffDateBrazil)
-      .limit(50000)
 
     const [
       { data: activeClients, error: activeError },
@@ -350,7 +341,16 @@ Deno.serve(async (req) => {
     // --- Processing Report 3: DB History (180 days) ---
     const csvContent3 = jsonToCsv(dbHistory || [])
 
-    // --- Send Email with 3 Attachments ---
+    // --- ZIP Compression ---
+    const zip = new JSZip()
+    zip.file(`relatorio_rotas_${todayBrazil}.csv`, csvContent1)
+    zip.file(`clientes_completo_${todayBrazil}.csv`, csvContent2)
+    zip.file(`banco_dados_180dias_${todayBrazil}.csv`, csvContent3)
+
+    const zipContentBase64 = await zip.generateAsync({ type: 'base64' })
+    const zipFilename = `relatorios_consolidados_${todayBrazil}.zip`
+
+    // --- Send Email with 1 ZIP Attachment ---
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -360,12 +360,12 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         from: 'Facil Vendas <onboarding@resend.dev>',
         to: [recipientEmail],
-        subject: `Relatórios Consolidados - ${todayBrazil}`,
+        subject: `Relatórios Consolidados (ZIP) - ${todayBrazil}`,
         html: `
             <div style="font-family: sans-serif; color: #333;">
               <h2>Relatórios Consolidados</h2>
               <p>Olá,</p>
-              <p>Seguem em anexo os relatórios solicitados:</p>
+              <p>Seguem em anexo os relatórios solicitados em formato ZIP:</p>
               <ul>
                 <li><strong>Relatório de Rotas (Ativos):</strong> ${routeReportRows.length} registros</li>
                 <li><strong>Relatório Geral de Clientes:</strong> ${allClients?.length || 0} registros</li>
@@ -378,16 +378,8 @@ Deno.serve(async (req) => {
           `,
         attachments: [
           {
-            filename: `relatorio_rotas_${todayBrazil}.csv`,
-            content: btoa(unescape(encodeURIComponent(csvContent1))),
-          },
-          {
-            filename: `clientes_completo_${todayBrazil}.csv`,
-            content: btoa(unescape(encodeURIComponent(csvContent2))),
-          },
-          {
-            filename: `banco_dados_180dias_${todayBrazil}.csv`,
-            content: btoa(unescape(encodeURIComponent(csvContent3))),
+            filename: zipFilename,
+            content: zipContentBase64,
           },
         ],
       }),
@@ -403,14 +395,14 @@ Deno.serve(async (req) => {
     await supabaseClient.from('system_logs').insert({
       user_id: userId,
       type: 'email_report',
-      description: `Relatórios (3 arquivos) enviados para ${recipientEmail}`,
+      description: `Relatórios (ZIP) enviados para ${recipientEmail}`,
       meta: {
         recipientEmail,
         routeCount: routeReportRows.length,
         clientsCount: allClients?.length,
         dbHistoryCount: dbHistory?.length,
         status: 'success',
-        type: 'multi_report_consolidated',
+        type: 'multi_report_zip',
       },
     })
 
