@@ -2,7 +2,9 @@ import { createClient } from 'jsr:@supabase/supabase-js@2'
 import JSZip from 'jszip'
 import { corsHeaders } from '../_shared/cors.ts'
 
-console.log('Send Route Report function up and running (Zip Consolidated)')
+console.log(
+  'Send Route Report function up and running (Zip Consolidated 10k Limit)',
+)
 
 // Helper for formatting currency (BRL)
 const formatCurrency = (value: number) => {
@@ -160,7 +162,7 @@ Deno.serve(async (req) => {
     date180.setDate(date180.getDate() - 180)
     const cutoffDateBrazil = brazilFormatter.format(date180)
 
-    // --- Parallel Data Fetching (UNLIMITED) ---
+    // --- Parallel Data Fetching (Limit 10000) ---
 
     // REPORT 1: Active Clients (Route Control)
     const fetchActiveClients = supabaseClient
@@ -168,38 +170,48 @@ Deno.serve(async (req) => {
       .select('*')
       .ilike('situacao', '%Ativo%')
       .order('NOME CLIENTE')
+      .limit(10000)
 
     const fetchDebts = supabaseClient
       .from('debitos_com_total_view')
       .select('cliente_codigo, debito_total')
+      .limit(10000)
 
     const fetchProjections = supabaseClient.rpc('get_client_projections')
 
     const fetchConsigned = supabaseClient
       .from('view_client_latest_consigned_value')
       .select('client_id, total_consigned_value')
+      .limit(10000)
 
     const fetchStats = supabaseClient
       .from('client_stats_view')
       .select('client_id, max_pedido, max_data_acerto')
+      .limit(10000)
 
     const fetchReceivables = supabaseClient
       .from('RECEBIMENTOS')
       .select('cliente_id, vencimento, valor_pago, valor_registrado')
       .order('vencimento', { ascending: true })
+      .limit(10000)
 
     const fetchVendors = supabaseClient
       .from('ROTA_ITEMS')
       .select('cliente_id, vendedor_id, FUNCIONARIOS(nome_completo)')
+      .limit(10000)
 
     // REPORT 2: All Clients (Full Dump)
-    const fetchAllClients = supabaseClient.from('CLIENTES').select('*')
+    const fetchAllClients = supabaseClient
+      .from('CLIENTES')
+      .select('*')
+      .limit(10000)
 
     // REPORT 3: Database History (Last 180 Days)
     const fetchDBHistory = supabaseClient
       .from('BANCO_DE_DADOS')
       .select('*')
       .gte('DATA DO ACERTO', cutoffDateBrazil)
+      .limit(10000)
 
     const [
       { data: activeClients, error: activeError },
@@ -348,7 +360,7 @@ Deno.serve(async (req) => {
     zip.file(`banco_dados_180dias_${todayBrazil}.csv`, csvContent3)
 
     const zipContentBase64 = await zip.generateAsync({ type: 'base64' })
-    const zipFilename = `relatorios_consolidados_${todayBrazil}.zip`
+    const zipFilename = `relatorios_vendas_${todayBrazil}.zip`
 
     // --- Send Email with 1 ZIP Attachment ---
     const res = await fetch('https://api.resend.com/emails', {
@@ -372,6 +384,7 @@ Deno.serve(async (req) => {
                 <li><strong>Histórico Banco de Dados (Últimos 180 dias):</strong> ${dbHistory?.length || 0} registros</li>
               </ul>
               <p><strong>Filtro de Data (DB):</strong> A partir de ${formatDate(cutoffDateBrazil)} (Timezone: America/Sao_Paulo)</p>
+              <p><strong>Limite de registros:</strong> 10.000 por arquivo</p>
               <br/>
               <p>Atenciosamente,<br/>Equipe Facil Vendas</p>
             </div>

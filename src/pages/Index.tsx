@@ -20,6 +20,7 @@ import {
   Car,
   UserX,
   Bike,
+  ShieldCheck,
 } from 'lucide-react'
 import { usePermissions } from '@/hooks/use-permissions'
 import { DashboardStats } from '@/components/dashboard/DashboardStats'
@@ -147,6 +148,14 @@ export default function Index() {
       description: 'Relatórios gerenciais e estatísticas',
       color: 'text-rose-600',
       module: 'Relatório',
+    },
+    {
+      title: 'E-mail Seguro',
+      icon: ShieldCheck,
+      to: '/email-seguro',
+      description: 'Envio seguro de relatórios consolidados',
+      color: 'text-blue-700',
+      module: 'E-mail Seguro',
     },
     {
       title: 'Permissões',
