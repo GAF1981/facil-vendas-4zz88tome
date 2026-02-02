@@ -1,6 +1,5 @@
 {
   "imports": {
-    "jszip": "npm:jszip@3.10.1",
-    "jsr:@supabase/supabase-js@2": "jsr:@supabase/supabase-js@2"
+    "jszip": "npm:jszip@3.10.1"
   }
 }
