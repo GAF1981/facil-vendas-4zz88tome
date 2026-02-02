@@ -66,6 +66,15 @@ export default function InventarioPage() {
     return items.every((i) => !i.is_mandatory || i.has_count_record)
   }, [items])
 
+  // Moved up before early return to comply with React Hooks rules
+  const filteredItems = useMemo(() => {
+    if (saldoFinalFilter === 'zero')
+      return items.filter((i) => i.saldo_final === 0)
+    if (saldoFinalFilter === 'positive')
+      return items.filter((i) => i.saldo_final > 0)
+    return items
+  }, [items, saldoFinalFilter])
+
   const loadSessions = useCallback(async () => {
     try {
       const data = await inventoryGeneralService.getSessions()
@@ -137,14 +146,6 @@ export default function InventarioPage() {
       </div>
     )
   }
-
-  const filteredItems = useMemo(() => {
-    if (saldoFinalFilter === 'zero')
-      return items.filter((i) => i.saldo_final === 0)
-    if (saldoFinalFilter === 'positive')
-      return items.filter((i) => i.saldo_final > 0)
-    return items
-  }, [items, saldoFinalFilter])
 
   const handleStartSession = async () => {
     if (!confirm('Iniciar novo inventário? O atual será fechado.')) return
