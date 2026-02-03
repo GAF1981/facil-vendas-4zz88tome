@@ -1880,6 +1880,7 @@ export type Database = {
         Row: {
           CODIGO: number | null
           'CÓDIGO BARRAS': number | null
+          codigo_interno: number | null
           'DESCRIÇÃO RESUMIDA': string | null
           FREQUENTES: string | null
           GRUPO: string | null
@@ -1891,6 +1892,7 @@ export type Database = {
         Insert: {
           CODIGO?: number | null
           'CÓDIGO BARRAS'?: number | null
+          codigo_interno?: number | null
           'DESCRIÇÃO RESUMIDA'?: string | null
           FREQUENTES?: string | null
           GRUPO?: string | null
@@ -1902,6 +1904,7 @@ export type Database = {
         Update: {
           CODIGO?: number | null
           'CÓDIGO BARRAS'?: number | null
+          codigo_interno?: number | null
           'DESCRIÇÃO RESUMIDA'?: string | null
           FREQUENTES?: string | null
           GRUPO?: string | null

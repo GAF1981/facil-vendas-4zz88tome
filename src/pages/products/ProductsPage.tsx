@@ -15,6 +15,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { productsService } from '@/services/productsService'
 import { ProductRow } from '@/types/product'
 import { useToast } from '@/hooks/use-toast'
+import { ProductImportDialog } from '@/components/products/ProductImportDialog'
+import { useUserStore } from '@/stores/useUserStore'
 
 const ProductsPage = () => {
   const [products, setProducts] = useState<ProductRow[]>([])
@@ -24,6 +26,7 @@ const ProductsPage = () => {
   const [totalCount, setTotalCount] = useState(0)
   const [pageSize] = useState(20)
   const { toast } = useToast()
+  const { employee } = useUserStore()
 
   const [debouncedSearch, setDebouncedSearch] = useState(searchTerm)
 
@@ -66,6 +69,15 @@ const ProductsPage = () => {
 
   const totalPages = Math.ceil(totalCount / pageSize)
 
+  // Check permissions for CSV Import
+  const canImport =
+    employee?.setor &&
+    (Array.isArray(employee.setor)
+      ? employee.setor.some((s) =>
+          ['Administrador', 'Gerente', 'Estoque'].includes(s),
+        )
+      : ['Administrador', 'Gerente', 'Estoque'].includes(employee.setor))
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -86,12 +98,15 @@ const ProductsPage = () => {
             Gerencie seu catálogo de produtos ({totalCount} itens encontrados).
           </p>
         </div>
-        <Button asChild>
-          <Link to="/produtos/novo">
-            <Plus className="mr-2 h-4 w-4" />
-            Novo Produto
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          {canImport && <ProductImportDialog onSuccess={fetchProducts} />}
+          <Button asChild>
+            <Link to="/produtos/novo">
+              <Plus className="mr-2 h-4 w-4" />
+              Novo Produto
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <div className="flex items-center bg-card p-4 rounded-lg border shadow-sm">
