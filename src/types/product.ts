@@ -3,8 +3,10 @@ import { z } from 'zod'
 
 // Manually extending types since we can't regenerate supabase types in this environment
 // Adding the new FREQUENTES column as defined in the migration
+// Adding the new codigo_interno column as defined in the migration
 interface AdditionalProductFields {
   FREQUENTES?: string | null
+  codigo_interno?: number | null
 }
 
 export type ProductRow = Database['public']['Tables']['PRODUTOS']['Row'] &
@@ -31,6 +33,7 @@ export const productSchema = z.object({
     .min(2, 'Nome do produto deve ter no mínimo 2 caracteres')
     .nullable(),
   CODIGO: numberOrNull,
+  codigo_interno: numberOrNull,
   'CÓDIGO BARRAS': numberOrNull,
   'DESCRIÇÃO RESUMIDA': z.string().optional().nullable(),
   GRUPO: z.string().optional().nullable(),

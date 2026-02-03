@@ -18,10 +18,10 @@ export const productsService = {
       const isNumber = !isNaN(Number(searchTerm)) && searchTerm !== ''
 
       if (isNumber) {
-        // Search by ID, Internal Code (CODIGO), Barcode (CÓDIGO BARRAS) OR Name (PRODUTO)
+        // Search by ID, Legacy Code (CODIGO), Internal Code (codigo_interno), Barcode (CÓDIGO BARRAS) OR Name (PRODUTO)
         // Using quotes for columns with spaces
         query = query.or(
-          `ID.eq.${searchTerm},CODIGO.eq.${searchTerm},"CÓDIGO BARRAS".eq.${searchTerm},PRODUTO.ilike.%${searchTerm}%`,
+          `ID.eq.${searchTerm},CODIGO.eq.${searchTerm},codigo_interno.eq.${searchTerm},"CÓDIGO BARRAS".eq.${searchTerm},PRODUTO.ilike.%${searchTerm}%`,
         )
       } else {
         // Search specifically by name (PRODUTO) for text queries

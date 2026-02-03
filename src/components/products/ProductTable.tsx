@@ -72,6 +72,9 @@ export function ProductTable({ products, onUpdate }: ProductTableProps) {
               <TableHead className="w-[70px]">ID</TableHead>
               <TableHead className="min-w-[200px]">Produto</TableHead>
               <TableHead className="hidden md:table-cell">
+                Cód. Interno
+              </TableHead>
+              <TableHead className="hidden md:table-cell">
                 Cód. Barras
               </TableHead>
               <TableHead className="hidden lg:table-cell">Grupo</TableHead>
@@ -94,11 +97,16 @@ export function ProductTable({ products, onUpdate }: ProductTableProps) {
                   <div className="flex flex-col">
                     <span className="font-medium">{product.PRODUTO}</span>
                     <span className="text-xs text-muted-foreground md:hidden">
-                      {product['CÓDIGO BARRAS']
-                        ? `EAN: ${product['CÓDIGO BARRAS']}`
-                        : product['DESCRIÇÃO RESUMIDA']}
+                      {product.codigo_interno
+                        ? `Cod: ${product.codigo_interno}`
+                        : product['CÓDIGO BARRAS']
+                          ? `EAN: ${product['CÓDIGO BARRAS']}`
+                          : product['DESCRIÇÃO RESUMIDA']}
                     </span>
                   </div>
+                </TableCell>
+                <TableCell className="hidden md:table-cell font-mono text-xs">
+                  {product.codigo_interno || '-'}
                 </TableCell>
                 <TableCell className="hidden md:table-cell font-mono text-xs">
                   {product['CÓDIGO BARRAS'] || '-'}

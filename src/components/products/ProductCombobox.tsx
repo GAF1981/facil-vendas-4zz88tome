@@ -6,6 +6,7 @@ import {
   Barcode,
   Search,
   Box,
+  Hash,
 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
@@ -104,11 +105,15 @@ export function ProductCombobox({
             <span className="truncate flex items-center gap-2">
               <Box className="h-4 w-4 opacity-50 shrink-0" />
               <span className="truncate">{selectedProduct.PRODUTO}</span>
-              {selectedProduct.CODIGO && (
+              {selectedProduct.codigo_interno ? (
+                <span className="text-xs text-muted-foreground ml-1">
+                  (CI: {selectedProduct.codigo_interno})
+                </span>
+              ) : selectedProduct.CODIGO ? (
                 <span className="text-xs text-muted-foreground ml-1">
                   (#{selectedProduct.CODIGO})
                 </span>
-              )}
+              ) : null}
             </span>
           ) : (
             'Selecione um produto...'
@@ -119,7 +124,7 @@ export function ProductCombobox({
       <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
         <Command shouldFilter={false}>
           <CommandInput
-            placeholder="Buscar por nome ou código de barras..."
+            placeholder="Buscar por nome, código interno ou barras..."
             value={searchTerm}
             onValueChange={setSearchTerm}
             className="h-10"
@@ -150,11 +155,17 @@ export function ProductCombobox({
                         <span className="truncate font-medium">
                           {product.PRODUTO}
                         </span>
-                        <div className="flex items-center text-xs text-muted-foreground gap-2">
+                        <div className="flex items-center text-xs text-muted-foreground gap-2 flex-wrap">
                           {product['CÓDIGO BARRAS'] && (
                             <span className="flex items-center">
                               <Barcode className="h-3 w-3 mr-1" />
                               {product['CÓDIGO BARRAS']}
+                            </span>
+                          )}
+                          {product.codigo_interno && (
+                            <span className="flex items-center text-blue-600">
+                              <Hash className="h-3 w-3 mr-1" />
+                              CI: {product.codigo_interno}
                             </span>
                           )}
                           {product.CODIGO && <span>Cod: {product.CODIGO}</span>}

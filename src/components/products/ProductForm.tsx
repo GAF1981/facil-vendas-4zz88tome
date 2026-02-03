@@ -45,6 +45,7 @@ export function ProductForm({
           ID: initialData.ID,
           PRODUTO: initialData.PRODUTO,
           CODIGO: initialData.CODIGO,
+          codigo_interno: initialData.codigo_interno,
           'CÓDIGO BARRAS': initialData['CÓDIGO BARRAS'],
           'DESCRIÇÃO RESUMIDA': initialData['DESCRIÇÃO RESUMIDA'],
           GRUPO: initialData.GRUPO,
@@ -56,6 +57,7 @@ export function ProductForm({
           ID: undefined, // Will be set by useEffect
           PRODUTO: '',
           CODIGO: null,
+          codigo_interno: null,
           'CÓDIGO BARRAS': null,
           'DESCRIÇÃO RESUMIDA': '',
           GRUPO: '',
@@ -209,7 +211,7 @@ export function ProductForm({
             </div>
 
             {/* Barcode */}
-            <div className="md:col-span-3">
+            <div className="md:col-span-4">
               <FormField
                 control={form.control}
                 name="CÓDIGO BARRAS"
@@ -230,18 +232,42 @@ export function ProductForm({
               />
             </div>
 
-            {/* Internal Code */}
-            <div className="md:col-span-3">
+            {/* New Internal Code */}
+            <div className="md:col-span-4">
+              <FormField
+                control={form.control}
+                name="codigo_interno"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-blue-600 font-semibold">
+                      Código Interno
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder="Novo Código"
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Legacy Internal Code */}
+            <div className="md:col-span-4">
               <FormField
                 control={form.control}
                 name="CODIGO"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Código Interno</FormLabel>
+                    <FormLabel>Código (Sistema Antigo)</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
-                        placeholder="Opcional"
+                        placeholder="Código Legado"
                         {...field}
                         value={field.value || ''}
                       />
@@ -295,7 +321,7 @@ export function ProductForm({
             </div>
 
             {/* Group */}
-            <div className="md:col-span-5">
+            <div className="md:col-span-4">
               <FormField
                 control={form.control}
                 name="GRUPO"
@@ -345,7 +371,7 @@ export function ProductForm({
             </div>
 
             {/* Summary Description */}
-            <div className="md:col-span-5">
+            <div className="md:col-span-12">
               <FormField
                 control={form.control}
                 name="DESCRIÇÃO RESUMIDA"

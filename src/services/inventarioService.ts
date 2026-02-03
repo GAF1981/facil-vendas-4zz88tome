@@ -14,9 +14,12 @@ export const inventarioService = {
   ): Promise<{ data: InventoryProduct[]; totalCount: number }> {
     let query = supabase
       .from('PRODUTOS')
-      .select('ID, CODIGO, PRODUTO, GRUPO, PREÇO, "CÓDIGO BARRAS"', {
-        count: 'exact',
-      })
+      .select(
+        'ID, CODIGO, codigo_interno, PRODUTO, GRUPO, PREÇO, "CÓDIGO BARRAS"',
+        {
+          count: 'exact',
+        },
+      )
 
     if (search) {
       const searchTerm = search.trim()
@@ -24,7 +27,7 @@ export const inventarioService = {
 
       if (isNumber) {
         query = query.or(
-          `ID.eq.${searchTerm},CODIGO.eq.${searchTerm},"CÓDIGO BARRAS".eq.${searchTerm},PRODUTO.ilike.%${searchTerm}%`,
+          `ID.eq.${searchTerm},CODIGO.eq.${searchTerm},codigo_interno.eq.${searchTerm},"CÓDIGO BARRAS".eq.${searchTerm},PRODUTO.ilike.%${searchTerm}%`,
         )
       } else {
         query = query.ilike('PRODUTO', `%${searchTerm}%`)
@@ -46,6 +49,7 @@ export const inventarioService = {
     const mappedData: InventoryProduct[] = (data || []).map((item: any) => ({
       id: item.ID,
       codigo: item.CODIGO,
+      codigo_interno: item.codigo_interno,
       produto: item.PRODUTO,
       grupo: item.GRUPO,
       preco:

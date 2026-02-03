@@ -1,6 +1,7 @@
 export interface InventoryProduct {
   id: number
   codigo: number | null
+  codigo_interno: number | null
   produto: string | null
   grupo: string | null
   preco: number
