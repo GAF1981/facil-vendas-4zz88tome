@@ -17,9 +17,17 @@ import {
   CheckCircle,
   AlertCircle,
   Loader2,
+  RefreshCw,
+  Plus,
+  ArrowRight,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
-import { productsService, CsvProductRow } from '@/services/productsService'
+import {
+  productsService,
+  CsvProductRow,
+  ImportPreviewResult,
+} from '@/services/productsService'
+import { useUserStore } from '@/stores/useUserStore'
 
 interface ProductImportDialogProps {
   onSuccess?: () => void
@@ -29,18 +37,25 @@ export function ProductImportDialog({ onSuccess }: ProductImportDialogProps) {
   const [open, setOpen] = useState(false)
   const [file, setFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(false)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [step, setStep] = useState<'upload' | 'preview' | 'result'>('upload')
   const [parsedData, setParsedData] = useState<CsvProductRow[]>([])
-  const [stats, setStats] = useState<{
-    success: number
-    failed: number
+  const [preview, setPreview] = useState<ImportPreviewResult | null>(null)
+  const [resultStats, setResultStats] = useState<{
+    updated: number
+    created: number
     errors: string[]
   } | null>(null)
+
   const { toast } = useToast()
+  const { employee } = useUserStore()
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0]
-    setStats(null)
+    setResultStats(null)
+    setPreview(null)
     setParsedData([])
+    setStep('upload')
 
     if (selectedFile) {
       if (!selectedFile.name.endsWith('.csv')) {
@@ -54,26 +69,36 @@ export function ProductImportDialog({ onSuccess }: ProductImportDialogProps) {
       }
 
       setFile(selectedFile)
-      setLoading(true)
+      setAnalyzing(true)
+
       try {
+        // Parse CSV
         const data = await productsService.parseCSV(selectedFile)
         setParsedData(data)
+
         if (data.length === 0) {
           toast({
             title: 'Arquivo vazio',
             description: 'Não foram encontrados dados válidos no arquivo.',
             variant: 'destructive',
           })
+          setAnalyzing(false)
+          return
         }
+
+        // Analyze Import
+        const analysis = await productsService.analyzeImport(data)
+        setPreview(analysis)
+        setStep('preview')
       } catch (error) {
         console.error(error)
         toast({
-          title: 'Erro ao ler arquivo',
+          title: 'Erro ao analisar',
           description: 'Não foi possível processar o arquivo CSV.',
           variant: 'destructive',
         })
       } finally {
-        setLoading(false)
+        setAnalyzing(false)
       }
     }
   }
@@ -83,32 +108,27 @@ export function ProductImportDialog({ onSuccess }: ProductImportDialogProps) {
 
     setLoading(true)
     try {
-      const result = await productsService.bulkUpdateFromCsv(parsedData)
-      setStats(result)
+      const result = await productsService.importProducts(
+        parsedData,
+        employee?.id,
+      )
+      setResultStats({
+        updated: result.updated,
+        created: result.created,
+        errors: result.errors,
+      })
+      setStep('result')
 
-      if (result.errors.length === 0 && result.success > 0) {
+      if (result.success) {
         toast({
           title: 'Importação concluída',
-          description: `${result.success} produtos atualizados com sucesso.`,
-        })
-        if (onSuccess) onSuccess()
-        setTimeout(() => {
-          setOpen(false)
-          setFile(null)
-          setParsedData([])
-          setStats(null)
-        }, 2000)
-      } else if (result.success > 0) {
-        toast({
-          title: 'Importação parcial',
-          description: `${result.success} atualizados, ${result.failed} não encontrados.`,
-          variant: 'default',
+          description: `${result.updated} atualizados, ${result.created} criados.`,
         })
         if (onSuccess) onSuccess()
       } else {
         toast({
-          title: 'Erro na importação',
-          description: 'Nenhum produto foi atualizado.',
+          title: 'Importação com erros',
+          description: 'Alguns itens podem não ter sido importados.',
           variant: 'destructive',
         })
       }
@@ -127,10 +147,13 @@ export function ProductImportDialog({ onSuccess }: ProductImportDialogProps) {
   const resetState = (isOpen: boolean) => {
     setOpen(isOpen)
     if (!isOpen) {
+      // Delay reset to allow animation to finish
       setTimeout(() => {
         setFile(null)
         setParsedData([])
-        setStats(null)
+        setPreview(null)
+        setResultStats(null)
+        setStep('upload')
       }, 300)
     }
   }
@@ -143,94 +166,170 @@ export function ProductImportDialog({ onSuccess }: ProductImportDialogProps) {
           Importar CSV
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Importar Atualização de Produtos</DialogTitle>
+          <DialogTitle>Importar Produtos</DialogTitle>
           <DialogDescription>
-            Selecione um arquivo CSV para atualizar códigos internos e códigos
-            de barras. Os campos são tratados como texto para preservar zeros à
-            esquerda.
+            Atualize códigos ou crie novos produtos via CSV.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          <div className="grid w-full items-center gap-1.5">
-            <Label htmlFor="csv-file">Arquivo CSV</Label>
-            <Input
-              id="csv-file"
-              type="file"
-              accept=".csv"
-              onChange={handleFileChange}
-              disabled={loading}
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              Colunas esperadas: <code>produto</code>,{' '}
-              <code>codigo_interno</code>, <code>codigo_barras</code>
-            </p>
-          </div>
-
-          {parsedData.length > 0 && !stats && (
-            <div className="flex items-center gap-2 p-3 bg-muted rounded-md text-sm">
-              <FileText className="h-4 w-4 text-primary" />
-              <span>
-                {parsedData.length} linhas identificadas para processamento.
-              </span>
+          {/* Step 1: Upload */}
+          {step === 'upload' && (
+            <div className="grid w-full items-center gap-1.5">
+              <Label htmlFor="csv-file">Arquivo CSV</Label>
+              <Input
+                id="csv-file"
+                type="file"
+                accept=".csv"
+                onChange={handleFileChange}
+                disabled={analyzing}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Colunas esperadas: <code>produto</code>,{' '}
+                <code>codigo_interno</code>, <code>codigo_barras</code>
+              </p>
+              {analyzing && (
+                <div className="flex items-center justify-center py-4 text-muted-foreground">
+                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                  Analisando arquivo...
+                </div>
+              )}
             </div>
           )}
 
-          {stats && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 rounded-md text-sm border border-green-200 dark:border-green-800">
-                <CheckCircle className="h-4 w-4" />
-                <span>{stats.success} produtos atualizados com sucesso.</span>
+          {/* Step 2: Preview */}
+          {step === 'preview' && preview && (
+            <div className="space-y-4">
+              <div className="bg-muted/50 p-4 rounded-lg border space-y-3">
+                <h4 className="font-semibold text-sm flex items-center">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Resumo da Importação
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col p-3 bg-background rounded border shadow-sm">
+                    <span className="text-xs text-muted-foreground">
+                      Para Atualizar
+                    </span>
+                    <span className="text-xl font-bold text-blue-600 flex items-center gap-2">
+                      <RefreshCw className="h-4 w-4" />
+                      {preview.toUpdate}
+                    </span>
+                  </div>
+                  <div className="flex flex-col p-3 bg-background rounded border shadow-sm">
+                    <span className="text-xs text-muted-foreground">
+                      Para Criar
+                    </span>
+                    <span className="text-xl font-bold text-green-600 flex items-center gap-2">
+                      <Plus className="h-4 w-4" />
+                      {preview.toCreate}
+                    </span>
+                  </div>
+                </div>
+                <div className="text-xs text-muted-foreground text-center pt-1">
+                  Total de linhas processáveis: {parsedData.length}
+                </div>
               </div>
 
-              {stats.failed > 0 && (
-                <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 rounded-md text-sm border border-amber-200 dark:border-amber-800">
-                  <AlertCircle className="h-4 w-4" />
-                  <span>
-                    {stats.failed} produtos não encontrados ou ignorados.
-                  </span>
+              {preview.errors.length > 0 && (
+                <div className="p-3 bg-destructive/10 text-destructive rounded-md text-sm border border-destructive/20">
+                  <p className="font-semibold mb-1 flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" /> Erros na análise:
+                  </p>
+                  <ul className="list-disc pl-4 space-y-1 text-xs">
+                    {preview.errors.slice(0, 3).map((err, i) => (
+                      <li key={i}>{err}</li>
+                    ))}
+                  </ul>
                 </div>
               )}
 
-              {stats.errors.length > 0 && (
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setStep('upload')}
+                  size="sm"
+                >
+                  Voltar
+                </Button>
+                <Button onClick={handleImport} disabled={loading} size="sm">
+                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Confirmar Importação
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: Result */}
+          {step === 'result' && resultStats && (
+            <div className="space-y-4 animate-fade-in">
+              <div className="flex flex-col items-center justify-center p-6 bg-green-50 dark:bg-green-900/10 rounded-lg border border-green-200 dark:border-green-800">
+                <CheckCircle className="h-10 w-10 text-green-600 mb-2" />
+                <h3 className="font-bold text-lg text-green-800 dark:text-green-300">
+                  Processamento Concluído
+                </h3>
+                <p className="text-sm text-green-700 dark:text-green-400">
+                  A importação foi finalizada.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 bg-muted rounded border text-center">
+                  <div className="text-sm text-muted-foreground">
+                    Atualizados
+                  </div>
+                  <div className="text-2xl font-bold">
+                    {resultStats.updated}
+                  </div>
+                </div>
+                <div className="p-3 bg-muted rounded border text-center">
+                  <div className="text-sm text-muted-foreground">Criados</div>
+                  <div className="text-2xl font-bold">
+                    {resultStats.created}
+                  </div>
+                </div>
+              </div>
+
+              {resultStats.errors.length > 0 && (
                 <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded-md text-sm border border-red-200 dark:border-red-800 max-h-[100px] overflow-y-auto">
                   <p className="font-semibold mb-1 flex items-center gap-2">
                     <AlertCircle className="h-4 w-4" /> Erros:
                   </p>
                   <ul className="list-disc pl-4 space-y-1">
-                    {stats.errors.slice(0, 5).map((err, i) => (
+                    {resultStats.errors.slice(0, 5).map((err, i) => (
                       <li key={i}>{err}</li>
                     ))}
-                    {stats.errors.length > 5 && (
-                      <li>...e mais {stats.errors.length - 5} erros.</li>
+                    {resultStats.errors.length > 5 && (
+                      <li>...e mais {resultStats.errors.length - 5} erros.</li>
                     )}
                   </ul>
                 </div>
               )}
+
+              <Button
+                className="w-full"
+                onClick={() => setOpen(false)}
+                variant="default"
+              >
+                Fechar
+              </Button>
             </div>
           )}
         </div>
 
-        <DialogFooter className="sm:justify-between">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => setOpen(false)}
-            disabled={loading}
-          >
-            Cancelar
-          </Button>
-          <Button
-            type="button"
-            onClick={handleImport}
-            disabled={!file || parsedData.length === 0 || loading || !!stats}
-          >
-            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {stats ? 'Concluído' : 'Atualizar Produtos'}
-          </Button>
-        </DialogFooter>
+        {step === 'upload' && (
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setOpen(false)}
+            >
+              Cancelar
+            </Button>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   )

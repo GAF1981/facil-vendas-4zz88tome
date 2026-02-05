@@ -1,9 +1,18 @@
 import { supabase } from '@/lib/supabase/client'
 import { ProductRow, ProductInsert, ProductUpdate } from '@/types/product'
 
-export interface BulkUpdateResult {
-  success: number
-  failed: number
+export interface ImportPreviewResult {
+  toUpdate: number
+  toCreate: number
+  errors: string[]
+  previewUpdates: any[] // Sample of updates for preview if needed
+  previewCreates: any[] // Sample of creates for preview if needed
+}
+
+export interface ImportResult {
+  success: boolean
+  updated: number
+  created: number
   errors: string[]
 }
 
@@ -209,86 +218,198 @@ export const productsService = {
     })
   },
 
-  async bulkUpdateFromCsv(data: CsvProductRow[]): Promise<BulkUpdateResult> {
-    const result: BulkUpdateResult = {
-      success: 0,
-      failed: 0,
-      errors: [],
-    }
-
+  async analyzeImport(data: CsvProductRow[]): Promise<ImportPreviewResult> {
     if (data.length === 0) {
-      result.errors.push('O arquivo CSV não contém dados válidos.')
-      return result
+      return {
+        toUpdate: 0,
+        toCreate: 0,
+        errors: ['O arquivo CSV não contém dados válidos.'],
+        previewUpdates: [],
+        previewCreates: [],
+      }
     }
 
     try {
-      const { data: products, error } = await supabase
+      // Fetch only necessary columns for matching
+      const { data: existingProducts, error } = await supabase
         .from('PRODUTOS')
         .select('ID, PRODUTO')
 
       if (error) throw error
 
       const productMap = new Map<string, number>()
-      products?.forEach((p) => {
+      existingProducts?.forEach((p) => {
         if (p.PRODUTO) {
           productMap.set(p.PRODUTO.toLowerCase().trim(), p.ID)
         }
       })
 
+      let toUpdate = 0
+      let toCreate = 0
+      const previewUpdates: any[] = []
+      const previewCreates: any[] = []
+
+      for (const row of data) {
+        if (!row.produto) continue
+
+        const normalizedName = row.produto.toLowerCase().trim()
+        if (productMap.has(normalizedName)) {
+          toUpdate++
+          if (previewUpdates.length < 5) previewUpdates.push(row)
+        } else {
+          toCreate++
+          if (previewCreates.length < 5) previewCreates.push(row)
+        }
+      }
+
+      return {
+        toUpdate,
+        toCreate,
+        errors: [],
+        previewUpdates,
+        previewCreates,
+      }
+    } catch (error: any) {
+      console.error('Error analyzing import:', error)
+      return {
+        toUpdate: 0,
+        toCreate: 0,
+        errors: [error.message || 'Erro ao analisar arquivo.'],
+        previewUpdates: [],
+        previewCreates: [],
+      }
+    }
+  },
+
+  async importProducts(
+    data: CsvProductRow[],
+    userId?: number,
+  ): Promise<ImportResult> {
+    const result: ImportResult = {
+      success: false,
+      updated: 0,
+      created: 0,
+      errors: [],
+    }
+
+    try {
+      // 1. Fetch Existing Products
+      const { data: existingProducts, error } = await supabase
+        .from('PRODUTOS')
+        .select('ID, PRODUTO')
+
+      if (error) throw error
+
+      const productMap = new Map<string, number>()
+      existingProducts?.forEach((p) => {
+        if (p.PRODUTO) {
+          productMap.set(p.PRODUTO.toLowerCase().trim(), p.ID)
+        }
+      })
+
+      // 2. Separate Updates and Creates
       const updates: {
+        id: number
+        codigo_interno?: string | null
+        codigo_barras?: string | null
+      }[] = []
+
+      const creates: {
         ID: number
+        PRODUTO: string
         codigo_interno?: string | null
         'CÓDIGO BARRAS'?: string | null
       }[] = []
 
+      // 3. Get Next ID for new items
+      let nextId = await this.getNextId()
+
       for (const row of data) {
-        if (!row.produto) {
-          result.failed++
-          continue
-        }
+        if (!row.produto) continue
 
         const normalizedName = row.produto.toLowerCase().trim()
-        const productId = productMap.get(normalizedName)
+        const existingId = productMap.get(normalizedName)
 
-        if (productId) {
-          // Use strings directly, preserve leading zeros
-          const codigoInterno = row.codigo_interno
-            ? row.codigo_interno.trim()
-            : null
-          const codigoBarras = row.codigo_barras
-            ? row.codigo_barras.trim()
-            : null
+        // Sanitize codes - ensure empty strings become null or trimmed strings
+        const codigoInterno = row.codigo_interno
+          ? row.codigo_interno.trim()
+          : null
+        const codigoBarras = row.codigo_barras ? row.codigo_barras.trim() : null
 
+        if (existingId) {
           updates.push({
-            ID: productId,
+            id: existingId,
+            codigo_interno: codigoInterno,
+            codigo_barras: codigoBarras,
+          })
+        } else {
+          creates.push({
+            ID: nextId++,
+            PRODUTO: row.produto.trim(),
             codigo_interno: codigoInterno,
             'CÓDIGO BARRAS': codigoBarras,
           })
-          result.success++
-        } else {
-          result.failed++
         }
       }
 
+      // 4. Perform Bulk Updates (via RPC)
       if (updates.length > 0) {
         const chunkSize = 100
         for (let i = 0; i < updates.length; i += chunkSize) {
           const chunk = updates.slice(i, i + chunkSize)
-          const { error: updateError } = await supabase
-            .from('PRODUTOS')
-            .upsert(chunk as any)
+          const { error: updateError } = await supabase.rpc(
+            'bulk_update_product_codes',
+            { payload: chunk },
+          )
 
           if (updateError) {
             console.error('Error updating batch:', updateError)
             result.errors.push(`Erro ao atualizar lote ${i / chunkSize + 1}`)
+          } else {
+            result.updated += chunk.length
           }
         }
       }
+
+      // 5. Perform Bulk Inserts
+      if (creates.length > 0) {
+        const chunkSize = 100
+        for (let i = 0; i < creates.length; i += chunkSize) {
+          const chunk = creates.slice(i, i + chunkSize)
+          const { error: insertError } = await supabase
+            .from('PRODUTOS')
+            .insert(chunk as any)
+
+          if (insertError) {
+            console.error('Error inserting batch:', insertError)
+            result.errors.push(
+              `Erro ao criar novos produtos lote ${i / chunkSize + 1}`,
+            )
+          } else {
+            result.created += chunk.length
+          }
+        }
+      }
+
+      result.success = result.errors.length === 0
+
+      // 6. Audit Log
+      if (userId) {
+        await supabase.from('system_logs').insert({
+          type: 'PRODUCT_IMPORT',
+          description: `Importação CSV: ${result.created} criados, ${result.updated} atualizados.`,
+          meta: {
+            created: result.created,
+            updated: result.updated,
+            errors: result.errors,
+          },
+          user_id: userId,
+        })
+      }
     } catch (err: any) {
-      console.error('Bulk update error:', err)
-      result.errors.push(
-        err.message || 'Erro desconhecido ao processar atualização.',
-      )
+      console.error('Import error:', err)
+      result.errors.push(err.message || 'Erro crítico ao processar importação.')
+      result.success = false
     }
 
     return result
