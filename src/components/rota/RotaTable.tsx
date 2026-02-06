@@ -337,11 +337,16 @@ export function RotaTable({
                       textClass = 'text-purple-100'
                     }
 
+                    // Logic Update: Ignore "Próxima" tags for alerts
+                    const cleanTarefas = row.tarefas
+                      ? row.tarefas.replace(/\[PROX:\d+\]/g, '').trim()
+                      : ''
+
                     const hasAlerts =
                       (row.pendency_details &&
                         row.pendency_details.length > 0) ||
                       !!row.client['OBSERVAÇÃO FIXA'] ||
-                      !!row.tarefas
+                      !!cleanTarefas // Use clean tarefas
 
                     return (
                       <TableRow key={row.client.CODIGO} className={rowClass}>

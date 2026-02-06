@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   Clock,
   ShieldAlert,
+  Info,
 } from 'lucide-react'
 import { usePermissions } from '@/hooks/use-permissions'
 import { useUserStore } from '@/stores/useUserStore'
@@ -76,10 +77,9 @@ export function RotaHeader({
     }
   }, [activeRota])
 
-  // Logic for visibility of "Finalizar Rota"
-  const canFinalize = (() => {
+  // Logic for visibility of "Finalizar Rota" (Permissions)
+  const isAdminOrManager = (() => {
     if (canAccess('Relatório')) return true
-
     if (employee?.setor) {
       const sectors = Array.isArray(employee.setor)
         ? employee.setor
@@ -91,8 +91,9 @@ export function RotaHeader({
     return false
   })()
 
+  const canFinalize = isAdminOrManager // For basic visibility
+
   // ALERT 1: Pendencia de Fechamento (Open/Active without record)
-  // This checks employees found in 'summaryData' (which usually comes from Receipts/Expenses activity)
   const pendingClosingEmployees = summaryData
     .filter((row) => !row.hasClosingRecord) // Not closed
     .map((row) => row.funcionarioNome)
@@ -103,8 +104,10 @@ export function RotaHeader({
     .map((row) => row.funcionarioNome)
 
   // ALERT 3: Pendencia de Rota (Sellers in RotaItems who don't have a record)
-  // This is stricter: checks ALL sellers assigned to the route, even if no sales.
+  // Logic updated: Allow ignore if zero movement.
   const pendingRouteEmployees: string[] = []
+  const ignoredRouteEmployees: string[] = []
+
   if (!alertsLoading) {
     const closedSellerIds = new Set(
       summaryData
@@ -112,21 +115,35 @@ export function RotaHeader({
         .map((row) => row.funcionarioId),
     )
 
-    // We need employee names for the IDs in activeSellers
-    // summaryData might not have them if they had NO sales/expenses/record.
-    // So we rely on mapping logic or fetch?
-    // Optimization: The alert text just needs names. If summaryData has it fine.
-    // If not, we might need a lookup map.
-    // For now, let's assume summaryData catches most active ones.
-    // If a seller is inactive (no sales), they might not be in summaryData unless we fetch ALL employees.
-    // caixaService.getFinancialSummary fetches ALL employees. So summaryData has everyone.
     activeSellers.forEach((sellerId) => {
       if (!closedSellerIds.has(sellerId)) {
-        const emp = summaryData.find((s) => s.funcionarioId === sellerId)
-        if (emp) {
-          pendingRouteEmployees.push(emp.funcionarioNome)
+        // Seller has not closed. Check if they have movement.
+        const empSummary = summaryData.find((s) => s.funcionarioId === sellerId)
+        // If employee has summary data (means they are in list of employees)
+        // Check totals. If no summary data, they might be new or not in employees table? Unlikely.
+        // Assuming if not in summaryData, they have 0 movement because summaryData usually builds from employees + receipts.
+        // Actually summaryData fetches ALL employees.
+
+        let hasMovement = false
+        let name = `Vendedor #${sellerId}`
+
+        if (empSummary) {
+          name = empSummary.funcionarioNome
+          // Calculate strict movement
+          const totalActivity =
+            Math.abs(empSummary.totalRecebido) +
+            Math.abs(empSummary.totalDespesas) +
+            Math.abs(empSummary.totalBoleto)
+          if (totalActivity > 0.01) {
+            hasMovement = true
+          }
+        }
+
+        if (hasMovement) {
+          pendingRouteEmployees.push(name)
         } else {
-          pendingRouteEmployees.push(`Vendedor #${sellerId}`)
+          // Track ignored for tooltip info (optional)
+          ignoredRouteEmployees.push(name)
         }
       }
     })
@@ -135,6 +152,15 @@ export function RotaHeader({
   const hasPendingClosing = pendingClosingEmployees.length > 0
   const hasPendingConfirmation = pendingConfirmationEmployees.length > 0
   const hasPendingRoute = pendingRouteEmployees.length > 0
+
+  // Admin Override Logic:
+  // If user is admin, allow finalize even if pending confirmation or pending route,
+  // BUT we still show the button as "Destructive" or with warning.
+  // The 'disabled' prop will block non-admins.
+  const isBlocked =
+    loading ||
+    hasPendingUpdates ||
+    (!isAdminOrManager && (hasPendingRoute || hasPendingConfirmation))
 
   return (
     <Card className="w-full border-l-4 border-l-primary shadow-sm bg-muted/20">
@@ -207,6 +233,37 @@ export function RotaHeader({
           ) : (
             canFinalize && (
               <>
+                {/* Ignored Sellers Info (Optional but good for clarity) */}
+                {ignoredRouteEmployees.length > 0 && isAdminOrManager && (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-muted-foreground hover:text-blue-600"
+                        title="Vendedores sem movimento ignorados"
+                      >
+                        <Info className="h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="w-64 bg-blue-50 border-blue-200"
+                      align="end"
+                    >
+                      <div className="space-y-1">
+                        <h4 className="font-semibold text-blue-900 text-xs">
+                          Ignorados (Sem Movimento)
+                        </h4>
+                        <ul className="list-disc pl-4 text-[10px] text-blue-800">
+                          {ignoredRouteEmployees.map((name, idx) => (
+                            <li key={idx}>{name}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                )}
+
                 {/* Alert: Pendência de Rota (Yellow) */}
                 {hasPendingRoute && (
                   <Popover>
@@ -230,8 +287,13 @@ export function RotaHeader({
                           Vendedores Pendentes
                         </h4>
                         <p className="text-xs text-yellow-800">
-                          Todos os vendedores da rota devem fechar o caixa para
-                          prosseguir:
+                          Todos os vendedores com movimento devem fechar o
+                          caixa.
+                          {isAdminOrManager && (
+                            <span className="block mt-1 font-bold">
+                              Admin pode forçar.
+                            </span>
+                          )}
                         </p>
                         <ul className="list-disc pl-4 text-sm text-yellow-900 max-h-40 overflow-y-auto">
                           {pendingRouteEmployees.map((name, idx) => (
@@ -319,12 +381,7 @@ export function RotaHeader({
                 <div className="relative group">
                   <Button
                     onClick={onEnd}
-                    disabled={
-                      loading ||
-                      hasPendingUpdates ||
-                      hasPendingRoute || // Strict check
-                      hasPendingConfirmation
-                    }
+                    disabled={isBlocked}
                     variant="destructive"
                     className="w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -333,12 +390,15 @@ export function RotaHeader({
                     ) : (
                       <Square className="mr-2 h-4 w-4" />
                     )}
-                    Finalizar Rota
+                    {isAdminOrManager &&
+                    (hasPendingRoute || hasPendingConfirmation)
+                      ? 'Forçar Finalização'
+                      : 'Finalizar Rota'}
                   </Button>
-                  {(hasPendingRoute || hasPendingConfirmation) && (
+                  {isBlocked && !loading && !hasPendingUpdates && (
                     <div className="absolute top-full right-0 mt-1 w-64 p-2 bg-black/80 text-white text-xs rounded hidden group-hover:block z-50 text-center">
                       Não é possível finalizar. Existem caixas não fechados ou
-                      pendentes de confirmação.
+                      pendentes de confirmação. (Admin pode ignorar)
                     </div>
                   )}
                 </div>

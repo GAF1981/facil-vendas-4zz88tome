@@ -216,6 +216,47 @@ export const rotaService = {
     await Promise.all(updates)
   },
 
+  async bulkClearNextSellers(rotaId: number) {
+    const items = await this.getRotaItems(rotaId)
+    const updates = []
+
+    for (const item of items) {
+      if (item.tarefas && extractNextSeller(item.tarefas)) {
+        const cleanTarefas = setNextSellerTag(item.tarefas, null)
+        updates.push(
+          this.upsertRotaItem({
+            rota_id: rotaId,
+            cliente_id: item.cliente_id,
+            tarefas: cleanTarefas,
+          }),
+        )
+      }
+    }
+    await Promise.all(updates)
+  },
+
+  async bulkTransferNextSellers(rotaId: number) {
+    const items = await this.getRotaItems(rotaId)
+    const updates = []
+
+    for (const item of items) {
+      const nextSellerId = extractNextSeller(item.tarefas || null)
+      // Condition: No current seller assigned AND has a "Next Seller" set
+      if (!item.vendedor_id && nextSellerId) {
+        const cleanTarefas = setNextSellerTag(item.tarefas || null, null)
+        updates.push(
+          this.upsertRotaItem({
+            rota_id: rotaId,
+            cliente_id: item.cliente_id,
+            vendedor_id: nextSellerId,
+            tarefas: cleanTarefas,
+          }),
+        )
+      }
+    }
+    await Promise.all(updates)
+  },
+
   async getFullRotaData(rota: Rota | null) {
     // 1. Fetch all Clients
     const { data: clients, error: clientsError } = await supabase

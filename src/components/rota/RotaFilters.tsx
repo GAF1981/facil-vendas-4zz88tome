@@ -10,7 +10,15 @@ import { Label } from '@/components/ui/label'
 import { RotaFilterState } from '@/types/rota'
 import { Employee } from '@/types/employee'
 import { Button } from '@/components/ui/button'
-import { Eraser, Search, Check, ChevronsUpDown } from 'lucide-react'
+import {
+  Eraser,
+  Search,
+  Check,
+  ChevronsUpDown,
+  Trash2,
+  ArrowRightLeft,
+  Loader2,
+} from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   Popover,
@@ -27,6 +35,9 @@ import {
 } from '@/components/ui/command'
 import { cn } from '@/lib/utils'
 import { Switch } from '@/components/ui/switch'
+import { rotaService } from '@/services/rotaService'
+import { useState } from 'react'
+import { useToast } from '@/hooks/use-toast'
 
 interface RotaFiltersProps {
   filters: RotaFilterState
@@ -36,6 +47,9 @@ interface RotaFiltersProps {
   routes: string[]
   isSelectionMode: boolean
   toggleSelectionMode: (value: boolean) => void
+  // Optional activeRotaId to enable bulk actions
+  activeRotaId?: number
+  onDataChange?: () => void
 }
 
 export function RotaFilters({
@@ -46,7 +60,12 @@ export function RotaFilters({
   routes,
   isSelectionMode,
   toggleSelectionMode,
+  activeRotaId,
+  onDataChange,
 }: RotaFiltersProps) {
+  const [bulkLoading, setBulkLoading] = useState(false)
+  const { toast } = useToast()
+
   const handleChange = (key: keyof RotaFilterState, value: any) => {
     setFilters({ ...filters, [key]: value })
   }
@@ -57,6 +76,7 @@ export function RotaFilters({
       x_na_rota: 'todos',
       agregado: 'todos',
       vendedor: [],
+      proximo_vendedor: 'todos',
       municipio: 'todos',
       grupo_rota: 'todos',
       debito_min: '',
@@ -93,12 +113,68 @@ export function RotaFilters({
     handleChange('vendedor', [])
   }
 
+  const handleBulkClear = async () => {
+    if (!activeRotaId) return
+    if (!confirm('Deseja apagar TODOS os registros da coluna "Próxima"?'))
+      return
+
+    setBulkLoading(true)
+    try {
+      await rotaService.bulkClearNextSellers(activeRotaId)
+      toast({
+        title: 'Sucesso',
+        description: 'Coluna "Próxima" limpa com sucesso.',
+        className: 'bg-green-600 text-white',
+      })
+      if (onDataChange) onDataChange()
+    } catch (error) {
+      console.error(error)
+      toast({
+        title: 'Erro',
+        description: 'Falha ao limpar dados.',
+        variant: 'destructive',
+      })
+    } finally {
+      setBulkLoading(false)
+    }
+  }
+
+  const handleBulkTransfer = async () => {
+    if (!activeRotaId) return
+    if (
+      !confirm(
+        'Deseja transferir o "Próximo" para "Vendedor" onde estiver vazio?',
+      )
+    )
+      return
+
+    setBulkLoading(true)
+    try {
+      await rotaService.bulkTransferNextSellers(activeRotaId)
+      toast({
+        title: 'Sucesso',
+        description: 'Transferência concluída.',
+        className: 'bg-green-600 text-white',
+      })
+      if (onDataChange) onDataChange()
+    } catch (error) {
+      console.error(error)
+      toast({
+        title: 'Erro',
+        description: 'Falha na transferência.',
+        variant: 'destructive',
+      })
+    } finally {
+      setBulkLoading(false)
+    }
+  }
+
   return (
     <Card className="w-full bg-card border-b shadow-sm rounded-none sm:rounded-md">
       <CardContent className="p-2">
         <div className="flex flex-wrap items-center gap-2">
           {/* Search */}
-          <div className="relative flex-1 min-w-[200px] max-w-[300px]">
+          <div className="relative flex-1 min-w-[150px] max-w-[240px]">
             <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
             <Input
               placeholder="Buscar Cliente..."
@@ -129,7 +205,7 @@ export function RotaFilters({
           </div>
 
           {/* Vendedor */}
-          <div className="w-[140px]">
+          <div className="w-[120px]">
             <Popover>
               <PopoverTrigger asChild>
                 <Button
@@ -203,8 +279,62 @@ export function RotaFilters({
             </Popover>
           </div>
 
+          {/* Próximo Filter */}
+          <div className="w-[120px]">
+            <Select
+              value={filters.proximo_vendedor}
+              onValueChange={(v) => handleChange('proximo_vendedor', v)}
+            >
+              <SelectTrigger className="h-8 text-xs px-2 border-dashed border-purple-300">
+                <SelectValue placeholder="Próx. Vendedor" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Próx: Todos</SelectItem>
+                {sellers.map((s) => (
+                  <SelectItem key={s.id} value={s.id.toString()}>
+                    {s.nome_completo.split(' ')[0]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Bulk Buttons */}
+          {activeRotaId && (
+            <div className="flex items-center gap-1 border-l pl-2 border-purple-100">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleBulkClear}
+                disabled={bulkLoading}
+                className="h-8 w-8 text-red-400 hover:text-red-600 hover:bg-red-50"
+                title="Apagar Tudo (Coluna Próxima)"
+              >
+                {bulkLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleBulkTransfer}
+                disabled={bulkLoading}
+                className="h-8 w-8 text-purple-500 hover:text-purple-700 hover:bg-purple-50"
+                title="Transferir Tudo (Próxima -> Vendedor)"
+              >
+                {bulkLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ArrowRightLeft className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+          )}
+
           {/* Status */}
-          <div className="w-[100px]">
+          <div className="w-[90px]">
             <Select
               value={filters.vencimento_status}
               onValueChange={(v) => handleChange('vencimento_status', v)}
@@ -221,7 +351,7 @@ export function RotaFilters({
           </div>
 
           {/* Municipio */}
-          <div className="w-[120px]">
+          <div className="w-[100px]">
             <Select
               value={filters.municipio}
               onValueChange={(v) => handleChange('municipio', v)}

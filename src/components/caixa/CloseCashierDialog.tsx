@@ -19,10 +19,25 @@ import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
 import { employeesService } from '@/services/employeesService'
 import { fechamentoService } from '@/services/fechamentoService'
+import {
+  caixaService,
+  ReceiptDetail,
+  ExpenseDetail,
+} from '@/services/caixaService'
 import { Employee } from '@/types/employee'
 import { Rota } from '@/types/rota'
 import { Loader2 } from 'lucide-react'
 import { useUserStore } from '@/stores/useUserStore'
+import { formatCurrency, safeFormatDate } from '@/lib/formatters'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 interface CloseCashierDialogProps {
   open: boolean
@@ -42,6 +57,10 @@ export function CloseCashierDialog({
   const [employees, setEmployees] = useState<Employee[]>([])
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('')
   const [loading, setLoading] = useState(false)
+  const [dataLoading, setDataLoading] = useState(false)
+  const [receipts, setReceipts] = useState<ReceiptDetail[]>([])
+  const [expenses, setExpenses] = useState<ExpenseDetail[]>([])
+
   const { toast } = useToast()
   const { employee: loggedInUser } = useUserStore()
 
@@ -58,6 +77,25 @@ export function CloseCashierDialog({
       }
     }
   }, [open, loggedInUser, targetEmployeeId])
+
+  useEffect(() => {
+    if (open && selectedEmployeeId && currentRoute) {
+      setDataLoading(true)
+      const empId = parseInt(selectedEmployeeId)
+      Promise.all([
+        caixaService.getEmployeeReceipts(empId, currentRoute),
+        caixaService.getEmployeeExpenses(empId, currentRoute),
+      ])
+        .then(([recs, exps]) => {
+          setReceipts(recs)
+          setExpenses(exps)
+        })
+        .finally(() => setDataLoading(false))
+    } else {
+      setReceipts([])
+      setExpenses([])
+    }
+  }, [open, selectedEmployeeId, currentRoute])
 
   const canChangeEmployee = useMemo(() => {
     if (!loggedInUser) return false
@@ -149,18 +187,17 @@ export function CloseCashierDialog({
     }
   }
 
+  const totalReceipts = receipts.reduce((acc, r) => acc + r.valor, 0)
+  const totalExpenses = expenses.reduce((acc, e) => acc + e.valor, 0)
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Fechar Caixa</DialogTitle>
+          <DialogTitle>Fechar Caixa Detalhado</DialogTitle>
           <DialogDescription>
-            Inicie o processo de conferência e fechamento para o caixa
-            selecionado na <strong>Rota #{currentRoute?.id}</strong>.
-            <br />
-            <span className="text-xs text-muted-foreground mt-2 block">
-              Nota: Serão gerados automaticamente comprovantes em A4 e 80mm.
-            </span>
+            Confira os lançamentos antes de fechar o caixa para{' '}
+            <strong>Rota #{currentRoute?.id}</strong>.
           </DialogDescription>
         </DialogHeader>
 
@@ -172,7 +209,7 @@ export function CloseCashierDialog({
               onValueChange={setSelectedEmployeeId}
               disabled={!canChangeEmployee}
             >
-              <SelectTrigger className="bg-background font-medium">
+              <SelectTrigger className="bg-background font-medium w-full sm:w-1/2">
                 <SelectValue placeholder="Selecione..." />
               </SelectTrigger>
               <SelectContent>
@@ -183,12 +220,124 @@ export function CloseCashierDialog({
                 ))}
               </SelectContent>
             </Select>
-            {!canChangeEmployee && (
-              <p className="text-xs text-muted-foreground">
-                Você só pode fechar o seu próprio caixa.
-              </p>
-            )}
           </div>
+
+          {dataLoading ? (
+            <div className="h-40 flex items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <Tabs defaultValue="receipts" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="receipts">
+                  Recebimentos ({receipts.length})
+                </TabsTrigger>
+                <TabsTrigger value="expenses">
+                  Despesas ({expenses.length})
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="receipts" className="mt-2">
+                <div className="rounded-md border h-64 overflow-auto">
+                  <Table>
+                    <TableHeader className="bg-muted/50 sticky top-0">
+                      <TableRow>
+                        <TableHead className="w-[80px]">ID</TableHead>
+                        <TableHead>Data</TableHead>
+                        <TableHead>Cliente</TableHead>
+                        <TableHead>Forma</TableHead>
+                        <TableHead className="text-right">Valor</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {receipts.length === 0 ? (
+                        <TableRow>
+                          <TableCell
+                            colSpan={5}
+                            className="text-center h-24 text-muted-foreground"
+                          >
+                            Nenhum recebimento encontrado.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        receipts.map((r) => (
+                          <TableRow key={r.id}>
+                            <TableCell className="font-mono text-xs">
+                              {r.id}
+                            </TableCell>
+                            <TableCell className="text-xs">
+                              {safeFormatDate(r.data, 'dd/MM HH:mm')}
+                            </TableCell>
+                            <TableCell className="text-xs truncate max-w-[150px]">
+                              {r.clienteNome}
+                            </TableCell>
+                            <TableCell className="text-xs">{r.forma}</TableCell>
+                            <TableCell className="text-right font-mono text-xs font-medium text-green-600">
+                              {formatCurrency(r.valor)}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+                <div className="flex justify-end mt-2">
+                  <span className="font-bold text-sm">
+                    Total Recebido: R$ {formatCurrency(totalReceipts)}
+                  </span>
+                </div>
+              </TabsContent>
+              <TabsContent value="expenses" className="mt-2">
+                <div className="rounded-md border h-64 overflow-auto">
+                  <Table>
+                    <TableHeader className="bg-muted/50 sticky top-0">
+                      <TableRow>
+                        <TableHead className="w-[80px]">ID</TableHead>
+                        <TableHead>Data</TableHead>
+                        <TableHead>Grupo</TableHead>
+                        <TableHead>Detalhes</TableHead>
+                        <TableHead className="text-right">Valor</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {expenses.length === 0 ? (
+                        <TableRow>
+                          <TableCell
+                            colSpan={5}
+                            className="text-center h-24 text-muted-foreground"
+                          >
+                            Nenhuma despesa encontrada.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        expenses.map((e) => (
+                          <TableRow key={e.id}>
+                            <TableCell className="font-mono text-xs">
+                              {e.id}
+                            </TableCell>
+                            <TableCell className="text-xs">
+                              {safeFormatDate(e.data, 'dd/MM HH:mm')}
+                            </TableCell>
+                            <TableCell className="text-xs">{e.grupo}</TableCell>
+                            <TableCell className="text-xs truncate max-w-[150px]">
+                              {e.detalhamento}
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-xs font-medium text-red-600">
+                              {formatCurrency(e.valor)}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+                <div className="flex justify-end mt-2">
+                  <span className="font-bold text-sm text-red-600">
+                    Total Despesas: R$ {formatCurrency(totalExpenses)}
+                  </span>
+                </div>
+              </TabsContent>
+            </Tabs>
+          )}
         </div>
 
         <DialogFooter>
@@ -200,7 +349,7 @@ export function CloseCashierDialog({
             disabled={loading || !selectedEmployeeId}
           >
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Iniciar Fechamento
+            Confirmar e Fechar
           </Button>
         </DialogFooter>
       </DialogContent>
