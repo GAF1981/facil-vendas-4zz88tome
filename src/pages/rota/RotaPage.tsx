@@ -306,22 +306,7 @@ export default function RotaPage() {
     if (!confirm('Tem certeza que deseja finalizar a rota atual?')) return
 
     try {
-      // Logic for transferring Next Sellers to new Route is handled here or in service?
-      // Service finishAndStartNewRoute does some transfers, but `applyNextSellers` logic is manual usually.
-      // Wait, we need to apply next sellers to the NEW route.
-      // The requirement "Bulk Transfer" was for the CURRENT route context (editing items).
-      // The "Next Seller" usually implies "Seller for NEXT route".
-      // If we finish route, we usually copy items.
-      // Let's stick to simple finish for now.
-
       await rotaService.finishAndStartNewRoute(activeRota.id)
-
-      // Apply Next Sellers logic if needed
-      // Since "Próxima" column exists, we might want to apply these to the new route.
-      // Fetch current items, find those with next seller, update the NEW items in the NEW route.
-      // This is complex. The user asked for "Transferir tudo" button in the interface, which does it NOW.
-      // So automated transfer on finish might not be requested here, but standard practice.
-      // I'll stick to just finishing as per user story which focused on "Force Finalization".
 
       toast({
         title: 'Rota Finalizada',
@@ -346,6 +331,101 @@ export default function RotaPage() {
       description: 'O download iniciará em breve.',
     })
     // Implementation would go here
+  }
+
+  const handleBulkClear = async () => {
+    if (!activeRota) return
+    if (!confirm('Deseja apagar TODOS os registros da coluna "Próxima"?'))
+      return
+
+    setLoading(true)
+    try {
+      await rotaService.bulkClearNextSellers(activeRota.id)
+      toast({
+        title: 'Sucesso',
+        description: 'Coluna "Próxima" limpa com sucesso.',
+        className: 'bg-green-600 text-white',
+      })
+      loadData()
+    } catch (error) {
+      console.error(error)
+      toast({
+        title: 'Erro',
+        description: 'Falha ao limpar dados.',
+        variant: 'destructive',
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleBulkTransfer = async () => {
+    if (!activeRota) return
+    if (
+      !confirm(
+        'Deseja transferir o "Próximo" para "Vendedor" onde estiver vazio?',
+      )
+    )
+      return
+
+    setLoading(true)
+    try {
+      await rotaService.bulkTransferNextSellers(activeRota.id)
+      toast({
+        title: 'Sucesso',
+        description: 'Transferência concluída.',
+        className: 'bg-green-600 text-white',
+      })
+      loadData()
+    } catch (error) {
+      console.error(error)
+      toast({
+        title: 'Erro',
+        description: 'Falha na transferência.',
+        variant: 'destructive',
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleTransferRow = async (row: RotaRow) => {
+    if (!activeRota || !row.proximo_vendedor_id) return
+
+    // Optimistic Update: Set Vendor to Next, and Next to null
+    setRows((prev) =>
+      prev.map((r) => {
+        if (r.client.CODIGO === row.client.CODIGO) {
+          return {
+            ...r,
+            vendedor_id: row.proximo_vendedor_id,
+            proximo_vendedor_id: null,
+          }
+        }
+        return r
+      }),
+    )
+
+    try {
+      await rotaService.transferSingleNextSeller(
+        activeRota.id,
+        row.client.CODIGO,
+        row.proximo_vendedor_id,
+        row.tarefas,
+      )
+      toast({
+        title: 'Transferido',
+        description: 'Vendedor atualizado com sucesso.',
+      })
+    } catch (error) {
+      console.error(error)
+      toast({
+        title: 'Erro',
+        description: 'Falha ao transferir vendedor.',
+        variant: 'destructive',
+      })
+      loadData() // Revert
+    }
   }
 
   return (
@@ -379,6 +459,9 @@ export default function RotaPage() {
         sortConfig={sortConfig}
         loading={loading}
         isSelectionMode={isSelectionMode}
+        onBulkTransfer={activeRota ? handleBulkTransfer : undefined}
+        onBulkClear={activeRota ? handleBulkClear : undefined}
+        onTransferRow={handleTransferRow}
       />
     </div>
   )

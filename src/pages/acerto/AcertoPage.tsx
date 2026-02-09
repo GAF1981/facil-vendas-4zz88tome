@@ -387,6 +387,8 @@ export default function AcertoPage() {
           employee: emp,
           items,
           date: new Date().toISOString(),
+          // Ensure we use 'thermal-history' layout when 80mm is selected, or 'acerto' which logic inside generate-pdf handles similarly.
+          // User story implies vertical thermal receipt.
           acertoTipo: isCaptacao ? 'Captação' : 'Acerto',
           totalVendido: totalSalesValue,
           valorDesconto: discountAmount,

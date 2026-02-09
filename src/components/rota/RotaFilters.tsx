@@ -10,15 +10,7 @@ import { Label } from '@/components/ui/label'
 import { RotaFilterState } from '@/types/rota'
 import { Employee } from '@/types/employee'
 import { Button } from '@/components/ui/button'
-import {
-  Eraser,
-  Search,
-  Check,
-  ChevronsUpDown,
-  Trash2,
-  ArrowRightLeft,
-  Loader2,
-} from 'lucide-react'
+import { Eraser, Search, Check, ChevronsUpDown } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   Popover,
@@ -35,9 +27,6 @@ import {
 } from '@/components/ui/command'
 import { cn } from '@/lib/utils'
 import { Switch } from '@/components/ui/switch'
-import { rotaService } from '@/services/rotaService'
-import { useState } from 'react'
-import { useToast } from '@/hooks/use-toast'
 
 interface RotaFiltersProps {
   filters: RotaFilterState
@@ -47,7 +36,7 @@ interface RotaFiltersProps {
   routes: string[]
   isSelectionMode: boolean
   toggleSelectionMode: (value: boolean) => void
-  // Optional activeRotaId to enable bulk actions
+  // Optional props for compatibility if passed from parent, even if not used for buttons here
   activeRotaId?: number
   onDataChange?: () => void
 }
@@ -60,12 +49,7 @@ export function RotaFilters({
   routes,
   isSelectionMode,
   toggleSelectionMode,
-  activeRotaId,
-  onDataChange,
 }: RotaFiltersProps) {
-  const [bulkLoading, setBulkLoading] = useState(false)
-  const { toast } = useToast()
-
   const handleChange = (key: keyof RotaFilterState, value: any) => {
     setFilters({ ...filters, [key]: value })
   }
@@ -111,62 +95,6 @@ export function RotaFilters({
 
   const deselectAllSellers = () => {
     handleChange('vendedor', [])
-  }
-
-  const handleBulkClear = async () => {
-    if (!activeRotaId) return
-    if (!confirm('Deseja apagar TODOS os registros da coluna "Próxima"?'))
-      return
-
-    setBulkLoading(true)
-    try {
-      await rotaService.bulkClearNextSellers(activeRotaId)
-      toast({
-        title: 'Sucesso',
-        description: 'Coluna "Próxima" limpa com sucesso.',
-        className: 'bg-green-600 text-white',
-      })
-      if (onDataChange) onDataChange()
-    } catch (error) {
-      console.error(error)
-      toast({
-        title: 'Erro',
-        description: 'Falha ao limpar dados.',
-        variant: 'destructive',
-      })
-    } finally {
-      setBulkLoading(false)
-    }
-  }
-
-  const handleBulkTransfer = async () => {
-    if (!activeRotaId) return
-    if (
-      !confirm(
-        'Deseja transferir o "Próximo" para "Vendedor" onde estiver vazio?',
-      )
-    )
-      return
-
-    setBulkLoading(true)
-    try {
-      await rotaService.bulkTransferNextSellers(activeRotaId)
-      toast({
-        title: 'Sucesso',
-        description: 'Transferência concluída.',
-        className: 'bg-green-600 text-white',
-      })
-      if (onDataChange) onDataChange()
-    } catch (error) {
-      console.error(error)
-      toast({
-        title: 'Erro',
-        description: 'Falha na transferência.',
-        variant: 'destructive',
-      })
-    } finally {
-      setBulkLoading(false)
-    }
   }
 
   return (
@@ -298,40 +226,6 @@ export function RotaFilters({
               </SelectContent>
             </Select>
           </div>
-
-          {/* Bulk Buttons */}
-          {activeRotaId && (
-            <div className="flex items-center gap-1 border-l pl-2 border-purple-100">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleBulkClear}
-                disabled={bulkLoading}
-                className="h-8 w-8 text-red-400 hover:text-red-600 hover:bg-red-50"
-                title="Apagar Tudo (Coluna Próxima)"
-              >
-                {bulkLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Trash2 className="h-4 w-4" />
-                )}
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleBulkTransfer}
-                disabled={bulkLoading}
-                className="h-8 w-8 text-purple-500 hover:text-purple-700 hover:bg-purple-50"
-                title="Transferir Tudo (Próxima -> Vendedor)"
-              >
-                {bulkLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <ArrowRightLeft className="h-4 w-4" />
-                )}
-              </Button>
-            </div>
-          )}
 
           {/* Status */}
           <div className="w-[90px]">

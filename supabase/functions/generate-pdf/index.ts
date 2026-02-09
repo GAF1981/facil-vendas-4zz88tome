@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json()
-    const { reportType, format, signature } = body
+    const { reportType, format } = body
     const isThermal = format === '80mm'
     const isDetailed = reportType === 'detailed-order'
 
@@ -87,16 +87,25 @@ Deno.serve(async (req) => {
       const detailedPaymentsCount = body.detailedPayments
         ? body.detailedPayments.length
         : 0
+      // For closing report
+      const expensesCount = body.expenses ? body.expenses.length : 0
+      const receiptsCount = body.receipts ? body.receipts.length : 0
 
-      const estimatedHeight =
-        400 + // Header
-        itemsCount * 120 + // Items (Increased for Unit Price)
-        120 + // Totals
-        (installmentsCount > 0 ? 50 + installmentsCount * 20 : 0) + // Installments
-        (detailedPaymentsCount > 0 ? 50 + detailedPaymentsCount * 20 : 0) + // Payments (Received)
-        50 + // Signature
-        (historyCount > 0 ? 50 + historyCount * 80 : 0) + // History (increased height estimate)
-        100 // Footer padding
+      // Calculate variable height
+      let estimatedHeight = 600 // Base height
+
+      if (
+        reportType === 'closing-confirmation' ||
+        reportType === 'employee-cash-summary'
+      ) {
+        estimatedHeight += receiptsCount * 20
+        estimatedHeight += expensesCount * 20
+        estimatedHeight += 300 // summary sections
+      } else {
+        estimatedHeight += itemsCount * 100 // Items block
+        estimatedHeight += installmentsCount * 20
+        estimatedHeight += historyCount * 40
+      }
 
       page = pdfDoc.addPage([226, Math.max(400, estimatedHeight)])
       width = page.getSize().width
@@ -190,7 +199,23 @@ Deno.serve(async (req) => {
     }
 
     if (reportType === 'detailed-order') {
-      // --- DETAILED REPORT (GREEN) ---
+      // --- DETAILED ORDER (A4 LANDSCAPE) ---
+      // Keeping existing implementation for Green button (Standard/Detailed) if needed,
+      // or if "Finalizar Acerto" uses this type.
+      // The user story focuses on "Finalizar Acerto PDF layout to match the provided PEDIDO template".
+      // Assuming "PEDIDO" template provided is the vertical one (80mm) because the other is "Fechamento de Caixa".
+      // If reportType is 'detailed-order' but format is '80mm', we should render the thermal version.
+      // However, usually 'detailed-order' implies the big grid.
+      // Let's assume if format is 80mm, we use the thermal layout regardless of reportType name variations for orders.
+    }
+
+    if (
+      isThermal &&
+      (reportType === 'thermal-history' ||
+        reportType === 'detailed-order' ||
+        reportType === 'acerto')
+    ) {
+      // --- THERMAL ORDER SETTLEMENT (PEDIDO) ---
       const {
         client,
         employee,
@@ -201,329 +226,6 @@ Deno.serve(async (req) => {
         valorDesconto = 0,
         valorAcerto = 0,
         installments = [],
-        detailedPayments = [], // Add this
-      } = body
-
-      // 1. Header Title
-      drawText('FACIL VENDAS', width / 2, y, {
-        size: 16,
-        font: fontBold,
-        align: 'center',
-      })
-      y -= 20
-      drawText('RELATORIO DETALHADO DE PEDIDO', width / 2, y, {
-        size: 14,
-        font: fontBold,
-        align: 'center',
-      })
-      y -= 25
-      drawLine(y, 1.5)
-      y -= 20
-
-      // 2. Info Columns
-      const startInfoY = y
-      const colLeftX = margins.left
-      const colRightX = width / 2 + 20
-      const lineHeight = 14
-
-      // Left Column
-      drawText(`Numero do Pedido: ${orderNumber}`, colLeftX, y, {
-        font: fontBold,
-        size: 10,
-      })
-      y -= lineHeight
-      drawText(
-        `Cliente: ${client?.CODIGO || ''} - ${client?.['NOME CLIENTE'] || ''}`,
-        colLeftX,
-        y,
-        { font: fontBold, size: 10 },
-      )
-      y -= lineHeight
-      drawText(`Endereco: ${client?.ENDEREÇO || ''}`, colLeftX, y, { size: 10 })
-      y -= lineHeight
-      drawText(
-        `Municipio: ${client?.MUNICÍPIO || ''} - ${client?.['ESTADO'] || ''}`,
-        colLeftX,
-        y,
-        { size: 10 },
-      )
-      y -= lineHeight
-      drawText(`Contato: ${client?.['CONTATO 1'] || ''}`, colLeftX, y, {
-        size: 10,
-      })
-      y -= lineHeight
-      drawText(`Funcionario: ${employee?.nome_completo || ''}`, colLeftX, y, {
-        size: 10,
-      })
-
-      // Right Column
-      y = startInfoY
-      drawText(`Data do Acerto: ${safeFormatDate(date)}`, colRightX, y, {
-        size: 10,
-      })
-      y -= lineHeight
-      drawText(`CNPJ/CPF: ${client?.CNPJ || ''}`, colRightX, y, { size: 10 })
-      y -= lineHeight
-      drawText(`CEP: ${client?.['CEP OFICIO'] || ''}`, colRightX, y, {
-        size: 10,
-      })
-      y -= lineHeight
-      drawText(`Telefone: ${client?.['FONE 1'] || ''}`, colRightX, y, {
-        size: 10,
-      })
-
-      // Move down for table
-      y = startInfoY - lineHeight * 6 - 20
-
-      // 3. Table Headers
-      const headerHeightSpace = 120
-      y -= headerHeightSpace
-
-      const headerBaseline = y
-      const cols = [
-        { label: 'CODIGO', x: margins.left, w: 60, vertical: true },
-        { label: 'MERCADORIA', x: margins.left + 60, w: 230, vertical: false }, // Horizontal
-        { label: 'TIPO', x: margins.left + 290, w: 50, vertical: true },
-        {
-          label: 'SALDO INICIAL',
-          x: margins.left + 340,
-          w: 60,
-          vertical: true,
-        },
-        { label: 'CONTAGEM', x: margins.left + 400, w: 60, vertical: true },
-        { label: 'QTD VENDIDA', x: margins.left + 460, w: 60, vertical: true },
-        {
-          label: 'VALOR VENDIDO',
-          x: margins.left + 520,
-          w: 70,
-          vertical: true,
-        },
-        { label: 'SALDO FINAL', x: margins.left + 590, w: 60, vertical: true },
-        {
-          label: 'NOVAS CONSIG.',
-          x: margins.left + 650,
-          w: 70,
-          vertical: true,
-        },
-        { label: 'RECOLHIDO', x: margins.left + 720, w: 60, vertical: true },
-      ]
-
-      // Draw Headers
-      cols.forEach((col) => {
-        if (col.vertical) {
-          const xOffset = col.x + col.w / 2 - 3
-          drawText(col.label, xOffset, headerBaseline, {
-            size: 9,
-            font: fontBold,
-            rotate: degrees(90),
-          })
-        } else {
-          drawText(col.label, col.x + 5, headerBaseline + 5, {
-            size: 9,
-            font: fontBold,
-          })
-        }
-      })
-
-      y -= 10
-      drawLine(y)
-      y -= 15
-
-      // 4. Rows
-      items.forEach((item: any, index: number) => {
-        checkPageBreak(20)
-        const rowY = y
-        const fontSize = 9
-
-        drawText(String(item.produtoCodigo || ''), cols[0].x, rowY, {
-          size: fontSize,
-        })
-        drawText(item.produtoNome, cols[1].x, rowY, {
-          size: fontSize,
-          maxWidth: cols[1].w,
-        })
-        drawText(item.tipo || '', cols[2].x, rowY, { size: fontSize })
-        drawText(String(item.saldoInicial), cols[3].x + 30, rowY, {
-          size: fontSize,
-          align: 'center',
-        })
-        drawText(String(item.contagem), cols[4].x + 30, rowY, {
-          size: fontSize,
-          align: 'center',
-        })
-        drawText(String(item.quantVendida), cols[5].x + 30, rowY, {
-          size: fontSize,
-          align: 'center',
-        })
-        drawText(formatCurrency(item.valorVendido), cols[6].x + 60, rowY, {
-          size: fontSize,
-          align: 'right',
-        })
-        drawText(String(item.saldoFinal), cols[7].x + 30, rowY, {
-          size: fontSize,
-          align: 'center',
-        })
-        drawText(formatCurrency(item.novasConsignacoes), cols[8].x + 60, rowY, {
-          size: fontSize,
-          align: 'right',
-        })
-        drawText(formatCurrency(item.recolhido), cols[9].x + 50, rowY, {
-          size: fontSize,
-          align: 'right',
-        })
-
-        y -= 15
-        if (index % 5 === 0 && index !== 0) drawLine(y + 12, 0.5)
-      })
-
-      y -= 10
-      drawLine(y)
-      y -= 40
-
-      // 5. Financial Summary
-      if (y < margins.bottom + 200) {
-        page = pdfDoc.addPage([842, 595])
-        y = height - margins.top
-      }
-
-      drawText('RESUMO FINANCEIRO', width - margins.right, y, {
-        size: 14,
-        font: fontBold,
-        align: 'right',
-      })
-      y -= 40
-
-      const summaryLabelX = width - margins.right - 200
-      const summaryValueX = width - margins.right
-
-      drawText('Total Vendido:', summaryLabelX, y, { size: 12, font: fontBold })
-      drawText(`R$ ${formatCurrency(totalVendido)}`, summaryValueX, y, {
-        size: 12,
-        font: fontBold,
-        align: 'right',
-      })
-      y -= 30
-
-      drawText('Desconto:', summaryLabelX, y, { size: 12, font: fontBold })
-      drawText(`R$ ${formatCurrency(valorDesconto)}`, summaryValueX, y, {
-        size: 12,
-        font: fontBold,
-        align: 'right',
-        color: rgb(0.8, 0, 0),
-      })
-      y -= 40
-
-      drawText('TOTAL A PAGAR:', summaryLabelX, y, { size: 16, font: fontBold })
-      drawText(`R$ ${formatCurrency(valorAcerto)}`, summaryValueX, y, {
-        size: 16,
-        font: fontBold,
-        align: 'right',
-      })
-      y -= 50
-
-      // 6. Values Received (New Section)
-      if (detailedPayments && detailedPayments.length > 0) {
-        checkPageBreak(80)
-        drawText('VALORES RECEBIDOS', margins.left, y, {
-          size: 12,
-          font: fontBold,
-          align: 'left',
-          color: rgb(0, 0.5, 0), // Dark Green
-        })
-        y -= 20
-
-        const iCol1 = margins.left
-        const iCol2 = margins.left + 150
-        const iCol3 = margins.left + 300
-
-        drawText('Forma', iCol1, y, { size: 10, font: fontBold })
-        drawText('Data', iCol2, y, { size: 10, font: fontBold })
-        drawText('Valor', iCol3, y, {
-          size: 10,
-          font: fontBold,
-          align: 'right',
-        })
-        y -= 5
-        drawLine(y, 0.5)
-        y -= 15
-
-        let totalRec = 0
-        detailedPayments.forEach((p: any) => {
-          checkPageBreak(20)
-          const method = p.method || '-'
-          const dateStr = safeFormatDate(p.date)
-          const val = formatCurrency(p.value)
-
-          drawText(method, iCol1, y, { size: 10 })
-          drawText(dateStr, iCol2, y, { size: 10 })
-          drawText(`R$ ${val}`, iCol3, y, { size: 10, align: 'right' })
-          y -= 15
-          totalRec += p.value
-        })
-
-        y -= 5
-        drawLine(y, 0.5)
-        y -= 15
-        drawText('TOTAL RECEBIDO:', iCol1, y, { size: 11, font: fontBold })
-        drawText(`R$ ${formatCurrency(totalRec)}`, iCol3, y, {
-          size: 11,
-          font: fontBold,
-          align: 'right',
-        })
-        y -= 40
-      }
-
-      // 7. Installments (Values to Receive)
-      if (installments && installments.length > 0) {
-        checkPageBreak(80)
-        drawText('VALORES A RECEBER (PARCELAS)', margins.left, y, {
-          size: 12,
-          font: fontBold,
-          align: 'left',
-          color: rgb(0.7, 0, 0), // Dark Red
-        })
-        y -= 20
-
-        const iCol1 = margins.left
-        const iCol2 = margins.left + 150
-        const iCol3 = margins.left + 300
-
-        drawText('Forma', iCol1, y, { size: 10, font: fontBold })
-        drawText('Vencimento', iCol2, y, { size: 10, font: fontBold })
-        drawText('Valor', iCol3, y, {
-          size: 10,
-          font: fontBold,
-          align: 'right',
-        })
-        y -= 5
-        drawLine(y, 0.5)
-        y -= 15
-
-        installments.forEach((p: any) => {
-          checkPageBreak(20)
-          const method = p.method || '-'
-          const dateStr = safeFormatDate(p.dueDate)
-          const val = formatCurrency(p.value)
-
-          drawText(method, iCol1, y, { size: 10 })
-          drawText(dateStr, iCol2, y, { size: 10 })
-          drawText(`R$ ${val}`, iCol3, y, { size: 10, align: 'right' })
-          y -= 15
-        })
-      }
-    } else if (reportType === 'thermal-history' || reportType === 'acerto') {
-      // --- THERMAL SETTLEMENT SUMMARY (RED/ACERTO) ---
-      const {
-        client,
-        employee,
-        items = [],
-        date,
-        orderNumber,
-        totalVendido = 0,
-        valorDesconto = 0,
-        valorAcerto = 0,
-        installments = [],
-        detailedPayments = [], // Add this
         history = [],
       } = body
 
@@ -531,9 +233,9 @@ Deno.serve(async (req) => {
       const clientName = client?.['NOME CLIENTE'] || 'Consumidor'
       const clientCode = client?.CODIGO || '0'
       const clientAddress = `${client?.ENDEREÇO || ''}, ${client?.BAIRRO || ''}`
-      const clientCity = client?.MUNICÍPIO || ''
+      const clientCity = `${client?.MUNICÍPIO || ''} - ${client?.ESTADO || ''}` // Assuming ESTADO exists or blank
 
-      // Header
+      // 1. Header
       drawText('FACIL VENDAS', width / 2, y, {
         size: 16,
         font: fontBold,
@@ -545,11 +247,11 @@ Deno.serve(async (req) => {
         font: fontBold,
         align: 'center',
       })
-      y -= 10
+      y -= 15
       drawLine(y)
       y -= 15
 
-      // Client Info
+      // Client & Info
       const infoSize = 9
       drawText(`Cliente: ${clientCode} - ${clientName}`, margins.left, y, {
         size: infoSize,
@@ -562,10 +264,7 @@ Deno.serve(async (req) => {
         maxWidth: width - 20,
       })
       y -= 12
-      drawText(`${clientCity}`, margins.left, y, {
-        size: infoSize,
-        font: fontBold,
-      })
+      drawText(clientCity, margins.left, y, { size: infoSize, font: fontBold })
       y -= 12
 
       const formattedDate = safeFormatDate(date)
@@ -579,11 +278,11 @@ Deno.serve(async (req) => {
         size: infoSize,
         font: fontBold,
       })
-      y -= 10
+      y -= 15
       drawLine(y)
       y -= 15
 
-      // ITEMS
+      // 2. Items Section (ITENS DO PEDIDO)
       drawText('ITENS DO PEDIDO', width / 2, y, {
         size: 10,
         font: fontBold,
@@ -592,36 +291,58 @@ Deno.serve(async (req) => {
       y -= 15
 
       for (const item of items) {
-        checkPageBreak(100)
+        checkPageBreak(80)
+
+        // Product Name and Price line
         drawText(`${item.produtoNome}`, margins.left, y, {
           size: 9,
           font: fontBold,
-          maxWidth: width - 20,
+          maxWidth: width - 70,
         })
-        y -= 12
-
-        const drawDetail = (label: string, val: any) => {
-          drawText(label, margins.left, y, { size: 9 })
-          drawText(String(val), width - margins.right, y, {
-            size: 9,
-            align: 'right',
-          })
-          y -= 11
-        }
-
-        drawText('Preço Unit.:', margins.left, y, { size: 9 })
         drawText(
           `R$ ${formatCurrency(item.precoUnitario || 0)}`,
           width - margins.right,
           y,
           { size: 9, align: 'right' },
         )
-        y -= 11
+        y -= 12
 
-        drawDetail('Saldo Inicial:', item.saldoInicial)
-        drawDetail('Contagem:', item.contagem)
-        drawDetail('Qtd. Vendida:', item.quantVendida)
-        drawDetail('Saldo Final:', item.saldoFinal)
+        // Stats grid
+        const drawStat = (label: string, val: any, x: number) => {
+          drawText(label, x, y, { size: 8 })
+          drawText(String(val), width - margins.right, y, {
+            size: 8,
+            align: 'right',
+          })
+        }
+
+        drawText('Saldo Inicial:', margins.left, y, { size: 8 })
+        drawText(String(item.saldoInicial), width - margins.right, y, {
+          size: 8,
+          align: 'right',
+        })
+        y -= 10
+
+        drawText('Contagem:', margins.left, y, { size: 8 })
+        drawText(String(item.contagem), width - margins.right, y, {
+          size: 8,
+          align: 'right',
+        })
+        y -= 10
+
+        drawText('Qtd. Vendida:', margins.left, y, { size: 8 })
+        drawText(String(item.quantVendida), width - margins.right, y, {
+          size: 8,
+          align: 'right',
+        })
+        y -= 10
+
+        drawText('Saldo Final:', margins.left, y, { size: 8 })
+        drawText(String(item.saldoFinal), width - margins.right, y, {
+          size: 8,
+          align: 'right',
+        })
+        y -= 10
 
         drawText('Total:', margins.left, y, { size: 9, font: fontBold })
         drawText(
@@ -632,149 +353,92 @@ Deno.serve(async (req) => {
         )
         y -= 15
       }
+
       drawLine(y)
       y -= 15
 
-      // TOTALS
-      const drawTotal = (
-        label: string,
-        val: number,
-        isBig = false,
-        color = rgb(0, 0, 0),
-      ) => {
-        const f = isBig ? fontBold : fontRegular
-        const s = isBig ? 11 : 9
-        drawText(label, margins.left, y, { size: s, font: f, color })
+      // 3. Totals Section
+      const drawTotalRow = (label: string, val: number, isBold = false) => {
+        drawText(label, margins.left, y, {
+          size: 9,
+          font: isBold ? fontBold : fontRegular,
+        })
         drawText(`R$ ${formatCurrency(val)}`, width - margins.right, y, {
-          size: s,
-          font: f,
+          size: 9,
+          font: isBold ? fontBold : fontRegular,
           align: 'right',
-          color,
         })
-        y -= 18
+        y -= 15
       }
 
-      drawTotal('Total Vendido:', totalVendido)
-      drawTotal('Desconto:', valorDesconto, false, rgb(0.8, 0, 0))
+      drawTotalRow('Total Vendido:', totalVendido)
+      drawTotalRow('Desconto:', valorDesconto)
       y -= 5
-      drawTotal('TOTAL A PAGAR:', valorAcerto, true)
+      drawTotalRow('TOTAL A PAGAR:', valorAcerto, true)
       y -= 15
       drawLine(y)
       y -= 15
 
-      // RECEIVED SECTION
-      if (detailedPayments && detailedPayments.length > 0) {
-        checkPageBreak(50)
-        drawText('VALORES RECEBIDOS', width / 2, y, {
-          size: 10,
-          font: fontBold,
-          align: 'center',
-        })
-        y -= 15
-
-        const col1 = margins.left
-        const col3 = width - margins.right
-
-        let totalRec = 0
-        detailedPayments.forEach((p: any) => {
-          checkPageBreak(25)
-          const methodShort = p.method.substring(0, 15)
-          const val = formatCurrency(p.value)
-
-          drawText(methodShort, col1, y, { size: 8 })
-          drawText(`R$ ${val}`, col3, y, { size: 8, align: 'right' })
-          y -= 12
-          totalRec += p.value
-        })
-
-        y -= 5
-        drawLine(y, 0.5)
-        y -= 12
-        drawText('Total Recebido:', margins.left, y, {
-          size: 9,
-          font: fontBold,
-        })
-        drawText(`R$ ${formatCurrency(totalRec)}`, width - margins.right, y, {
-          size: 9,
-          font: fontBold,
-          align: 'right',
-        })
-        y -= 15
-        drawLine(y)
-        y -= 15
-      }
-
-      // INSTALLMENTS SECTION
+      // 4. Installments Section (VALORES A PAGAR)
       if (installments.length > 0) {
-        checkPageBreak(50)
-        drawText('A RECEBER (PARCELAS)', width / 2, y, {
+        checkPageBreak(60)
+        drawText('VALORES A PAGAR (PARCELAS)', width / 2, y, {
           size: 10,
           font: fontBold,
           align: 'center',
         })
         y -= 15
 
-        const col1 = margins.left
-        const col2 = margins.left + 60
-        const col3 = width - margins.right
-
-        drawText('Forma', col1, y, { size: 8, font: fontBold })
-        drawText('Vencimento', col2, y, { size: 8, font: fontBold })
-        drawText('Valor', col3, y, {
+        // Headers
+        drawText('Forma', margins.left, y, { size: 8, font: fontBold })
+        drawText('Vencimento', margins.left + 70, y, {
+          size: 8,
+          font: fontBold,
+        })
+        drawText('Valor', width - margins.right, y, {
           size: 8,
           font: fontBold,
           align: 'right',
         })
-        y -= 10
+        y -= 5
         drawLine(y, 0.5)
         y -= 12
 
-        let totalParcelas = 0
-        installments.forEach((p: any) => {
-          checkPageBreak(25)
-          const methodShort = p.method.substring(0, 10)
-          const dateStr = safeFormatDate(p.dueDate)
+        let totalInstallments = 0
+        installments.forEach((inst: any) => {
+          checkPageBreak(20)
+          const method = (inst.method || 'Outros').substring(0, 12)
+          const dateStr = safeFormatDate(inst.dueDate)
 
-          drawText(methodShort, col1, y, { size: 8 })
-          drawText(dateStr, col2, y, { size: 8 })
-          drawText(`R$ ${formatCurrency(p.value)}`, col3, y, {
-            size: 8,
-            align: 'right',
-          })
+          drawText(method, margins.left, y, { size: 8 })
+          drawText(dateStr, margins.left + 70, y, { size: 8 })
+          drawText(
+            `R$ ${formatCurrency(inst.value)}`,
+            width - margins.right,
+            y,
+            { size: 8, align: 'right' },
+          )
           y -= 12
-          totalParcelas += p.value
+          totalInstallments += inst.value
         })
 
         y -= 5
         drawLine(y, 0.5)
         y -= 12
-        drawText('Total a Receber:', margins.left, y, {
-          size: 9,
-          font: fontBold,
-        })
+        drawText('Total a Pagar:', margins.left, y, { size: 9, font: fontBold })
         drawText(
-          `R$ ${formatCurrency(totalParcelas)}`,
+          `R$ ${formatCurrency(totalInstallments)}`,
           width - margins.right,
           y,
-          {
-            size: 9,
-            font: fontBold,
-            align: 'right',
-          },
+          { size: 9, font: fontBold, align: 'right' },
         )
         y -= 25
       }
 
-      // SIGNATURE
+      // 5. Signature
       checkPageBreak(60)
       y -= 30
-      const sigLineY = y
-      page.drawLine({
-        start: { x: margins.left + 20, y: sigLineY },
-        end: { x: width - margins.right - 20, y: sigLineY },
-        thickness: 1,
-        color: rgb(0, 0, 0),
-      })
+      drawLine(y)
       y -= 15
       drawText('Assinatura do Cliente', width / 2, y, {
         size: 9,
@@ -783,9 +447,9 @@ Deno.serve(async (req) => {
       })
       y -= 25
 
-      // HISTORY
+      // 6. History Section (RESUMO DE ACERTOS)
       if (history && history.length > 0) {
-        checkPageBreak(150)
+        checkPageBreak(100)
         drawText('RESUMO DE ACERTOS (HISTORICO)', width / 2, y, {
           size: 10,
           font: fontBold,
@@ -794,130 +458,204 @@ Deno.serve(async (req) => {
         y -= 15
 
         history.forEach((h: any) => {
-          checkPageBreak(60)
-
+          checkPageBreak(40)
           const dateStr = safeFormatDate(h.data)
           const orderId = h.id ? `#${h.id}` : '-'
-          const vendor = h.vendedor ? h.vendedor.split(' ')[0] : '-'
+          const vendor = h.vendedor ? h.vendedor.split(' ')[0] : 'N/D'
 
-          drawText(`${dateStr}`, margins.left, y, { size: 8, font: fontBold })
-          drawText(`${orderId}`, margins.left + 55, y, {
+          // Line 1: Date | #ID | Vendor
+          drawText(dateStr, margins.left, y, { size: 8, font: fontBold })
+          drawText(orderId, margins.left + 60, y, { size: 8 })
+          drawText(vendor, width - margins.right, y, {
             size: 8,
-            font: fontBold,
-          })
-          drawText(`${vendor}`, width - margins.right, y, {
-            size: 8,
-            font: fontBold,
             align: 'right',
           })
-          y -= 11
+          y -= 10
 
-          const venda = formatCurrency(h.valorVendaTotal || 0)
-          const aPagar = formatCurrency(h.saldoAPagar || 0)
+          // Line 2: V: Val | A Pagar: Val
+          drawText(
+            `V: ${formatCurrency(h.valorVendaTotal || 0)}`,
+            margins.left,
+            y,
+            { size: 8 },
+          )
+          drawText(
+            `A Pagar: ${formatCurrency(h.saldoAPagar || 0)}`,
+            width - margins.right,
+            y,
+            { size: 8, font: fontBold, align: 'right' },
+          )
+          y -= 10
 
-          drawText(`V: ${venda}`, margins.left, y, { size: 8, font: fontBold })
-          drawText(`A Pagar: ${aPagar}`, width - margins.right, y, {
+          // Line 3: Pg: Val | Deb: Val | Med: Val
+          drawText(`Pg: ${formatCurrency(h.valorPago || 0)}`, margins.left, y, {
             size: 8,
-            font: fontBold,
-            align: 'right',
           })
-          y -= 11
 
-          const pago = formatCurrency(h.valorPago || 0)
-          const debitoVal = h.debito || 0
-          const mediaVal = h.mediaMensal || 0
+          const debVal = h.debito || 0
+          const debColor = debVal > 0.05 ? rgb(0.8, 0, 0) : rgb(0, 0, 0)
 
-          drawText(`Pg: ${pago}`, margins.left, y, { size: 8 })
-
-          const debitoColor = debitoVal > 1.0 ? rgb(0.6, 0, 0) : rgb(0, 0, 0)
-          const medColor = rgb(0, 0, 0.6)
-
-          drawText(`Deb: ${formatCurrency(debitoVal)}`, margins.left + 70, y, {
+          drawText(`Deb: ${formatCurrency(debVal)}`, margins.left + 70, y, {
             size: 8,
-            font: fontBold,
-            color: debitoColor,
+            color: debColor,
+            font: debVal > 0.05 ? fontBold : fontRegular,
           })
 
           drawText(
-            `Med: ${formatCurrency(mediaVal)}`,
+            `Med: ${formatCurrency(h.mediaMensal || 0)}`,
             width - margins.right,
             y,
-            {
-              size: 8,
-              font: fontBold,
-              color: medColor,
-              align: 'right',
-            },
+            { size: 8, align: 'right', color: rgb(0, 0, 0.6) },
           )
 
-          y -= 12
+          y -= 5
           drawLine(y, 0.5)
           y -= 10
         })
       }
-    } else {
-      // DEFAULT (Closing)
-      if (
-        reportType === 'closing-confirmation' ||
-        reportType === 'employee-cash-summary'
-      ) {
-        const { fechamento, date: closingDate } = body
-        const closingData = fechamento || body.data
+    } else if (
+      isThermal &&
+      (reportType === 'closing-confirmation' ||
+        reportType === 'employee-cash-summary')
+    ) {
+      // --- CASHIER CLOSURE (FECHAMENTO DE CAIXA) ---
+      const { fechamento, receipts = [], expenses = [], date } = body
 
-        if (closingData) {
-          const empName =
-            closingData.funcionario?.nome_completo || 'Funcionario'
+      const closingData = fechamento || body.data || {}
+      const empName = closingData.funcionario?.nome_completo || 'Funcionario'
+      const rotaId = closingData.rota_id || '-'
+      const formattedDate = safeFormatDate(date)
+      const formattedTime = safeFormatTime(date)
 
-          drawText('FECHAMENTO DE CAIXA', width / 2, y, {
-            size: 14,
-            font: fontBold,
-            align: 'center',
-          })
-          y -= 25
-          drawText(`Funcionario: ${empName}`, margins.left, y, { size: 10 })
-          y -= 15
-          drawText(`Data: ${safeFormatDate(closingDate)}`, margins.left, y, {
-            size: 10,
-          })
-          y -= 20
-          drawLine(y)
-          y -= 20
+      // Header
+      drawText('FACIL VENDAS', width / 2, y, {
+        size: 16,
+        font: fontBold,
+        align: 'center',
+      })
+      y -= 20
+      drawText('FECHAMENTO DE CAIXA', width / 2, y, {
+        size: 14,
+        font: fontBold,
+        align: 'center',
+      })
+      y -= 15
+      drawLine(y)
+      y -= 15
 
-          drawText('RESUMO GERAL', margins.left, y, {
-            size: 12,
-            font: fontBold,
-          })
-          y -= 15
-          const drawRow = (label: string, value: number) => {
-            checkPageBreak(20)
-            drawText(label, margins.left, y)
-            drawText(`R$ ${formatCurrency(value)}`, width - margins.right, y, {
-              align: 'right',
-            })
-            y -= 15
-          }
-          drawRow('Total Vendas:', closingData.venda_total)
-          drawRow(
-            'Total Recebido:',
-            closingData.valor_dinheiro +
-              closingData.valor_pix +
-              closingData.valor_cheque +
-              closingData.valor_boleto,
-          )
-          drawRow('Total Despesas:', closingData.valor_despesas)
-          y -= 10
-          drawText('SALDO ACERTO:', margins.left, y, { font: fontBold })
-          drawText(
-            `R$ ${formatCurrency(closingData.saldo_acerto)}`,
-            width - margins.right,
-            y,
-            { align: 'right', font: fontBold },
-          )
-          y -= 20
-          drawLine(y)
-          y -= 20
-        }
+      drawText(`Data: ${formattedDate} ${formattedTime}`, margins.left, y, {
+        size: 9,
+      })
+      y -= 12
+      drawText(`Funcionario: ${empName}`, margins.left, y, {
+        size: 9,
+        font: fontBold,
+      })
+      y -= 12
+      drawText(`Rota ID: ${rotaId}`, margins.left, y, { size: 9 })
+      y -= 15
+      drawLine(y)
+      y -= 15
+
+      // Main Balance
+      drawText('SALDO DO ACERTO', margins.left, y, { size: 12, font: fontBold })
+      drawText(
+        `R$ ${formatCurrency(closingData.saldo_acerto || 0)}`,
+        width - margins.right,
+        y,
+        { size: 14, font: fontBold, align: 'right' },
+      )
+      y -= 25
+      drawLine(y, 0.5)
+      y -= 15
+
+      // Entry Summary (RESUMO DE ENTRADA)
+      drawText('RESUMO DE ENTRADA', width / 2, y, {
+        size: 10,
+        font: fontBold,
+        align: 'center',
+      })
+      y -= 15
+
+      const drawEntryRow = (label: string, val: number) => {
+        drawText(label, margins.left, y, { size: 9 })
+        drawText(`R$ ${formatCurrency(val)}`, width - margins.right, y, {
+          size: 9,
+          align: 'right',
+        })
+        y -= 12
       }
+
+      drawEntryRow('Dinheiro:', closingData.valor_dinheiro || 0)
+      drawEntryRow('Pix:', closingData.valor_pix || 0)
+      drawEntryRow('Cheque:', closingData.valor_cheque || 0)
+      y -= 5
+      const totalEntrada =
+        (closingData.valor_dinheiro || 0) +
+        (closingData.valor_pix || 0) +
+        (closingData.valor_cheque || 0)
+      drawText('TOTAL ENTRADA:', margins.left, y, { size: 9, font: fontBold })
+      drawText(`R$ ${formatCurrency(totalEntrada)}`, width - margins.right, y, {
+        size: 9,
+        font: fontBold,
+        align: 'right',
+      })
+      y -= 15
+      drawLine(y)
+      y -= 15
+
+      // Exit Summary (DETALHAMENTO DA SAIDA)
+      drawText('DETALHAMENTO DA SAIDA', width / 2, y, {
+        size: 10,
+        font: fontBold,
+        align: 'center',
+      })
+      y -= 15
+
+      // Optional: List expenses if needed? Template says "TOTAL SAIDA (DESPESAS)"
+      // We can list top expenses or just total. Template implies just total based on brevity, but "Detalhamento" implies details.
+      // Let's list details if available, then total.
+
+      // Filter only "saiu_do_caixa" expenses for accuracy
+      const cashExpenses = expenses.filter((e: any) => e.saiuDoCaixa !== false)
+
+      /* Detailed list optional - commented out to match brief template example more closely, or enable if desired
+      cashExpenses.forEach((e: any) => {
+         checkPageBreak(20)
+         drawText(e.detalhamento?.substring(0, 20) || 'Despesa', margins.left, y, { size: 8 })
+         drawText(`R$ ${formatCurrency(e.valor)}`, width - margins.right, y, { size: 8, align: 'right' })
+         y -= 10
+      })
+      if (cashExpenses.length > 0) y -= 5
+      */
+
+      drawText('TOTAL SAIDA (DESPESAS):', margins.left, y, {
+        size: 9,
+        font: fontBold,
+      })
+      drawText(
+        `R$ ${formatCurrency(closingData.valor_despesas || 0)}`,
+        width - margins.right,
+        y,
+        { size: 9, font: fontBold, align: 'right' },
+      )
+      y -= 15
+      drawLine(y)
+      y -= 15
+
+      // Settlement Summary (DETALHAMENTO DO ACERTO)
+      drawText('DETALHAMENTO DO ACERTO', width / 2, y, {
+        size: 10,
+        font: fontBold,
+        align: 'center',
+      })
+      y -= 15
+
+      drawEntryRow('Venda Total:', closingData.venda_total || 0)
+      drawEntryRow('Desconto Total:', closingData.desconto_total || 0)
+
+      y -= 15
+      drawLine(y)
     }
 
     const pdfBytes = await pdfDoc.save()

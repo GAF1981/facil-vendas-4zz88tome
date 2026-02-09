@@ -118,9 +118,6 @@ export const rotaService = {
     const newItemsPayload = fullData
       .filter((row) => {
         // Only carry over rows that had relevant data or are active/in route
-        // getFullRotaData returns all active clients. We should create items for all of them usually,
-        // or at least those that were in the previous route configuration.
-        // Assuming we want to maintain the route list structure.
         return true
       })
       .map((row) => {
@@ -131,12 +128,6 @@ export const rotaService = {
         if (row.is_completed) {
           nextSellerId = null
         }
-
-        // Also, we can optionally clear "tarefas" or specifically the [PROX] tag?
-        // Let's preserve generic tasks but maybe clear next seller tag if it was used?
-        // User story doesn't specify clearing tasks, so we keep them as per standard.
-        // However, if [PROX] tag was used, it implies a one-time instruction.
-        // Let's keep it simple: Persist existing tarefas.
 
         return {
           rota_id: nextId,
@@ -296,12 +287,28 @@ export const rotaService = {
             rota_id: rotaId,
             cliente_id: item.cliente_id,
             vendedor_id: nextSellerId,
-            tarefas: cleanTarefas,
+            tarefas: cleanTarefas, // Clear the tag after transfer
           }),
         )
       }
     }
     await Promise.all(updates)
+  },
+
+  // Transfers a specific row's "Next Seller" to "Current Seller" and clears the tag
+  async transferSingleNextSeller(
+    rotaId: number,
+    clientId: number,
+    nextSellerId: number,
+    currentTarefas: string | null,
+  ) {
+    const cleanTarefas = setNextSellerTag(currentTarefas, null)
+    return this.upsertRotaItem({
+      rota_id: rotaId,
+      cliente_id: clientId,
+      vendedor_id: nextSellerId,
+      tarefas: cleanTarefas,
+    })
   },
 
   async getFullRotaData(rota: Rota | null) {

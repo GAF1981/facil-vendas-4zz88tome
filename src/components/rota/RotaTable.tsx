@@ -31,6 +31,8 @@ import {
   History,
   ArrowLeft,
   X,
+  ArrowRightLeft,
+  Trash2,
 } from 'lucide-react'
 import {
   Tooltip,
@@ -58,6 +60,9 @@ interface RotaTableProps {
   sortConfig: SortConfig
   loading?: boolean
   isSelectionMode: boolean
+  onBulkTransfer?: () => void
+  onBulkClear?: () => void
+  onTransferRow?: (row: RotaRow) => void
 }
 
 export function RotaTable({
@@ -69,6 +74,9 @@ export function RotaTable({
   sortConfig,
   loading = false,
   isSelectionMode,
+  onBulkTransfer,
+  onBulkClear,
+  onTransferRow,
 }: RotaTableProps) {
   const [alertDialogOpen, setAlertDialogOpen] = useState(false)
   const [selectedAlertRow, setSelectedAlertRow] = useState<RotaRow | null>(null)
@@ -215,7 +223,33 @@ export function RotaTable({
 
                   {/* NEW COLUMN: Próxima */}
                   <TableHead className="min-w-[180px] font-bold text-xs bg-muted/30">
-                    Próxima (Ações)
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate">Próxima</span>
+                      <div className="flex items-center gap-1">
+                        {onBulkTransfer && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-5 w-5 text-purple-600 hover:bg-purple-100 hover:text-purple-800"
+                            onClick={onBulkTransfer}
+                            title="Transferir Todos (Batch)"
+                          >
+                            <ArrowRightLeft className="h-3 w-3" />
+                          </Button>
+                        )}
+                        {onBulkClear && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-5 w-5 text-red-400 hover:bg-red-100 hover:text-red-600"
+                            onClick={onBulkClear}
+                            title="Limpar Todos (Batch)"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
                   </TableHead>
 
                   <SortableHeader
@@ -643,11 +677,7 @@ export function RotaTable({
                                       : 'text-blue-600 hover:text-blue-700 hover:bg-blue-50',
                                   )}
                                   onClick={() =>
-                                    onUpdateRow(
-                                      row.client.CODIGO,
-                                      'vendedor_id',
-                                      row.proximo_vendedor_id,
-                                    )
+                                    onTransferRow && onTransferRow(row)
                                   }
                                   title="Transferir para Vendedor Atual"
                                 >
