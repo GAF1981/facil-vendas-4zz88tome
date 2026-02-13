@@ -39,16 +39,13 @@ export const productsService = {
       const isNumber = !isNaN(Number(searchTerm)) && searchTerm !== ''
 
       // Sanitize search term to prevent PostgREST syntax errors
-      // We replace commas and parentheses with the SQL wildcard '_'
-      // This allows searching for "49,99" without breaking the OR filter syntax
       const sanitizedSearch = searchTerm.replace(/[,()]/g, '_')
 
       // Always search text fields with ilike
-      // Removed CODIGO reference to avoid errors with non-existent column
+      // PRODUTO (Name) and CÓDIGO BARRAS (Barcode) are key requirements
       let orQuery = `PRODUTO.ilike.%${sanitizedSearch}%,codigo_interno.ilike.%${sanitizedSearch}%,"CÓDIGO BARRAS".ilike.%${sanitizedSearch}%`
 
       // If it looks like a number, also search numeric IDs
-      // We use original searchTerm for ID because it must be a valid number
       if (isNumber) {
         orQuery += `,ID.eq.${searchTerm}`
       }
@@ -112,7 +109,6 @@ export const productsService = {
       .limit(1)
       .single()
 
-    // PGRST116: The result contains 0 rows (table is empty)
     if (error && error.code !== 'PGRST116') {
       console.error('Error fetching next ID:', error)
       throw error
@@ -237,7 +233,6 @@ export const productsService = {
     }
 
     try {
-      // Fetch only necessary columns for matching
       const { data: existingProducts, error } = await supabase
         .from('PRODUTOS')
         .select('ID, PRODUTO')
@@ -300,7 +295,6 @@ export const productsService = {
     }
 
     try {
-      // 1. Fetch Existing Products
       const { data: existingProducts, error } = await supabase
         .from('PRODUTOS')
         .select('ID, PRODUTO')
@@ -314,7 +308,6 @@ export const productsService = {
         }
       })
 
-      // 2. Separate Updates and Creates
       const updates: {
         id: number
         codigo_interno?: string | null
@@ -328,7 +321,6 @@ export const productsService = {
         'CÓDIGO BARRAS'?: string | null
       }[] = []
 
-      // 3. Get Next ID for new items
       let nextId = await this.getNextId()
 
       for (const row of data) {
@@ -337,7 +329,6 @@ export const productsService = {
         const normalizedName = row.produto.toLowerCase().trim()
         const existingId = productMap.get(normalizedName)
 
-        // Sanitize codes - ensure empty strings become null or trimmed strings
         const codigoInterno = row.codigo_interno
           ? row.codigo_interno.trim()
           : null
@@ -359,7 +350,6 @@ export const productsService = {
         }
       }
 
-      // 4. Perform Bulk Updates (via RPC)
       if (updates.length > 0) {
         const chunkSize = 100
         for (let i = 0; i < updates.length; i += chunkSize) {
@@ -378,7 +368,6 @@ export const productsService = {
         }
       }
 
-      // 5. Perform Bulk Inserts
       if (creates.length > 0) {
         const chunkSize = 100
         for (let i = 0; i < creates.length; i += chunkSize) {
@@ -400,7 +389,6 @@ export const productsService = {
 
       result.success = result.errors.length === 0
 
-      // 6. Audit Log
       if (userId) {
         await supabase.from('system_logs').insert({
           type: 'PRODUCT_IMPORT',

@@ -6,6 +6,7 @@ import {
   Barcode,
   Box,
   Hash,
+  Search,
 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
@@ -44,6 +45,7 @@ export function ProductCombobox({
   const [products, setProducts] = React.useState<ProductRow[]>([])
   const [loading, setLoading] = React.useState(false)
 
+  // Use debouncing to avoid too many requests while typing
   React.useEffect(() => {
     const timer = setTimeout(() => {
       fetchProducts(searchTerm)
@@ -55,7 +57,6 @@ export function ProductCombobox({
   const fetchProducts = async (term: string) => {
     setLoading(true)
     try {
-      // The service defaults to page 1, size 20 if search is empty
       const { data } = await productsService.getProducts(
         1,
         20,
@@ -80,6 +81,11 @@ export function ProductCombobox({
     }
   }
 
+  const handleSelect = (product: ProductRow) => {
+    onSelect(product)
+    setOpen(false)
+  }
+
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
@@ -102,14 +108,14 @@ export function ProductCombobox({
                 <span className="text-xs text-muted-foreground ml-1">
                   (CI: {selectedProduct.codigo_interno})
                 </span>
-              ) : selectedProduct.CODIGO ? (
+              ) : selectedProduct['CÓDIGO BARRAS'] ? (
                 <span className="text-xs text-muted-foreground ml-1">
-                  (#{selectedProduct.CODIGO})
+                  (EAN: {selectedProduct['CÓDIGO BARRAS']})
                 </span>
               ) : null}
             </span>
           ) : (
-            'Selecione um produto...'
+            'Selecione ou busque um produto...'
           )}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
@@ -138,37 +144,38 @@ export function ProductCombobox({
                     <CommandItem
                       key={product.ID}
                       value={product.ID.toString()}
-                      onSelect={() => {
-                        onSelect(product)
-                        setOpen(false)
-                      }}
-                      className="flex items-center justify-between"
+                      onSelect={() => handleSelect(product)}
+                      className="flex items-center justify-between py-2"
                     >
-                      <div className="flex flex-col overflow-hidden">
-                        <span className="truncate font-medium">
-                          {product.PRODUTO}
-                        </span>
-                        <div className="flex items-center text-xs text-muted-foreground gap-2 flex-wrap">
+                      <div className="flex flex-col overflow-hidden w-full">
+                        <div className="flex justify-between items-center w-full">
+                          <span className="truncate font-medium">
+                            {product.PRODUTO}
+                          </span>
+                          {product.PREÇO && (
+                            <span className="text-xs font-semibold ml-2 shrink-0">
+                              R$ {product.PREÇO.replace('.', ',')}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center text-xs text-muted-foreground gap-3 mt-1 flex-wrap">
                           {product['CÓDIGO BARRAS'] && (
-                            <span className="flex items-center">
+                            <span className="flex items-center text-blue-600 dark:text-blue-400">
                               <Barcode className="h-3 w-3 mr-1" />
                               {product['CÓDIGO BARRAS']}
                             </span>
                           )}
                           {product.codigo_interno && (
-                            <span className="flex items-center text-blue-600">
+                            <span className="flex items-center text-orange-600 dark:text-orange-400">
                               <Hash className="h-3 w-3 mr-1" />
                               CI: {product.codigo_interno}
                             </span>
                           )}
-                          {product.CODIGO && <span>Cod: {product.CODIGO}</span>}
-                          {product.TIPO && (
-                            <span className="uppercase">[{product.TIPO}]</span>
-                          )}
+                          {product.ID && <span>ID: {product.ID}</span>}
                         </div>
                       </div>
                       {selectedProduct?.ID === product.ID && (
-                        <Check className="ml-2 h-4 w-4 opacity-100 shrink-0" />
+                        <Check className="ml-2 h-4 w-4 opacity-100 shrink-0 text-primary" />
                       )}
                     </CommandItem>
                   ))}

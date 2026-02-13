@@ -1705,6 +1705,60 @@ export type Database = {
         }
         Relationships: []
       }
+      kit_items: {
+        Row: {
+          id: number
+          kit_id: number
+          produto_id: number
+          quantidade_padrao: number
+        }
+        Insert: {
+          id?: number
+          kit_id: number
+          produto_id: number
+          quantidade_padrao?: number
+        }
+        Update: {
+          id?: number
+          kit_id?: number
+          produto_id?: number
+          quantidade_padrao?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'kit_items_kit_id_fkey'
+            columns: ['kit_id']
+            isOneToOne: false
+            referencedRelation: 'kits'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'kit_items_produto_id_fkey'
+            columns: ['produto_id']
+            isOneToOne: false
+            referencedRelation: 'PRODUTOS'
+            referencedColumns: ['ID']
+          },
+        ]
+      }
+      kits: {
+        Row: {
+          created_at: string
+          id: number
+          nome: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          nome: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          nome?: string
+        }
+        Relationships: []
+      }
       NOTA_FISCAL: {
         Row: {
           cliente_id: number

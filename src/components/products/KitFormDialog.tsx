@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -46,6 +46,9 @@ export function KitFormDialog({
   const [quantity, setQuantity] = useState(1)
   const { toast } = useToast()
 
+  // Reference for quantity input to focus it after product selection
+  const quantityInputRef = useRef<HTMLInputElement>(null)
+
   useEffect(() => {
     if (open) {
       if (kitToEdit) {
@@ -67,6 +70,7 @@ export function KitFormDialog({
     if (items.some((i) => i.produto_id === selectedProduct.ID)) {
       toast({
         title: 'Produto já adicionado',
+        description: 'Este produto já está na lista.',
         variant: 'destructive',
       })
       return
@@ -122,25 +126,17 @@ export function KitFormDialog({
         // Update Kit Name
         await kitsService.updateKit(kitId, { nome: name })
 
-        // Diff Items logic is complex (add/remove/update).
-        // Simplest strategy: Delete all old items and re-insert all current items.
-        // Or specific handling. For simplicity and robustness given time:
-        // We will remove items not in new list, add items not in old list, update existing.
-        // Actually, deleting all and re-adding is safer to ensure consistency if IDs map correctly.
-        // BUT, better to just sync.
-
-        // Since we don't have bulk update for items easily exposed without complex logic:
-        // 1. Fetch current DB items
+        // Sync Items Logic
         const freshKit = await kitsService.getKitById(kitId)
         const dbItems = freshKit.items || []
 
-        // 2. Identify to Delete
+        // Delete removed items
         const toDelete = dbItems.filter(
           (db) => !items.find((i) => i.produto_id === db.produto_id),
         )
         for (const i of toDelete) await kitsService.removeKitItem(i.id)
 
-        // 3. Identify to Insert or Update
+        // Update or Insert items
         for (const item of items) {
           const existing = dbItems.find(
             (db) => db.produto_id === item.produto_id,
@@ -161,7 +157,7 @@ export function KitFormDialog({
           }
         }
       } else {
-        // Create New
+        // Create New Kit
         const newKit = await kitsService.createKit({ nome: name })
         kitId = newKit.id
 
@@ -216,17 +212,30 @@ export function KitFormDialog({
               <div className="flex-1">
                 <ProductCombobox
                   selectedProduct={selectedProduct}
-                  onSelect={setSelectedProduct}
+                  onSelect={(p) => {
+                    setSelectedProduct(p)
+                    // Auto-focus quantity input when product is selected
+                    if (p) {
+                      setTimeout(() => quantityInputRef.current?.focus(), 100)
+                    }
+                  }}
                 />
               </div>
               <div className="w-24">
                 <Input
+                  ref={quantityInputRef}
                   type="number"
                   min="1"
                   value={quantity}
                   onChange={(e) =>
                     setQuantity(Math.max(1, parseInt(e.target.value) || 1))
                   }
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleAddItem()
+                    }
+                  }}
                   placeholder="Qtd"
                 />
               </div>
@@ -234,10 +243,15 @@ export function KitFormDialog({
                 onClick={handleAddItem}
                 disabled={!selectedProduct}
                 variant="secondary"
+                title="Adicionar item (Enter)"
               >
                 <Plus className="h-4 w-4" />
               </Button>
             </div>
+            <p className="text-xs text-muted-foreground">
+              Busque por nome ou código de barras. Pressione Enter na quantidade
+              para adicionar.
+            </p>
           </div>
 
           <div className="rounded-md border max-h-[300px] overflow-y-auto">
@@ -254,7 +268,7 @@ export function KitFormDialog({
                   <TableRow>
                     <TableCell
                       colSpan={3}
-                      className="text-center text-muted-foreground"
+                      className="text-center text-muted-foreground py-8"
                     >
                       Nenhum item adicionado.
                     </TableCell>
@@ -262,8 +276,17 @@ export function KitFormDialog({
                 ) : (
                   items.map((item, index) => (
                     <TableRow key={index}>
-                      <TableCell className="font-medium">
-                        {item.product?.PRODUTO}
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-medium">
+                            {item.product?.PRODUTO}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {item.product?.['CÓDIGO BARRAS']
+                              ? `EAN: ${item.product['CÓDIGO BARRAS']}`
+                              : `ID: ${item.product?.ID}`}
+                          </span>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Input
@@ -283,7 +306,7 @@ export function KitFormDialog({
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-destructive"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
                           onClick={() => handleRemoveItem(index)}
                         >
                           <Trash2 className="h-4 w-4" />
