@@ -111,7 +111,7 @@ Deno.serve(async (req) => {
       margins = { top: 20, bottom: 20, left: 10, right: 10 }
       y = height - margins.top
     } else {
-      // Default fallback
+      // Default fallback (Standard A4)
       page = pdfDoc.addPage()
       width = page.getSize().width
       height = page.getSize().height
@@ -271,7 +271,6 @@ Deno.serve(async (req) => {
       drawLine(y)
 
       // Fix Overlapping Headers: Move Y down significantly before drawing headers
-      // Vertical headers rotate UP from the drawing point, so we need space above
       y -= 100
 
       // Table Header - Vertical Headers
@@ -368,7 +367,6 @@ Deno.serve(async (req) => {
       // Footer - RESUMO FINANCEIRO
       checkPageBreak(80)
       const footerRightX = width - margins.right
-      // Increased spacing significantly (approx 5cm / 140 pts more space)
       const footerLabelX = width - 350
 
       drawText('RESUMO FINANCEIRO', footerRightX, y, {
@@ -402,6 +400,144 @@ Deno.serve(async (req) => {
         font: fontBold,
         align: 'right',
       })
+    }
+
+    // --- CASH CLOSURE (FECHAMENTO DE CAIXA) - A4 LAYOUT ---
+    else if (
+      !isThermal &&
+      (reportType === 'closing-confirmation' ||
+        reportType === 'employee-cash-summary')
+    ) {
+      const { fechamento, date } = body
+      const closingData = fechamento || body.data || {}
+
+      const empName = closingData.funcionario?.nome_completo || 'Funcionario'
+      const rotaId = closingData.rota_id || '-'
+      const reportDate = closingData.created_at || date
+
+      // Values
+      const saldoAcerto = closingData.saldo_acerto || 0
+      const vDinheiro = closingData.valor_dinheiro || 0
+      const vPix = closingData.valor_pix || 0
+      const vCheque = closingData.valor_cheque || 0
+      const totalEntrada = vDinheiro + vPix + vCheque
+      const vDespesas = closingData.valor_despesas || 0
+      const vendaTotal = closingData.venda_total || 0
+      const descontoTotal = closingData.desconto_total || 0
+
+      // Title
+      drawText('FACIL VENDAS', width / 2, y, {
+        size: 18,
+        font: fontBold,
+        align: 'center',
+      })
+      y -= 25
+      drawText('FECHAMENTO DE CAIXA', width / 2, y, {
+        size: 14,
+        font: fontBold,
+        align: 'center',
+      })
+      y -= 20
+      drawLine(y)
+      y -= 20
+
+      // Metadata
+      const formattedDate =
+        safeFormatDate(reportDate) + ' ' + safeFormatTime(reportDate)
+
+      drawText(`Data: ${formattedDate}`, margins.left, y, { size: 10 })
+      y -= 15
+      drawText(`Funcionario: ${empName}`, margins.left, y, {
+        size: 10,
+        font: fontBold,
+      })
+      y -= 15
+      drawText(`Rota ID: ${rotaId}`, margins.left, y, { size: 10 })
+      y -= 20
+      drawLine(y)
+      y -= 25
+
+      // SALDO DO ACERTO
+      drawText('SALDO DO ACERTO', margins.left, y, {
+        size: 14,
+        font: fontBold,
+      })
+      drawText(`R$ ${formatCurrency(saldoAcerto)}`, width - margins.right, y, {
+        size: 14,
+        font: fontBold,
+        align: 'right',
+      })
+      y -= 10
+      drawLine(y)
+      y -= 25
+
+      // RESUMO DE ENTRADA
+      drawText('RESUMO DE ENTRADA', width / 2, y, {
+        size: 12,
+        font: fontBold,
+        align: 'center',
+      })
+      y -= 25
+
+      const drawRow = (label: string, val: number, boldVal = false) => {
+        drawText(label, margins.left, y, { size: 10 })
+        drawText(`R$ ${formatCurrency(val)}`, width - margins.right, y, {
+          size: 10,
+          align: 'right',
+          font: boldVal ? fontBold : fontRegular,
+        })
+        y -= 15
+      }
+
+      drawRow('Dinheiro:', vDinheiro)
+      drawRow('Pix:', vPix)
+      drawRow('Cheque:', vCheque)
+
+      y -= 5
+      drawText('TOTAL ENTRADA:', margins.left, y, {
+        size: 10,
+        font: fontBold,
+      })
+      drawText(`R$ ${formatCurrency(totalEntrada)}`, width - margins.right, y, {
+        size: 10,
+        font: fontBold,
+        align: 'right',
+      })
+      y -= 20
+      drawLine(y)
+      y -= 25
+
+      // DETALHAMENTO DA SAIDA
+      drawText('DETALHAMENTO DA SAIDA', width / 2, y, {
+        size: 12,
+        font: fontBold,
+        align: 'center',
+      })
+      y -= 25
+
+      drawText('TOTAL SAIDA (DESPESAS):', margins.left, y, { size: 10 })
+      drawText(`R$ ${formatCurrency(vDespesas)}`, width - margins.right, y, {
+        size: 10,
+        font: fontBold,
+        align: 'right',
+      })
+      y -= 20
+      drawLine(y)
+      y -= 25
+
+      // DETALHAMENTO DO ACERTO
+      drawText('DETALHAMENTO DO ACERTO', width / 2, y, {
+        size: 12,
+        font: fontBold,
+        align: 'center',
+      })
+      y -= 25
+
+      drawRow('Venda Total:', vendaTotal)
+      drawRow('Desconto Total:', descontoTotal)
+
+      y -= 5
+      drawLine(y)
     }
 
     // --- CASH CLOSURE (FECHAMENTO DE CAIXA) - Standardized Layout (80mm) ---
