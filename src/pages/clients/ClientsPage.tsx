@@ -18,6 +18,7 @@ import {
   ArrowLeft,
   Filter,
   CreditCard,
+  Download,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Card, CardContent } from '@/components/ui/card'
@@ -26,6 +27,7 @@ import { ClientRow } from '@/types/client'
 import { useToast } from '@/hooks/use-toast'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
+import { useUserStore } from '@/stores/useUserStore'
 
 const ClientsPage = () => {
   const [clients, setClients] = useState<ClientRow[]>([])
@@ -47,9 +49,16 @@ const ClientsPage = () => {
   const [totalCount, setTotalCount] = useState(0)
   const [pageSize] = useState(20)
   const { toast } = useToast()
+  const { employee } = useUserStore()
+  const [exporting, setExporting] = useState(false)
 
   const [debouncedSearch, setDebouncedSearch] = useState(searchTerm)
   const [debouncedCnpj, setDebouncedCnpj] = useState(cnpjFilter)
+
+  // Permission check for Export button
+  const canExport = employee?.setor?.some((s) =>
+    ['Administrador', 'Gerente'].includes(s),
+  )
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -142,6 +151,88 @@ const ClientsPage = () => {
     fetchClients()
   }, [fetchClients])
 
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const data = await clientsService.getAllForExport()
+
+      // Headers exactly as requested
+      const headers = [
+        'CODIGO',
+        'NOME CLIENTE',
+        'RAZÃO SOCIAL',
+        'CNPJ',
+        'IE',
+        'TIPO DE CLIENTE',
+        'TIPO',
+        'MUNICÍPIO',
+        'BAIRRO',
+        'ENDEREÇO',
+        'CEP OFICIO',
+        'FONE 1',
+        'FONE 2',
+        'CONTATO 1',
+        'CONTATO 2',
+        'EMAIL',
+        'email_cobranca',
+        'telefone_cobranca',
+        'GRUPO',
+        'GRUPO ROTA',
+        'FORMA DE PAGAMENTO',
+        'NOTA FISCAL',
+        'EXPOSITOR',
+        'OBSERVAÇÃO FIXA',
+        'Desconto',
+        'DESCONTO BRINQUEDO',
+        'DESCONTO ACESSORIO',
+        'DESCONTO ACESSORIO CELULAR',
+        'DESCONTO OUTROS',
+        'ALTERAÇÃO CLIENTE',
+        'situacao',
+      ]
+
+      // Generate CSV content
+      const csvContent = [
+        headers.join(','), // CSV header row
+        ...data.map((row: any) =>
+          headers
+            .map((header) => {
+              const val = row[header]
+              // Handle null/undefined and escape double quotes
+              if (val === null || val === undefined) return '""'
+              const str = String(val).replace(/"/g, '""')
+              return `"${str}"`
+            })
+            .join(','),
+        ),
+      ].join('\n')
+
+      // Download file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', 'clientes.csv')
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+
+      toast({
+        title: 'Exportação concluída',
+        description: 'O arquivo clientes.csv foi baixado com sucesso.',
+      })
+    } catch (error) {
+      console.error('Export error:', error)
+      toast({
+        title: 'Erro na exportação',
+        description: 'Não foi possível gerar o arquivo CSV.',
+        variant: 'destructive',
+      })
+    } finally {
+      setExporting(false)
+    }
+  }
+
   const totalPages = Math.ceil(totalCount / pageSize)
 
   return (
@@ -164,12 +255,29 @@ const ClientsPage = () => {
             Gerencie sua base de clientes ({totalCount} registros).
           </p>
         </div>
-        <Button asChild>
-          <Link to="/clientes/novo">
-            <Plus className="mr-2 h-4 w-4" />
-            Novo Cliente
-          </Link>
-        </Button>
+        <div className="flex gap-2 w-full sm:w-auto">
+          {canExport && (
+            <Button
+              variant="outline"
+              onClick={handleExport}
+              disabled={exporting}
+              className="flex-1 sm:flex-none"
+            >
+              {exporting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="mr-2 h-4 w-4" />
+              )}
+              {exporting ? 'Exportando...' : 'Exportar CSV'}
+            </Button>
+          )}
+          <Button asChild className="flex-1 sm:flex-none">
+            <Link to="/clientes/novo">
+              <Plus className="mr-2 h-4 w-4" />
+              Novo Cliente
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <div className="bg-card p-4 rounded-lg border shadow-sm space-y-4">

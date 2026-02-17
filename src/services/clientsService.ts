@@ -74,6 +74,51 @@ export const clientsService = {
     return data as ClientRow[]
   },
 
+  async getAllForExport() {
+    // Select specific columns as requested for export
+    const { data, error } = await supabase
+      .from('CLIENTES')
+      .select(
+        `
+        CODIGO,
+        "NOME CLIENTE",
+        "RAZÃO SOCIAL",
+        CNPJ,
+        IE,
+        "TIPO DE CLIENTE",
+        TIPO,
+        MUNICÍPIO,
+        BAIRRO,
+        ENDEREÇO,
+        "CEP OFICIO",
+        "FONE 1",
+        "FONE 2",
+        "CONTATO 1",
+        "CONTATO 2",
+        EMAIL,
+        email_cobranca,
+        telefone_cobranca,
+        GRUPO,
+        "GRUPO ROTA",
+        "FORMA DE PAGAMENTO",
+        "NOTA FISCAL",
+        EXPOSITOR,
+        "OBSERVAÇÃO FIXA",
+        Desconto,
+        "DESCONTO BRINQUEDO",
+        "DESCONTO ACESSORIO",
+        "DESCONTO ACESSORIO CELULAR",
+        "DESCONTO OUTROS",
+        "ALTERAÇÃO CLIENTE",
+        situacao
+      `,
+      )
+      .order('CODIGO', { ascending: true })
+
+    if (error) throw error
+    return data
+  },
+
   async getById(id: number) {
     const { data, error } = await supabase
       .from('CLIENTES')
