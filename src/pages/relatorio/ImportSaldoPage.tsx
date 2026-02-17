@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   Loader2,
   ShieldAlert,
+  Info,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useUserStore } from '@/stores/useUserStore'
@@ -168,13 +169,27 @@ export default function ImportSaldoPage() {
         </div>
       </div>
 
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-md flex items-start gap-3">
+        <Info className="h-5 w-5 text-blue-500 mt-0.5 flex-shrink-0" />
+        <div>
+          <h3 className="font-medium text-blue-800">Sistema Atualizado</h3>
+          <p className="text-sm text-blue-700 mt-1">
+            O sistema de importação foi atualizado para suportar busca por ID,
+            Código (curto) e Código Interno. Caso tenha enfrentado erros
+            anteriormente, por favor, envie o arquivo novamente para processar
+            com as novas regras de validação.
+          </p>
+        </div>
+      </div>
+
       <div className="grid gap-6 md:grid-cols-2">
         <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle>Carregar Arquivo CSV</CardTitle>
             <CardDescription>
               O arquivo deve conter as colunas: <code>código do cliente</code>,{' '}
-              <code>código do produto</code>, <code>quantidade</code>.
+              <code>código do produto</code> (aceita ID, código ou código
+              interno), <code>quantidade</code>.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

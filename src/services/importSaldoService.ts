@@ -1,7 +1,5 @@
 import { supabase } from '@/lib/supabase/client'
 import { bancoDeDadosService } from '@/services/bancoDeDadosService'
-import { clientsService } from '@/services/clientsService'
-import { productsService } from '@/services/productsService'
 import { format } from 'date-fns'
 
 export interface ImportResult {
@@ -10,10 +8,13 @@ export interface ImportResult {
   errors: string[]
 }
 
-export interface CsvRow {
-  codigo_cliente: string
-  codigo_produto: string
-  quantidade: string
+export type CsvRow = Record<string, string>
+
+interface ProductInfo {
+  id: number
+  codigo: number | null
+  name: string
+  codigo_interno: string | null
 }
 
 export const importSaldoService = {
@@ -45,17 +46,17 @@ export const importSaldoService = {
 
         for (let i = 1; i < lines.length; i++) {
           const currentLine = lines[i]
-          // Handle quotes if necessary, but simple split for now as per constraints
+          // Handle quotes if necessary
           const values = currentLine
             .split(delimiter)
             .map((v) => v.trim().replace(/"/g, ''))
 
           if (values.length === headers.length) {
-            const row: any = {}
+            const row: CsvRow = {}
             headers.forEach((header, index) => {
               row[header] = values[index]
             })
-            result.push(row as CsvRow)
+            result.push(row)
           }
         }
         resolve(result)
@@ -94,19 +95,41 @@ export const importSaldoService = {
     const clientMap = new Map<number, string>()
     clients.forEach((c) => clientMap.set(c.CODIGO, c['NOME CLIENTE']))
 
-    // Fetch all products (Lightweight)
+    // Fetch all products (Including codigo_interno)
     const { data: products, error: productsError } = await supabase
       .from('PRODUTOS')
-      .select('ID, CODIGO, PRODUTO')
+      .select('ID, CODIGO, PRODUTO, codigo_interno')
 
     if (productsError || !products) {
       throw new Error('Falha ao carregar lista de produtos para validação.')
     }
 
-    const productMap = new Map<number, { id: number; name: string }>()
+    // Maps for different lookup methods
+    const mapId = new Map<number, ProductInfo>()
+    const mapCodigo = new Map<number, ProductInfo>()
+    const mapCodigoInterno = new Map<string, ProductInfo>()
+
     products.forEach((p) => {
-      if (p.CODIGO)
-        productMap.set(p.CODIGO, { id: p.ID, name: p.PRODUTO || '' })
+      const info: ProductInfo = {
+        id: p.ID,
+        codigo: p.CODIGO,
+        name: p.PRODUTO || '',
+        codigo_interno: p.codigo_interno,
+      }
+
+      // Map by ID
+      mapId.set(p.ID, info)
+
+      // Map by CODIGO (Legacy/Short code)
+      if (p.CODIGO) {
+        mapCodigo.set(p.CODIGO, info)
+      }
+
+      // Map by codigo_interno
+      if (p.codigo_interno) {
+        // Normalize: trim
+        mapCodigoInterno.set(p.codigo_interno.trim(), info)
+      }
     })
 
     // 2. Validate and Group Data
@@ -116,8 +139,8 @@ export const importSaldoService = {
       {
         clientName: string
         items: {
-          productCode: number
           productId: number
+          productCodigo: number | null
           productName: string
           quantity: number
         }[]
@@ -128,24 +151,39 @@ export const importSaldoService = {
 
     for (const row of csvData) {
       rowIndex++
-      const clientCode = parseInt(
+
+      // Get Client Code
+      const clientCodeVal =
         row['código do cliente'] ||
-          row['codigo do cliente'] ||
-          row['codigo_cliente'] ||
-          '0',
-      )
-      const productCode = parseInt(
+        row['codigo do cliente'] ||
+        row['codigo_cliente'] ||
+        '0'
+      const clientCode = parseInt(clientCodeVal)
+
+      // Get Product Code (Keep as string initially for internal code lookup)
+      const productCodeRaw =
         row['código do produto'] ||
-          row['codigo do produto'] ||
-          row['codigo_produto'] ||
-          '0',
-      )
-      const quantity = parseFloat((row['quantidade'] || '0').replace(',', '.'))
+        row['codigo do produto'] ||
+        row['codigo_produto'] ||
+        row['produto_codigo'] ||
+        ''
+
+      // Get Quantity
+      const quantityVal = row['quantidade'] || '0'
+      const quantity = parseFloat(quantityVal.replace(',', '.'))
 
       // Validation
-      if (!clientCode || !productCode) {
+      if (!clientCode) {
         result.failureCount++
-        result.errors.push(`Linha ${rowIndex}: Códigos inválidos ou faltando.`)
+        result.errors.push(
+          `Linha ${rowIndex}: Código do cliente inválido ou faltando.`,
+        )
+        continue
+      }
+
+      if (!productCodeRaw) {
+        result.failureCount++
+        result.errors.push(`Linha ${rowIndex}: Código do produto faltando.`)
         continue
       }
 
@@ -157,10 +195,32 @@ export const importSaldoService = {
         continue
       }
 
-      if (!productMap.has(productCode)) {
+      // Product Lookup Logic
+      let productInfo: ProductInfo | undefined
+
+      // 1. Try codigo_interno (Exact String Match)
+      const codeTrimmed = productCodeRaw.trim()
+      if (mapCodigoInterno.has(codeTrimmed)) {
+        productInfo = mapCodigoInterno.get(codeTrimmed)
+      }
+
+      // 2. Try ID and CODIGO (Numeric Match)
+      if (!productInfo) {
+        const codeNum = parseInt(productCodeRaw)
+        if (!isNaN(codeNum)) {
+          // Priority: ID > CODIGO
+          if (mapId.has(codeNum)) {
+            productInfo = mapId.get(codeNum)
+          } else if (mapCodigo.has(codeNum)) {
+            productInfo = mapCodigo.get(codeNum)
+          }
+        }
+      }
+
+      if (!productInfo) {
         result.failureCount++
         result.errors.push(
-          `Linha ${rowIndex}: Produto código ${productCode} não encontrado.`,
+          `Linha ${rowIndex}: Produto código '${productCodeRaw}' não encontrado.`,
         )
         continue
       }
@@ -180,9 +240,9 @@ export const importSaldoService = {
       }
 
       validGroups.get(clientCode)!.items.push({
-        productCode,
-        productId: productMap.get(productCode)!.id,
-        productName: productMap.get(productCode)!.name,
+        productId: productInfo.id,
+        productCodigo: productInfo.codigo,
+        productName: productInfo.name,
         quantity,
       })
     }
@@ -203,7 +263,7 @@ export const importSaldoService = {
           'NÚMERO DO PEDIDO': orderId,
           'CÓDIGO DO CLIENTE': clientCode,
           CLIENTE: groupData.clientName,
-          'COD. PRODUTO': item.productCode,
+          'COD. PRODUTO': item.productCodigo, // Use real CODIGO if available
           MERCADORIA: item.productName,
           'SALDO FINAL': item.quantity,
           'SALDO INICIAL': 0,
@@ -227,7 +287,7 @@ export const importSaldoService = {
         const ajusteInserts = groupData.items.map((item) => ({
           cliente_id: clientCode,
           cliente_nome: groupData.clientName,
-          produto_id: item.productId,
+          produto_id: item.productId, // Use robust ID
           quantidade_alterada: item.quantity,
           saldo_anterior: 0,
           saldo_novo: item.quantity,
