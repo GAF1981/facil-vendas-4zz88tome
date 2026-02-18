@@ -37,9 +37,13 @@ export default function ImportSaldoPage() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [result, setResult] = useState<ImportResult | null>(null)
   const [csvPreview, setCsvPreview] = useState<CsvRow[]>([])
+  const [detectedColumns, setDetectedColumns] = useState<{
+    clientCol: string | null
+    productCol: string | null
+    qtyCol: string | null
+  } | null>(null)
 
   // Security Check: Only 'Administrador' sector allowed
-  // Handling array of sectors for compatibility
   const userSectors = Array.isArray(employee?.setor)
     ? employee.setor
     : [employee?.setor]
@@ -87,11 +91,22 @@ export default function ImportSaldoPage() {
 
     setFile(selectedFile)
     setResult(null)
+    setDetectedColumns(null)
 
     // Parse preview
     try {
       const parsed = await importSaldoService.parseCSV(selectedFile)
-      setCsvPreview(parsed.slice(0, 5)) // Show first 5 rows
+      if (parsed.length > 0) {
+        setCsvPreview(parsed.slice(0, 5)) // Show first 5 rows
+        setDetectedColumns(importSaldoService.identifyColumns(parsed[0]))
+      } else {
+        setCsvPreview([])
+        toast({
+          title: 'Arquivo Vazio',
+          description: 'Não foi possível ler dados do arquivo.',
+          variant: 'destructive',
+        })
+      }
     } catch (error) {
       toast({
         title: 'Erro ao ler arquivo',
@@ -125,8 +140,9 @@ export default function ImportSaldoPage() {
 
       if (importResult.failureCount > 0) {
         toast({
-          title: 'Erros na Importação',
-          description: 'Alguns registros falharam. Verifique o relatório.',
+          title: 'Atenção',
+          description:
+            'Alguns registros falharam ou colunas não foram identificadas. Verifique o relatório.',
           variant: 'destructive',
         })
       }
@@ -146,6 +162,7 @@ export default function ImportSaldoPage() {
     setFile(null)
     setCsvPreview([])
     setResult(null)
+    setDetectedColumns(null)
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
@@ -172,13 +189,27 @@ export default function ImportSaldoPage() {
       <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-md flex items-start gap-3">
         <Info className="h-5 w-5 text-blue-500 mt-0.5 flex-shrink-0" />
         <div>
-          <h3 className="font-medium text-blue-800">Sistema Atualizado</h3>
-          <p className="text-sm text-blue-700 mt-1">
-            O sistema de importação foi atualizado para suportar busca por ID,
-            Código (curto) e Código Interno. Caso tenha enfrentado erros
-            anteriormente, por favor, envie o arquivo novamente para processar
-            com as novas regras de validação.
+          <h3 className="font-medium text-blue-800">
+            Instruções de Importação
+          </h3>
+          <p className="text-sm text-blue-700 mt-1 mb-2">
+            O sistema identifica automaticamente as colunas se utilizarem os
+            seguintes cabeçalhos (maiúsculo/minúsculo e acentos são ignorados):
           </p>
+          <ul className="text-sm text-blue-800 list-disc pl-5 space-y-1">
+            <li>
+              <strong>Cliente:</strong> CÓDIGO DO CLIENTE, COD. CLIENTE, CODIGO
+              CLIENTE, ID CLIENTE
+            </li>
+            <li>
+              <strong>Produto (Código Interno):</strong> CODIGO INTERNO, COD.
+              INTERNO, CODIGO PRODUTO, COD. PRODUTO
+            </li>
+            <li>
+              <strong>Quantidade:</strong> SALDO INICIAL, QUANTIDADE, QTD,
+              CONTAGEM
+            </li>
+          </ul>
         </div>
       </div>
 
@@ -187,9 +218,7 @@ export default function ImportSaldoPage() {
           <CardHeader>
             <CardTitle>Carregar Arquivo CSV</CardTitle>
             <CardDescription>
-              O arquivo deve conter as colunas: <code>código do cliente</code>,{' '}
-              <code>código do produto</code> (aceita ID, código ou código
-              interno), <code>quantidade</code>.
+              Selecione um arquivo CSV contendo os dados de saldo inicial.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -239,31 +268,58 @@ export default function ImportSaldoPage() {
               )}
             </div>
 
-            {file && !result && (
-              <div className="flex justify-end">
-                <Button
-                  onClick={handleProcess}
-                  disabled={isProcessing}
-                  className="w-full sm:w-auto"
+            {detectedColumns && (
+              <div className="grid grid-cols-3 gap-2 text-sm border p-3 rounded bg-muted/20">
+                <div
+                  className={`p-2 rounded ${detectedColumns.clientCol ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}
                 >
-                  {isProcessing ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />{' '}
-                      Processando...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="mr-2 h-4 w-4" /> Processar
-                      Importação
-                    </>
-                  )}
-                </Button>
+                  <span className="font-bold block">Cliente:</span>
+                  {detectedColumns.clientCol || 'Não identificado'}
+                </div>
+                <div
+                  className={`p-2 rounded ${detectedColumns.productCol ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}
+                >
+                  <span className="font-bold block">Produto:</span>
+                  {detectedColumns.productCol || 'Não identificado'}
+                </div>
+                <div
+                  className={`p-2 rounded ${detectedColumns.qtyCol ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}
+                >
+                  <span className="font-bold block">Quantidade:</span>
+                  {detectedColumns.qtyCol || 'Não identificado'}
+                </div>
               </div>
             )}
+
+            {file &&
+              !result &&
+              detectedColumns?.clientCol &&
+              detectedColumns?.productCol &&
+              detectedColumns?.qtyCol && (
+                <div className="flex justify-end">
+                  <Button
+                    onClick={handleProcess}
+                    disabled={isProcessing}
+                    className="w-full sm:w-auto"
+                  >
+                    {isProcessing ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />{' '}
+                        Processando...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="mr-2 h-4 w-4" /> Processar
+                        Importação
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
           </CardContent>
         </Card>
 
-        {csvPreview.length > 0 && !result && (
+        {csvPreview.length > 0 && !result && detectedColumns && (
           <Card className="md:col-span-2">
             <CardHeader>
               <CardTitle>Pré-visualização (Primeiras 5 linhas)</CardTitle>
@@ -273,21 +329,39 @@ export default function ImportSaldoPage() {
                 <table className="w-full text-sm border-collapse">
                   <thead>
                     <tr className="border-b bg-muted/50">
-                      <th className="p-2 text-left">Cliente (Cód)</th>
-                      <th className="p-2 text-left">Produto (Cód)</th>
-                      <th className="p-2 text-left">Quantidade</th>
+                      {detectedColumns.clientCol && (
+                        <th className="p-2 text-left">
+                          {detectedColumns.clientCol} (Cliente)
+                        </th>
+                      )}
+                      {detectedColumns.productCol && (
+                        <th className="p-2 text-left">
+                          {detectedColumns.productCol} (Produto)
+                        </th>
+                      )}
+                      {detectedColumns.qtyCol && (
+                        <th className="p-2 text-left">
+                          {detectedColumns.qtyCol} (Qtd)
+                        </th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
                     {csvPreview.map((row, idx) => (
                       <tr key={idx} className="border-b">
-                        <td className="p-2">
-                          {row['código do cliente'] || row['codigo do cliente']}
-                        </td>
-                        <td className="p-2">
-                          {row['código do produto'] || row['codigo do produto']}
-                        </td>
-                        <td className="p-2">{row['quantidade']}</td>
+                        {detectedColumns.clientCol && (
+                          <td className="p-2">
+                            {row[detectedColumns.clientCol]}
+                          </td>
+                        )}
+                        {detectedColumns.productCol && (
+                          <td className="p-2">
+                            {row[detectedColumns.productCol]}
+                          </td>
+                        )}
+                        {detectedColumns.qtyCol && (
+                          <td className="p-2">{row[detectedColumns.qtyCol]}</td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
