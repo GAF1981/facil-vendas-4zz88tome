@@ -59,9 +59,9 @@ export interface DebitoReportRow {
 }
 
 export const reportsService = {
-  // ... (keep existing methods like getProjectionsReport)
   async getProjectionsReport(): Promise<ProjectionReportRow[]> {
-    const { data, error } = await supabase
+    // 1. Fetch Sales Data
+    const { data: salesData, error: salesError } = await supabase
       .from('BANCO_DE_DADOS')
       .select(
         '"NÚMERO DO PEDIDO", "CÓDIGO DO CLIENTE", "CLIENTE", "DATA DO ACERTO", "VALOR VENDIDO", "HORA DO ACERTO"',
@@ -72,23 +72,38 @@ export const reportsService = {
       .order('HORA DO ACERTO', { ascending: false })
       .limit(10000)
 
-    if (error) throw error
+    if (salesError) throw salesError
 
-    const ordersMap = new Map<number, ProjectionReportRow>()
+    // 2. Fetch Initial Balance / Adjustment Data to be included as settlements
+    const { data: adjData, error: adjError } = await supabase
+      .from('AJUSTE_SALDO_INICIAL')
+      .select(
+        'cliente_id, cliente_nome, data_acerto, numero_pedido, saldo_novo, id',
+      )
+      .not('data_acerto', 'is', null)
+      .order('data_acerto', { ascending: false })
 
-    data?.forEach((row) => {
+    if (adjError) throw adjError
+
+    const ordersMap = new Map<string, ProjectionReportRow>()
+
+    // Process Sales Data
+    salesData?.forEach((row) => {
       const orderId = row['NÚMERO DO PEDIDO']
       if (!orderId) return
-      if (!row['DATA DO ACERTO']) return
+
+      const dateObj = parseDateSafe(row['DATA DO ACERTO'])
+      if (!dateObj) return
 
       const val = parseCurrency(row['VALOR VENDIDO'])
+      const uniqueId = `sale-${orderId}`
 
-      if (!ordersMap.has(orderId)) {
-        ordersMap.set(orderId, {
+      if (!ordersMap.has(uniqueId)) {
+        ordersMap.set(uniqueId, {
           orderId: orderId,
           clientCode: row['CÓDIGO DO CLIENTE'] || 0,
           clientName: row['CLIENTE'] || 'N/D',
-          orderDate: row['DATA DO ACERTO'] || '',
+          orderDate: dateObj.toISOString(), // Use ISO string for reliable parsing
           totalValue: 0,
           daysBetweenOrders: null,
           indexDays: null,
@@ -98,8 +113,33 @@ export const reportsService = {
         })
       }
 
-      const order = ordersMap.get(orderId)!
+      const order = ordersMap.get(uniqueId)!
       order.totalValue += val
+    })
+
+    // Process Adjustment Data
+    adjData?.forEach((row) => {
+      const dateObj = parseDateSafe(row.data_acerto)
+      if (!dateObj) return
+
+      // Use numero_pedido if available, otherwise use a placeholder ID derived from row ID
+      const orderId = row.numero_pedido || -row.id
+      const uniqueId = `adj-${orderId}-${row.id}`
+
+      if (!ordersMap.has(uniqueId)) {
+        ordersMap.set(uniqueId, {
+          orderId: orderId,
+          clientCode: row.cliente_id,
+          clientName: row.cliente_nome || 'Cliente Importado',
+          orderDate: dateObj.toISOString(), // Use ISO string for reliable parsing
+          totalValue: 0, // Initial balances count as 0 for revenue calc in this context, but valid for timeline
+          daysBetweenOrders: null,
+          indexDays: null,
+          monthlyAverage: null,
+          daysSinceLastOrder: null,
+          projection: null,
+        })
+      }
     })
 
     const allOrders = Array.from(ordersMap.values())
@@ -114,62 +154,51 @@ export const reportsService = {
     const today = startOfDay(new Date())
 
     clientOrdersMap.forEach((orders) => {
-      // Sort using parseDateSafe to handle mixed date formats correctly
+      // Sort using date timestamps
       orders.sort((a, b) => {
-        const dateA = parseDateSafe(a.orderDate)?.getTime() || 0
-        const dateB = parseDateSafe(b.orderDate)?.getTime() || 0
+        const dateA = new Date(a.orderDate).getTime()
+        const dateB = new Date(b.orderDate).getTime()
         return dateB - dateA
       })
 
       const latestOrderDate =
-        orders.length > 0 ? parseDateSafe(orders[0].orderDate) : null
+        orders.length > 0 ? new Date(orders[0].orderDate) : null
       const daysSinceLastForClient = latestOrderDate
         ? differenceInDays(today, latestOrderDate)
         : 0
 
       orders.forEach((currentOrder, index) => {
         currentOrder.daysSinceLastOrder = daysSinceLastForClient
+        let calculated = false
 
         if (index < orders.length - 1) {
           const prevOrder = orders[index + 1]
 
-          // Use robust parsing
-          const currDate = parseDateSafe(currentOrder.orderDate)
-          const prevDate = parseDateSafe(prevOrder.orderDate)
+          const currDate = new Date(currentOrder.orderDate)
+          const prevDate = new Date(prevOrder.orderDate)
 
-          if (currDate && prevDate) {
-            const diffDays = differenceInDays(currDate, prevDate)
-            currentOrder.daysBetweenOrders = Math.abs(diffDays) // Ensure positive difference
+          const diffDays = differenceInDays(currDate, prevDate)
+          currentOrder.daysBetweenOrders = Math.abs(diffDays) // Ensure positive difference
 
-            const indexD = currentOrder.daysBetweenOrders / 30
-            currentOrder.indexDays = indexD
+          const indexD = currentOrder.daysBetweenOrders / 30
+          currentOrder.indexDays = indexD
 
-            if (indexD > 0) {
-              currentOrder.monthlyAverage = currentOrder.totalValue / indexD
-            } else {
-              if (currentOrder.totalValue > 0) {
-                currentOrder.monthlyAverage = currentOrder.totalValue / 2
-              } else {
-                currentOrder.monthlyAverage = 0
-              }
-            }
-
-            const daysSinceLastMonths = daysSinceLastForClient / 30
-            if (currentOrder.monthlyAverage) {
-              currentOrder.projection =
-                daysSinceLastMonths * currentOrder.monthlyAverage
-            } else {
-              currentOrder.projection = 0
-            }
-
-            if (currentOrder.projection === 0) {
-              currentOrder.projection = 100
-            }
+          if (indexD > 0) {
+            currentOrder.monthlyAverage = currentOrder.totalValue / indexD
           } else {
-            // Fallback if dates are invalid
-            currentOrder.daysBetweenOrders = 0
-            currentOrder.indexDays = 0
-            currentOrder.monthlyAverage = 0
+            if (currentOrder.totalValue > 0) {
+              currentOrder.monthlyAverage = currentOrder.totalValue / 0.5 // Default to half month if days=0
+            } else {
+              currentOrder.monthlyAverage = 0
+            }
+          }
+
+          const daysSinceLastMonths = daysSinceLastForClient / 30
+          if (currentOrder.monthlyAverage) {
+            currentOrder.projection =
+              daysSinceLastMonths * currentOrder.monthlyAverage
+            calculated = true
+          } else {
             currentOrder.projection = 0
           }
         } else {
@@ -179,13 +208,22 @@ export const reportsService = {
           currentOrder.projection = null
         }
 
+        // Fallback Rule: If projection cannot be calculated or is 0, default to 100.00
+        if (
+          !calculated ||
+          currentOrder.projection === 0 ||
+          currentOrder.projection === null
+        ) {
+          currentOrder.projection = 100
+        }
+
         result.push(currentOrder)
       })
     })
 
     return result.sort((a, b) => {
-      const dateA = parseDateSafe(a.orderDate)?.getTime() || 0
-      const dateB = parseDateSafe(b.orderDate)?.getTime() || 0
+      const dateA = new Date(a.orderDate).getTime()
+      const dateB = new Date(b.orderDate).getTime()
       return dateB - dateA
     })
   },
@@ -258,7 +296,6 @@ export const reportsService = {
       query = query.lte('data_acerto', format(filters.endDate, 'yyyy-MM-dd'))
     }
 
-    // Limit if no filters to prevent massive load, otherwise allow more
     if (!filters?.startDate && !filters?.sellerId) {
       query = query.limit(1000)
     } else {
@@ -269,7 +306,6 @@ export const reportsService = {
 
     if (error) throw error
 
-    // Fetch Product Details to enrich the report
     const productIds = new Set<number>()
     data.forEach((row) => {
       if (row.produto_id) productIds.add(row.produto_id)
@@ -301,7 +337,6 @@ export const reportsService = {
     return data.map((row) => {
       const product = productsMap.get(row.produto_id)
       const price = product?.price || 0
-      // Calculate Value based on Quantity * Price
       const adjustmentValue = (row.quantidade_alterada || 0) * price
 
       return {
