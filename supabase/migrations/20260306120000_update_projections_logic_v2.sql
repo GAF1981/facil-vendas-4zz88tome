@@ -2,6 +2,8 @@
 -- This ensures 'Days Between Settlements' and 'Projection' calculations are accurate by considering
 -- imported settlements and initial balance records as valid historical points.
 
+DROP FUNCTION IF EXISTS get_client_projections();
+
 CREATE OR REPLACE FUNCTION get_client_projections()
 RETURNS TABLE (
   client_id INTEGER,
