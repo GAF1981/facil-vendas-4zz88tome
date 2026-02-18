@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase/client'
 import { parseCurrency } from '@/lib/formatters'
 import { differenceInDays, parseISO, startOfDay, format } from 'date-fns'
+import { parseDateSafe } from '@/lib/dateUtils'
 
 export interface ProjectionReportRow {
   orderId: number
@@ -113,14 +114,15 @@ export const reportsService = {
     const today = startOfDay(new Date())
 
     clientOrdersMap.forEach((orders) => {
+      // Sort using parseDateSafe to handle mixed date formats correctly
       orders.sort((a, b) => {
-        const dateA = new Date(a.orderDate).getTime()
-        const dateB = new Date(b.orderDate).getTime()
+        const dateA = parseDateSafe(a.orderDate)?.getTime() || 0
+        const dateB = parseDateSafe(b.orderDate)?.getTime() || 0
         return dateB - dateA
       })
 
       const latestOrderDate =
-        orders.length > 0 ? parseISO(orders[0].orderDate) : null
+        orders.length > 0 ? parseDateSafe(orders[0].orderDate) : null
       const daysSinceLastForClient = latestOrderDate
         ? differenceInDays(today, latestOrderDate)
         : 0
@@ -130,35 +132,45 @@ export const reportsService = {
 
         if (index < orders.length - 1) {
           const prevOrder = orders[index + 1]
-          const currDate = parseISO(currentOrder.orderDate)
-          const prevDate = parseISO(prevOrder.orderDate)
 
-          const diffDays = differenceInDays(currDate, prevDate)
-          currentOrder.daysBetweenOrders = diffDays
+          // Use robust parsing
+          const currDate = parseDateSafe(currentOrder.orderDate)
+          const prevDate = parseDateSafe(prevOrder.orderDate)
 
-          const indexD = diffDays / 30
-          currentOrder.indexDays = indexD
+          if (currDate && prevDate) {
+            const diffDays = differenceInDays(currDate, prevDate)
+            currentOrder.daysBetweenOrders = Math.abs(diffDays) // Ensure positive difference
 
-          if (indexD > 0) {
-            currentOrder.monthlyAverage = currentOrder.totalValue / indexD
-          } else {
-            if (currentOrder.totalValue > 0) {
-              currentOrder.monthlyAverage = currentOrder.totalValue / 2
+            const indexD = currentOrder.daysBetweenOrders / 30
+            currentOrder.indexDays = indexD
+
+            if (indexD > 0) {
+              currentOrder.monthlyAverage = currentOrder.totalValue / indexD
             } else {
-              currentOrder.monthlyAverage = 0
+              if (currentOrder.totalValue > 0) {
+                currentOrder.monthlyAverage = currentOrder.totalValue / 2
+              } else {
+                currentOrder.monthlyAverage = 0
+              }
             }
-          }
 
-          const daysSinceLastMonths = daysSinceLastForClient / 30
-          if (currentOrder.monthlyAverage) {
-            currentOrder.projection =
-              daysSinceLastMonths * currentOrder.monthlyAverage
+            const daysSinceLastMonths = daysSinceLastForClient / 30
+            if (currentOrder.monthlyAverage) {
+              currentOrder.projection =
+                daysSinceLastMonths * currentOrder.monthlyAverage
+            } else {
+              currentOrder.projection = 0
+            }
+
+            if (currentOrder.projection === 0) {
+              currentOrder.projection = 100
+            }
           } else {
+            // Fallback if dates are invalid
+            currentOrder.daysBetweenOrders = 0
+            currentOrder.indexDays = 0
+            currentOrder.monthlyAverage = 0
             currentOrder.projection = 0
-          }
-
-          if (currentOrder.projection === 0) {
-            currentOrder.projection = 100
           }
         } else {
           currentOrder.daysBetweenOrders = null
@@ -171,10 +183,11 @@ export const reportsService = {
       })
     })
 
-    return result.sort(
-      (a, b) =>
-        new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime(),
-    )
+    return result.sort((a, b) => {
+      const dateA = parseDateSafe(a.orderDate)?.getTime() || 0
+      const dateB = parseDateSafe(b.orderDate)?.getTime() || 0
+      return dateB - dateA
+    })
   },
 
   async getTopSellingItems(

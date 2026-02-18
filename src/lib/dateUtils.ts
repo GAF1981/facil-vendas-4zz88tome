@@ -1,4 +1,4 @@
-import { format, parseISO } from 'date-fns'
+import { format, parseISO, parse, isValid } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
 // Brazil Timezone
@@ -35,11 +35,20 @@ export const formatBrazilDate = (
   if (!dateString) return '-'
   try {
     if (dateString.length === 10 && !dateString.includes('T')) {
-      return format(parseISO(`${dateString}T12:00:00`), formatStr, {
-        locale: ptBR,
-      })
+      // Try to parse as ISO if it looks like one, otherwise try BR
+      if (dateString.includes('-')) {
+        return format(parseISO(`${dateString}T12:00:00`), formatStr, {
+          locale: ptBR,
+        })
+      }
+      // If BR format already, just return or reformat?
+      // For now, assuming input might be YYYY-MM-DD or DD/MM/YYYY
+      const date = parseDateSafe(dateString)
+      if (date) return format(date, formatStr, { locale: ptBR })
     }
-    return format(parseISO(dateString), formatStr, { locale: ptBR })
+    const date = parseDateSafe(dateString)
+    if (date) return format(date, formatStr, { locale: ptBR })
+    return dateString
   } catch (e) {
     return dateString
   }
@@ -54,7 +63,9 @@ export const formatDateTimeBR = (
 ): string => {
   if (!dateString) return '-'
   try {
-    const date = new Date(dateString)
+    const date = parseDateSafe(dateString) || new Date(dateString)
+    if (!isValid(date)) return '-'
+
     return new Intl.DateTimeFormat('pt-BR', {
       timeZone: TIMEZONE,
       day: '2-digit',
@@ -66,4 +77,37 @@ export const formatDateTimeBR = (
   } catch (e) {
     return '-'
   }
+}
+
+/**
+ * Robustly parses a date string that might be in ISO (YYYY-MM-DD) or BR (DD/MM/YYYY) format.
+ * Returns null if parsing fails.
+ */
+export const parseDateSafe = (
+  dateString: string | null | undefined,
+): Date | null => {
+  if (!dateString) return null
+  const str = String(dateString).trim()
+  if (!str) return null
+
+  // Try ISO format (YYYY-MM-DD)
+  // Simple check for YYYY-MM-DD pattern
+  if (str.match(/^\d{4}-\d{2}-\d{2}/)) {
+    const d = parseISO(str)
+    if (isValid(d)) return d
+  }
+
+  // Try BR formats
+  const formats = ['dd/MM/yyyy HH:mm:ss', 'dd/MM/yyyy HH:mm', 'dd/MM/yyyy']
+
+  for (const fmt of formats) {
+    const d = parse(str, fmt, new Date(), { locale: ptBR })
+    if (isValid(d)) return d
+  }
+
+  // Last resort: standard Date parsing (might work for some ISO variations or US formats)
+  const fallback = new Date(str)
+  if (isValid(fallback)) return fallback
+
+  return null
 }
