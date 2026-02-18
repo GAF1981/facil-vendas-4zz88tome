@@ -386,7 +386,6 @@ export function RotaTable({
                       textClass = 'text-purple-100'
                     }
 
-                    // Logic Update: Ignore "Próxima" tags for alerts (deprecated but kept for safety)
                     const cleanTarefas = row.tarefas
                       ? row.tarefas.replace(/\[PROX:\d+\]/g, '').trim()
                       : ''
@@ -395,7 +394,7 @@ export function RotaTable({
                       (row.pendency_details &&
                         row.pendency_details.length > 0) ||
                       !!row.client['OBSERVAÇÃO FIXA'] ||
-                      !!cleanTarefas // Use clean tarefas
+                      !!cleanTarefas
 
                     return (
                       <TableRow key={row.client.CODIGO} className={rowClass}>
@@ -510,7 +509,7 @@ export function RotaTable({
                             >
                               {row.debito > 0
                                 ? `R$ ${formatCurrency(row.debito)}`
-                                : '-'}
+                                : 'R$ 0,00'}
                             </span>
                             {row.quant_debito > 1 && (
                               <span
@@ -632,7 +631,6 @@ export function RotaTable({
                           </Select>
                         </TableCell>
 
-                        {/* NEW COLUMN: Próxima Implementation */}
                         <TableCell className="bg-muted/10 p-1">
                           <div className="flex items-center gap-1">
                             <Select

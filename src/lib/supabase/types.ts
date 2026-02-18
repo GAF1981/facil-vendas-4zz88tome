@@ -2465,6 +2465,7 @@ export type Database = {
         Args: never
         Returns: {
           client_id: number
+          dias_entre_acertos: number
           projecao: number
         }[]
       }

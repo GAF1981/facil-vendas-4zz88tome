@@ -406,9 +406,9 @@ export const rotaService = {
         const entry = debtMap.get(cid)!
         const val = row.debito || 0
 
-        entry.totalDebt += val
-
+        // Only consider positive debts for accumulated debt
         if (val > 0.01) {
+          entry.totalDebt += val
           entry.orderCount += 1
           if (row.pedido_id) {
             ordersWithDebt.add(row.pedido_id)
