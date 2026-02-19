@@ -13,11 +13,14 @@ import { estoqueCarroService } from '@/services/estoqueCarroService'
 
 export const bancoDeDadosService = {
   async hasOutstandingBalance(clienteId: number): Promise<boolean> {
+    // Fixed: Use GET request with limit(1) instead of HEAD to prevent "Unexpected end of JSON input" error
+    // Selecting ID only to minimize data transfer
     const { count, error } = await supabase
       .from('BANCO_DE_DADOS')
-      .select('*', { count: 'exact', head: true })
+      .select('"ID VENDA ITENS"', { count: 'exact' })
       .eq('"CÓDIGO DO CLIENTE"', clienteId)
       .gt('SALDO FINAL', 0)
+      .limit(1)
 
     if (error) {
       console.error('Error checking client balance:', error)
@@ -27,11 +30,14 @@ export const bancoDeDadosService = {
   },
 
   async checkClientHasOrders(clienteId: number): Promise<boolean> {
+    // Fixed: Use GET request with limit(1) instead of HEAD to prevent "Unexpected end of JSON input" error
+    // Selecting ID only to minimize data transfer
     const { count, error } = await supabase
       .from('BANCO_DE_DADOS')
-      .select('*', { count: 'exact', head: true })
+      .select('"ID VENDA ITENS"', { count: 'exact' })
       .eq('"CÓDIGO DO CLIENTE"', clienteId)
       .not('"NÚMERO DO PEDIDO"', 'is', null)
+      .limit(1)
 
     if (error) {
       console.error('Error checking client orders:', error)
