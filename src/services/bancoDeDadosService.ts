@@ -12,9 +12,9 @@ import { reportsService } from '@/services/reportsService'
 import { estoqueCarroService } from '@/services/estoqueCarroService'
 
 export const bancoDeDadosService = {
+  // ... (previous methods kept for context, showing updated getHistoryForPdf)
+
   async hasOutstandingBalance(clienteId: number): Promise<boolean> {
-    // Fixed: Use GET request with limit(1) instead of HEAD to prevent "Unexpected end of JSON input" error
-    // Selecting ID only to minimize data transfer
     const { count, error } = await supabase
       .from('BANCO_DE_DADOS')
       .select('"ID VENDA ITENS"', { count: 'exact' })
@@ -30,8 +30,6 @@ export const bancoDeDadosService = {
   },
 
   async checkClientHasOrders(clienteId: number): Promise<boolean> {
-    // Fixed: Use GET request with limit(1) instead of HEAD to prevent "Unexpected end of JSON input" error
-    // Selecting ID only to minimize data transfer
     const { count, error } = await supabase
       .from('BANCO_DE_DADOS')
       .select('"ID VENDA ITENS"', { count: 'exact' })

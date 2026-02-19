@@ -61,7 +61,6 @@ const calculateThermalHeight = (body: any) => {
 
   // Totals Section
   // Approx: 5(spacer) + 12(Total) + 12(Desc) + 15(Total Pay) + 15(Line) = 59
-  // Removed lines for product counts: 12(Prod count) + 12(Qtd count) = 24 less than before (83)
   h += 59
 
   // Quantidades Pedido Section (New)
