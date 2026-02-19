@@ -398,9 +398,6 @@ export const bancoDeDadosService = {
     }))
 
     // Iterate to calculate Media Mensal using same logic as UI
-    // The view 'debitos_historico' has 'media_mensal' column, but we want to ensure it's populated/consistent
-    // If the view returns it, use it, otherwise calculate.
-    // Assuming view might return 0 or null if not computed.
     const result = entries.map((row, i) => {
       let mediaMensal = row.media_mensal || 0
 
