@@ -86,7 +86,8 @@ const calculateThermalHeight = (body: any) => {
   }
 
   // Signature Section
-  h += 60 // Space + Line + Text
+  // If signature present, allow space for it
+  h += 100 // Space + Line + Text + Signature Image area
 
   // History Section
   const history = body.history || []
@@ -110,13 +111,27 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json()
-    const { reportType, format } = body
+    const { reportType, format, signature } = body
     const isThermal = format === '80mm'
     const isDetailedOrder = reportType === 'detailed-order'
 
     const pdfDoc = await PDFDocument.create()
     const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica)
     const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+
+    // Handle Signature Embedding
+    let signatureImage = null
+    if (signature) {
+      try {
+        // Handle data URL prefix if present
+        const base64Data = signature.includes(',')
+          ? signature.split(',')[1]
+          : signature
+        signatureImage = await pdfDoc.embedPng(base64Data)
+      } catch (e) {
+        console.error('Error embedding signature:', e)
+      }
+    }
 
     let page
     let width
@@ -413,7 +428,7 @@ Deno.serve(async (req) => {
       y -= 20
 
       // Footer - RESUMO FINANCEIRO
-      checkPageBreak(80)
+      checkPageBreak(120) // Need more space for footer + signature
       const footerRightX = width - margins.right
       const footerLabelX = width - 350
 
@@ -468,6 +483,28 @@ Deno.serve(async (req) => {
         size: 12,
         font: fontBold,
         align: 'right',
+      })
+      y -= 30
+
+      // Add Signature Section for A4 as well
+      if (signatureImage) {
+        // Draw centered in page width
+        const scaled = signatureImage.scaleToFit(200, 60)
+        const xPos = (width - scaled.width) / 2
+        page.drawImage(signatureImage, {
+          x: xPos,
+          y: y - 60,
+          width: scaled.width,
+          height: scaled.height,
+        })
+      }
+      y -= 60
+      drawLine(y)
+      y -= 10
+      drawText('Assinatura do Cliente', width / 2, y, {
+        size: 10,
+        align: 'center',
+        font: fontBold,
       })
     }
 
@@ -1045,8 +1082,25 @@ Deno.serve(async (req) => {
       }
 
       // 5. Signature
-      checkPageBreak(60)
-      y -= 30
+      // Ensure space for signature block (image + line + text)
+      checkPageBreak(80)
+
+      if (signatureImage) {
+        const scaled = signatureImage.scaleToFit(180, 50)
+        // Position image so it sits on the line
+        const xPos = (width - scaled.width) / 2
+        // We want to draw the line at `y - 50` (roughly)
+        // The image should be above that line.
+        // Image bottom left is (x, y - 50).
+        page.drawImage(signatureImage, {
+          x: xPos,
+          y: y - 50,
+          width: scaled.width,
+          height: scaled.height,
+        })
+      }
+
+      y -= 50
       drawLine(y)
       y -= 10
       drawText('Assinatura do Cliente', width / 2, y, {

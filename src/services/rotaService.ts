@@ -342,6 +342,7 @@ export const rotaService = {
         supabase
           .from('debitos_historico')
           .select('cliente_codigo, debito, data_acerto, pedido_id')
+          .gt('debito', 0.01) // Updated: Only fetch positive debts to ensure accurate summation of outstanding balance
           .limit(100000)
           .then(({ data, error }) => {
             if (error) throw error
