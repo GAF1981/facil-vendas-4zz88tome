@@ -888,7 +888,7 @@ export default function AcertoPage() {
               title="Copiar Saldo Inicial para Saldo Final em todos os itens"
             >
               <RefreshCw className="mr-2 h-4 w-4" />
-              Repetir Saldo Inicial no Final
+              Repetir saldo inicial no saldo final
             </Button>
             <Button
               variant="outline"

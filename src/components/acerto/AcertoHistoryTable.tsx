@@ -133,6 +133,8 @@ export function AcertoHistoryTable({
   const [newAction, setNewAction] = useState({
     acao: '',
     dataAcao: new Date().toISOString().split('T')[0],
+    motivo: '',
+    novaDataCombinada: '',
   })
   const [submittingAction, setSubmittingAction] = useState(false)
 
@@ -227,7 +229,7 @@ export function AcertoHistoryTable({
       await cobrancaService.addCollectionAction({
         acao: newAction.acao,
         dataAcao: newAction.dataAcao,
-        novaDataCombinada: null,
+        novaDataCombinada: newAction.novaDataCombinada || null,
         funcionarioId: loggedInUser.id,
         funcionarioNome: loggedInUser.nome_completo,
         pedidoId: selectedOrderIdForActions,
@@ -236,6 +238,7 @@ export function AcertoHistoryTable({
         installments: [],
         targetVencimento: null,
         targetFormaPagamento: null,
+        motivo: newAction.motivo || null,
       })
 
       toast({
@@ -253,6 +256,8 @@ export function AcertoHistoryTable({
       setNewAction({
         acao: '',
         dataAcao: new Date().toISOString().split('T')[0],
+        motivo: '',
+        novaDataCombinada: '',
       })
       // Refresh history to update count bubble if needed
       if (!externalData) {
@@ -699,14 +704,44 @@ export function AcertoHistoryTable({
                     className="min-h-[80px]"
                   />
                 </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="dataAcao">Data da Ação</Label>
+                    <Input
+                      id="dataAcao"
+                      type="date"
+                      value={newAction.dataAcao}
+                      onChange={(e) =>
+                        setNewAction({
+                          ...newAction,
+                          dataAcao: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="novaData">Nova Previsão de Pagamento</Label>
+                    <Input
+                      id="novaData"
+                      type="date"
+                      value={newAction.novaDataCombinada}
+                      onChange={(e) =>
+                        setNewAction({
+                          ...newAction,
+                          novaDataCombinada: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="dataAcao">Data da Ação</Label>
+                  <Label htmlFor="motivo">Motivo (Opcional)</Label>
                   <Input
-                    id="dataAcao"
-                    type="date"
-                    value={newAction.dataAcao}
+                    id="motivo"
+                    placeholder="Ex: Sem dinheiro no caixa, etc."
+                    value={newAction.motivo}
                     onChange={(e) =>
-                      setNewAction({ ...newAction, dataAcao: e.target.value })
+                      setNewAction({ ...newAction, motivo: e.target.value })
                     }
                   />
                 </div>

@@ -1099,7 +1099,6 @@ Deno.serve(async (req) => {
       y -= 20
 
       // 6. History Section ("RESUMO DE ACERTOS (HISTORICO)")
-      // Updated to match the requested layout
       if (history && history.length > 0) {
         checkPageBreak(80)
         drawText('RESUMO DE ACERTOS (HISTORICO)', width / 2, y, {
