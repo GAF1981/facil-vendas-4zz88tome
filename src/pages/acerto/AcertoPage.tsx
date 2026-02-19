@@ -488,7 +488,7 @@ export default function AcertoPage() {
           monthlyAverage,
           orderNumber: nextOrderNumber,
           issuerName: loggedInUser?.nome_completo,
-          history: history.slice(0, 10), // Limit history to recent 10
+          history: history, // Passing calculated history
           totalItemsSold,
           totalQuantitySold,
         },

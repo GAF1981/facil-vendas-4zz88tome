@@ -12,8 +12,6 @@ import { reportsService } from '@/services/reportsService'
 import { estoqueCarroService } from '@/services/estoqueCarroService'
 
 export const bancoDeDadosService = {
-  // ... (previous methods kept for context, showing updated getHistoryForPdf)
-
   async hasOutstandingBalance(clienteId: number): Promise<boolean> {
     const { count, error } = await supabase
       .from('BANCO_DE_DADOS')
@@ -354,6 +352,7 @@ export const bancoDeDadosService = {
       }
     })
 
+    // Calculate monthly average iteratively
     for (let i = 0; i < result.length; i++) {
       const current = result[i]
       let mediaMensal = null
@@ -386,20 +385,58 @@ export const bancoDeDadosService = {
       .eq('cliente_codigo', clienteId)
       .order('data_acerto', { ascending: false })
       .order('pedido_id', { ascending: false })
-      .limit(10) // Limit to 10 most recent orders for PDF history as per requirements
+      .limit(20) // Fetch slightly more to calculate average correctly
 
     if (error) throw error
-    return data.map((row) => ({
-      id: row.pedido_id,
-      data: row.data_acerto,
+
+    // Transform initial data
+    const entries = data.map((row) => ({
+      ...row,
       valorVendaTotal: row.valor_venda || 0,
-      saldoAPagar: row.saldo_a_pagar || 0,
-      valorPago: row.valor_pago || 0,
-      debito: row.debito || 0,
-      vendedor: row.vendedor_nome || '-',
-      mediaMensal: row.media_mensal || 0,
-      desconto: row.desconto || 0,
+      data: row.data_acerto,
+      hora: '00:00:00', // View might not have time, default
     }))
+
+    // Iterate to calculate Media Mensal using same logic as UI
+    // The view 'debitos_historico' has 'media_mensal' column, but we want to ensure it's populated/consistent
+    // If the view returns it, use it, otherwise calculate.
+    // Assuming view might return 0 or null if not computed.
+    const result = entries.map((row, i) => {
+      let mediaMensal = row.media_mensal || 0
+
+      // Only calculate if view didn't provide it
+      if (!mediaMensal && i < entries.length - 1) {
+        const current = entries[i]
+        const previous = entries[i + 1]
+        try {
+          const d1 = new Date(current.data)
+          const d2 = new Date(previous.data)
+          const diffTime = Math.abs(d1.getTime() - d2.getTime())
+          const diffDays = Math.max(
+            1,
+            Math.ceil(diffTime / (1000 * 60 * 60 * 24)),
+          )
+          const factor = diffDays / 30
+          mediaMensal = current.valorVendaTotal / factor
+        } catch (e) {
+          // ignore date errors
+        }
+      }
+
+      return {
+        id: row.pedido_id,
+        data: row.data_acerto,
+        valorVendaTotal: row.valor_venda || 0,
+        saldoAPagar: row.saldo_a_pagar || 0,
+        valorPago: row.valor_pago || 0,
+        debito: row.debito || 0,
+        vendedor: row.vendedor_nome || '-',
+        mediaMensal: mediaMensal,
+        desconto: row.desconto || 0,
+      }
+    })
+
+    return result.slice(0, 10) // Return top 10 for PDF
   },
 
   async getOrderDetails(orderId: number) {
@@ -431,8 +468,6 @@ export const bancoDeDadosService = {
     data_acerto?: string
   }) {
     const quantity = payload.saldo_novo - payload.saldo_anterior
-
-    // Ensure strict ISO format for database compatibility
     const timestamp = payload.data_acerto
       ? new Date(payload.data_acerto).toISOString()
       : new Date().toISOString()
@@ -459,7 +494,6 @@ export const bancoDeDadosService = {
       customOrderNumber ?? (await this.reserveNextOrderNumber())
     const dataAcertoStr = format(date, 'yyyy-MM-dd')
     const horaAcerto = format(date, 'HH:mm:ss')
-    // Ensure strict ISO format for database compatibility
     const dataEHora = date.toISOString()
 
     const activeRoute = await rotaService.getActiveRota()

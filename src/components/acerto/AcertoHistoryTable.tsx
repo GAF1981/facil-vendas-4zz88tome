@@ -402,7 +402,9 @@ export function AcertoHistoryTable({
                     <TableHead className="w-[80px]">Pedido</TableHead>
                     <TableHead>Data do Acerto</TableHead>
                     <TableHead>Vendedor</TableHead>
-                    <TableHead className="text-right">Média Mensal</TableHead>
+                    <TableHead className="text-right text-blue-600 font-bold">
+                      Média Mensal
+                    </TableHead>
                     <TableHead className="text-right">Valor da Venda</TableHead>
                     <TableHead className="text-right text-blue-600 font-semibold bg-blue-50/50">
                       Saldo a Pagar
@@ -454,7 +456,7 @@ export function AcertoHistoryTable({
                             </div>
                           </TableCell>
                           <TableCell>{row.vendedor || '-'}</TableCell>
-                          <TableCell className="text-right font-mono text-muted-foreground">
+                          <TableCell className="text-right font-mono font-bold text-blue-600">
                             {row.mediaMensal !== null
                               ? `R$ ${formatCurrency(row.mediaMensal)}`
                               : '-'}
