@@ -683,7 +683,7 @@ export function AcertoHistoryTable({
             <div className="flex justify-end mb-2">
               <Button size="sm" onClick={() => setShowAddActionForm(true)}>
                 <Plus className="mr-2 h-4 w-4" />
-                Registrar Ação
+                Registrar ação de cobrança
               </Button>
             </div>
           )}

@@ -229,6 +229,7 @@ export default function ResumoAcertosPage() {
     (acc, curr) => acc + curr.valorDevido,
     0,
   )
+  const totalAcertos = filteredData.length
 
   return (
     <div className="space-y-6 animate-fade-in p-2 pb-20 sm:p-6">
@@ -339,7 +340,7 @@ export default function ResumoAcertosPage() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
         <Card className="bg-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Venda Total</CardTitle>
@@ -396,6 +397,20 @@ export default function ResumoAcertosPage() {
               {formatCurrency(totalReceber)}
             </div>
             <p className="text-xs text-blue-600/80">Pendências da rota</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-card border-purple-200 bg-purple-50/30">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-purple-700">
+              Total de Acertos
+            </CardTitle>
+            <FileText className="h-4 w-4 text-purple-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-purple-700">
+              {totalAcertos}
+            </div>
+            <p className="text-xs text-purple-600/80">Acertos realizados</p>
           </CardContent>
         </Card>
       </div>

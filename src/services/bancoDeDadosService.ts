@@ -379,57 +379,103 @@ export const bancoDeDadosService = {
   },
 
   async getHistoryForPdf(clienteId: number) {
-    const { data, error } = await supabase
+    const { data: debitosData, error: debitosError } = await supabase
       .from('debitos_historico')
       .select('*')
       .eq('cliente_codigo', clienteId)
       .order('data_acerto', { ascending: false })
       .order('pedido_id', { ascending: false })
-      .limit(20) // Fetch slightly more to calculate average correctly
+      .limit(20)
 
-    if (error) throw error
+    if (debitosError) throw debitosError
+
+    // Fetch initial stock adjustments
+    const { data: ajustesData, error: ajustesError } = await supabase
+      .from('AJUSTE_SALDO_INICIAL')
+      .select('*')
+      .eq('cliente_id', clienteId)
+      .order('data_acerto', { ascending: false })
+      .limit(20)
+
+    if (ajustesError) throw ajustesError
 
     // Transform initial data
-    const entries = data.map((row) => ({
-      ...row,
-      valorVendaTotal: row.valor_venda || 0,
+    const debitosEntries = debitosData.map((row) => ({
+      type: 'ACERTO',
+      id: row.pedido_id,
       data: row.data_acerto,
       hora: '00:00:00', // View might not have time, default
+      vendedor: row.vendedor_nome || '-',
+      valorVendaTotal: row.valor_venda || 0,
+      saldoAPagar: row.saldo_a_pagar || 0,
+      valorPago: row.valor_pago || 0,
+      debito: row.debito || 0,
+      mediaMensal: row.media_mensal || 0,
+      desconto: row.desconto || 0,
     }))
 
+    const ajustesEntries = (ajustesData || []).map((row) => ({
+      type: 'AJUSTE',
+      id: row.numero_pedido || row.id,
+      data: row.data_acerto,
+      hora: '00:00:00',
+      vendedor: row.vendedor_nome || '-',
+      valorVendaTotal: 0,
+      saldoAPagar: 0,
+      valorPago: 0,
+      debito: 0,
+      mediaMensal: 0,
+      desconto: 0,
+      isAjuste: true,
+      quantidadeAlterada: row.quantidade_alterada || 0,
+    }))
+
+    const combined = [...debitosEntries, ...ajustesEntries].sort((a, b) => {
+      const d1 = new Date(a.data || 0).getTime()
+      const d2 = new Date(b.data || 0).getTime()
+      return d2 - d1
+    })
+
+    const acertoEntries = combined.filter((e) => e.type === 'ACERTO')
+
     // Iterate to calculate Media Mensal using same logic as UI
-    const result = entries.map((row, i) => {
-      let mediaMensal = row.media_mensal || 0
+    const result = combined.map((row) => {
+      let mediaMensal = row.mediaMensal || 0
 
       // Only calculate if view didn't provide it
-      if (!mediaMensal && i < entries.length - 1) {
-        const current = entries[i]
-        const previous = entries[i + 1]
-        try {
-          const d1 = new Date(current.data)
-          const d2 = new Date(previous.data)
-          const diffTime = Math.abs(d1.getTime() - d2.getTime())
-          const diffDays = Math.max(
-            1,
-            Math.ceil(diffTime / (1000 * 60 * 60 * 24)),
-          )
-          const factor = diffDays / 30
-          mediaMensal = current.valorVendaTotal / factor
-        } catch (e) {
-          // ignore date errors
+      if (row.type === 'ACERTO' && !mediaMensal) {
+        const indexInAcertos = acertoEntries.findIndex((e) => e.id === row.id)
+        if (indexInAcertos >= 0 && indexInAcertos < acertoEntries.length - 1) {
+          const current = acertoEntries[indexInAcertos]
+          const previous = acertoEntries[indexInAcertos + 1]
+          try {
+            const d1 = new Date(current.data)
+            const d2 = new Date(previous.data)
+            const diffTime = Math.abs(d1.getTime() - d2.getTime())
+            const diffDays = Math.max(
+              1,
+              Math.ceil(diffTime / (1000 * 60 * 60 * 24)),
+            )
+            const factor = diffDays / 30
+            mediaMensal = current.valorVendaTotal / factor
+          } catch (e) {
+            // ignore date errors
+          }
         }
       }
 
       return {
-        id: row.pedido_id,
-        data: row.data_acerto,
-        valorVendaTotal: row.valor_venda || 0,
-        saldoAPagar: row.saldo_a_pagar || 0,
-        valorPago: row.valor_pago || 0,
-        debito: row.debito || 0,
-        vendedor: row.vendedor_nome || '-',
+        id: row.id,
+        data: row.data,
+        valorVendaTotal: row.valorVendaTotal,
+        saldoAPagar: row.saldoAPagar,
+        valorPago: row.valorPago,
+        debito: row.debito,
+        vendedor: row.vendedor,
         mediaMensal: mediaMensal,
-        desconto: row.desconto || 0,
+        desconto: row.desconto,
+        isAjuste: row.isAjuste,
+        quantidadeAlterada: row.quantidadeAlterada,
       }
     })
 

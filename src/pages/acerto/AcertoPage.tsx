@@ -464,6 +464,23 @@ export default function AcertoPage() {
         a.produtoNome.localeCompare(b.produtoNome),
       )
 
+      // Include current order in the history for the PDF
+      const previewHistoryEntry = {
+        id: nextOrderNumber || 0,
+        data: new Date().toISOString(),
+        vendedor: loggedInUser?.nome_completo || 'N/D',
+        valorVendaTotal: totalSalesValue,
+        saldoAPagar: amountToPay,
+        valorPago: payments.reduce((acc, p) => acc + p.paidValue, 0),
+        debito: Math.max(
+          0,
+          amountToPay - payments.reduce((acc, p) => acc + p.paidValue, 0),
+        ),
+        mediaMensal: monthlyAverage,
+        desconto: discountAmount,
+      }
+      const combinedHistory = [previewHistoryEntry, ...history].slice(0, 10)
+
       const pdfBlob = await acertoService.generatePdf(
         {
           client,
@@ -488,7 +505,7 @@ export default function AcertoPage() {
           monthlyAverage,
           orderNumber: nextOrderNumber,
           issuerName: loggedInUser?.nome_completo,
-          history: history, // Passing calculated history
+          history: combinedHistory, // Passing calculated history
           totalItemsSold,
           totalQuantitySold,
         },
@@ -689,12 +706,9 @@ export default function AcertoPage() {
         })
       }
 
-      // Retrieve history for PDF - Exclude the current order we just saved to avoid redundancy
-      // Use getHistoryForPdf as requested by User Story to use debitos_historico view
+      // Retrieve history for PDF - Include the current order as per User Story
       const history = await bancoDeDadosService.getHistoryForPdf(client.CODIGO)
-      const filteredHistory = history
-        .filter((h) => h.id !== finalOrderNumber)
-        .slice(0, 10)
+      const filteredHistory = history.slice(0, 10)
 
       const detailedPayments = payments
         .filter((p) => p.paidValue > 0)
@@ -888,7 +902,7 @@ export default function AcertoPage() {
               title="Copiar Saldo Inicial para Saldo Final em todos os itens"
             >
               <RefreshCw className="mr-2 h-4 w-4" />
-              Repetir saldo inicial no saldo final
+              Repetir Saldo Inicial no Saldo Final
             </Button>
             <Button
               variant="outline"

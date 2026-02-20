@@ -149,7 +149,7 @@ export const acertoService = {
 
     // Fetch History
     const history = await bancoDeDadosService.getHistoryForPdf(clientId)
-    const recentHistory = history.filter((h) => h.id !== orderId).slice(0, 10) // Limit to 10 most recent excluding current
+    const recentHistory = history.slice(0, 10) // Limit to 10 most recent
     const lastOrder = recentHistory.length > 0 ? recentHistory[0] : null
 
     // Fetch Monthly Average for the PDF report
@@ -241,9 +241,6 @@ export const acertoService = {
     )
     const totalQuantitySold = items.reduce((acc, i) => acc + i.quantVendida, 0)
 
-    // Ensure we are passing 10 history items max (service limits to 10 but slice again to be safe)
-    const finalHistory = recentHistory.slice(0, 10)
-
     const data = {
       client: {
         ...client,
@@ -269,7 +266,7 @@ export const acertoService = {
       isReceipt,
       issuerName,
       lastOrder: lastOrder ? { id: lastOrder.id, date: lastOrder.data } : null,
-      history: finalHistory, // Pass history to PDF
+      history: recentHistory, // Pass history to PDF
       monthlyAverage,
       totalItemsSold,
       totalQuantitySold,

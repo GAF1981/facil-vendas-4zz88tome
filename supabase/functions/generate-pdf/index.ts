@@ -1118,6 +1118,30 @@ Deno.serve(async (req) => {
             12,
           )
 
+          if (h.isAjuste) {
+            drawText(hDate, margins.left, y, { size: 8, font: fontBold })
+            drawText(`Ajuste #${hId}`, margins.left + 70, y, {
+              size: 8,
+              font: fontBold,
+            })
+            drawText(hSeller, width - margins.right, y, {
+              size: 8,
+              font: fontBold,
+              align: 'right',
+            })
+            y -= 10
+
+            drawText(`Ajuste Inicial de Estoque`, margins.left, y, { size: 8 })
+            drawText(
+              `Qtd: ${h.quantidadeAlterada || 0}`,
+              width - margins.right,
+              y,
+              { size: 8, align: 'right' },
+            )
+            y -= 25
+            continue
+          }
+
           const valTotal = Number(h.valorVendaTotal || h.valor_venda || 0)
           const valAPagar = Number(h.saldoAPagar || h.saldo_a_pagar || valTotal)
           const valPago = Number(h.valorPago || h.valor_pago || 0)
