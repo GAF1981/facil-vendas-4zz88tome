@@ -43,19 +43,19 @@ SELECT
     bd."FUNCIONÁRIO" AS vendedor_nome,
     bd."CODIGO FUNCIONARIO" AS vendedor_id,
     MAX(c."GRUPO ROTA") AS rota,
-    safe_cast_numeric(MAX(bd."VALOR VENDIDO")) AS valor_venda,
-    safe_cast_numeric(MAX(bd."VALOR DEVIDO")) AS saldo_a_pagar,
+    safe_cast_numeric(MAX(bd."VALOR VENDIDO")::text) AS valor_venda,
+    COALESCE(MAX(bd."VALOR DEVIDO")::numeric, 0) AS saldo_a_pagar,
     COALESCE((
         SELECT SUM(r.valor_pago)
         FROM "RECEBIMENTOS" r
         WHERE r.venda_id = bd."NÚMERO DO PEDIDO"
     ), 0) AS valor_pago,
-    GREATEST(0, safe_cast_numeric(MAX(bd."VALOR DEVIDO")) - COALESCE((
+    GREATEST(0, COALESCE(MAX(bd."VALOR DEVIDO")::numeric, 0) - COALESCE((
         SELECT SUM(r.valor_pago)
         FROM "RECEBIMENTOS" r
         WHERE r.venda_id = bd."NÚMERO DO PEDIDO"
     ), 0)) AS debito,
-    safe_cast_numeric(MAX(bd."DESCONTO POR GRUPO")) AS desconto,
+    safe_cast_numeric(MAX(bd."DESCONTO POR GRUPO")::text) AS desconto,
     0 AS media_mensal
 FROM "BANCO_DE_DADOS" bd
 LEFT JOIN "CLIENTES" c ON c."CODIGO" = bd."CÓDIGO DO CLIENTE"
