@@ -310,16 +310,21 @@ export const bancoDeDadosService = {
         }
       }
 
+      const valorVendaTotal = row.valor_venda || 0
+      const desconto = row.desconto || 0
+      const valorPago = row.valor_pago || 0
+      const debito = Math.max(0, valorVendaTotal - desconto - valorPago)
+
       return {
         id: row.pedido_id,
         data: dataStr,
         hora: horaStr,
         vendedor: row.vendedor_nome || '-',
-        valorVendaTotal: row.valor_venda || 0,
-        saldoAPagar: row.saldo_a_pagar || 0,
-        valorPago: row.valor_pago || 0,
-        debito: row.debito || 0,
-        desconto: row.desconto || 0,
+        valorVendaTotal,
+        saldoAPagar: row.saldo_a_pagar || valorVendaTotal - desconto,
+        valorPago,
+        debito,
+        desconto,
         methods: paymentInfo ? Array.from(paymentInfo.methods).join(', ') : '-',
         paymentDetails: paymentInfo ? paymentInfo.details : [],
         collectionActionCount: collectionCountsMap.get(row.pedido_id) || 0,
@@ -437,19 +442,26 @@ export const bancoDeDadosService = {
 
     const ajustesEntries = Array.from(ajustesEntriesMap.values())
 
-    const debitosEntries = debitosData.map((row) => ({
-      type: 'ACERTO',
-      id: row.pedido_id,
-      data: row.data_acerto,
-      hora: '00:00:00',
-      vendedor: row.vendedor_nome || '-',
-      valorVendaTotal: row.valor_venda || 0,
-      saldoAPagar: row.saldo_a_pagar || 0,
-      valorPago: row.valor_pago || 0,
-      debito: row.debito || 0,
-      mediaMensal: row.media_mensal || 0,
-      desconto: row.desconto || 0,
-    }))
+    const debitosEntries = debitosData.map((row) => {
+      const valorVendaTotal = row.valor_venda || 0
+      const desconto = row.desconto || 0
+      const valorPago = row.valor_pago || 0
+      const debito = Math.max(0, valorVendaTotal - desconto - valorPago)
+
+      return {
+        type: 'ACERTO',
+        id: row.pedido_id,
+        data: row.data_acerto,
+        hora: '00:00:00',
+        vendedor: row.vendedor_nome || '-',
+        valorVendaTotal,
+        saldoAPagar: row.saldo_a_pagar || valorVendaTotal - desconto,
+        valorPago,
+        debito,
+        mediaMensal: row.media_mensal || 0,
+        desconto,
+      }
+    })
 
     const combined = [...debitosEntries, ...ajustesEntries].sort((a, b) => {
       const d1 = new Date(a.data || 0).getTime()

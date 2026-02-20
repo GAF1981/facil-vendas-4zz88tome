@@ -449,6 +449,11 @@ export const reportsService = {
         clientName = clientNameMap.get(clientCode) || clientName
       }
 
+      const valorVenda = row.valor_venda || 0
+      const desconto = row.desconto || 0
+      const valorPago = row.valor_pago || 0
+      const debitoCalc = Math.max(0, valorVenda - desconto - valorPago)
+
       return {
         ...row,
         cliente_codigo: clientCode,
@@ -456,7 +461,8 @@ export const reportsService = {
         saldo_a_pagar:
           row.saldo_a_pagar !== undefined && row.saldo_a_pagar !== null
             ? row.saldo_a_pagar
-            : row.valor_venda - (row.desconto || 0),
+            : valorVenda - desconto,
+        debito: debitoCalc,
         debito_total: row.debito_total,
       }
     })
