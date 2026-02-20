@@ -174,7 +174,7 @@ export function CollectionActionsSheet({
             <div className="flex justify-end">
               <Button size="sm" onClick={() => setShowForm(true)}>
                 <Plus className="w-4 h-4 mr-2" />
-                Nova Ação
+                Registrar ação de cobrança
               </Button>
             </div>
           )}

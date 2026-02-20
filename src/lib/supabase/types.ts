@@ -2866,8 +2866,7 @@ export const Constants = {
 //   PRIMARY KEY FUNCIONARIOS_pkey: PRIMARY KEY (id)
 //   CHECK email_check: CHECK ((email ~* '^.+@.+'::text))
 //   CHECK funcionarios_situacao_check: CHECK ((situacao = ANY (ARRAY['ATIVO'::text, 'INATIVO'::text])))
-//   CHECK senha_check: CHECK ((senha ~ '^[0-9]{4}
-::text))
+//   CHECK senha_check: CHECK (((senha IS NULL) OR (senha = ''::text) OR (length(senha) >= 4)))
 // Table: ID ESTOQUE CARRO
 //   FOREIGN KEY ID ESTOQUE CARRO_funcionario_id_fkey: FOREIGN KEY (funcionario_id) REFERENCES "FUNCIONARIOS"(id)
 //   PRIMARY KEY ID ESTOQUE CARRO_pkey: PRIMARY KEY (id)

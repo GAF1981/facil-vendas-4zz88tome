@@ -395,9 +395,37 @@ export const bancoDeDadosService = {
       .select('*')
       .eq('cliente_id', clienteId)
       .order('data_acerto', { ascending: false })
-      .limit(20)
+      .limit(100)
 
     if (ajustesError) throw ajustesError
+
+    const ajustesEntriesMap = new Map<string, any>()
+    ;(ajustesData || []).forEach((row) => {
+      const key = row.numero_pedido
+        ? `pedido_${row.numero_pedido}`
+        : `data_${row.data_acerto?.split('T')[0]}_${row.vendedor_id}`
+      if (!ajustesEntriesMap.has(key)) {
+        ajustesEntriesMap.set(key, {
+          type: 'AJUSTE',
+          id: row.numero_pedido || row.id,
+          data: row.data_acerto,
+          hora: '00:00:00',
+          vendedor: row.vendedor_nome || '-',
+          valorVendaTotal: 0,
+          saldoAPagar: 0,
+          valorPago: 0,
+          debito: 0,
+          mediaMensal: 0,
+          desconto: 0,
+          isAjuste: true,
+          quantidadeAlterada: 0,
+        })
+      }
+      ajustesEntriesMap.get(key).quantidadeAlterada +=
+        row.quantidade_alterada || 0
+    })
+
+    const ajustesEntries = Array.from(ajustesEntriesMap.values())
 
     // Transform initial data
     const debitosEntries = debitosData.map((row) => ({
@@ -412,22 +440,6 @@ export const bancoDeDadosService = {
       debito: row.debito || 0,
       mediaMensal: row.media_mensal || 0,
       desconto: row.desconto || 0,
-    }))
-
-    const ajustesEntries = (ajustesData || []).map((row) => ({
-      type: 'AJUSTE',
-      id: row.numero_pedido || row.id,
-      data: row.data_acerto,
-      hora: '00:00:00',
-      vendedor: row.vendedor_nome || '-',
-      valorVendaTotal: 0,
-      saldoAPagar: 0,
-      valorPago: 0,
-      debito: 0,
-      mediaMensal: 0,
-      desconto: 0,
-      isAjuste: true,
-      quantidadeAlterada: row.quantidade_alterada || 0,
     }))
 
     const combined = [...debitosEntries, ...ajustesEntries].sort((a, b) => {
@@ -725,5 +737,117 @@ export const bancoDeDadosService = {
     }
 
     return nextPedido
+  },
+
+  async generateOrderReceipt(
+    orderId: number,
+    type: 'standard' | 'settlement' = 'standard',
+  ): Promise<Blob> {
+    const { data: orderData, error: orderError } = await supabase
+      .from('BANCO_DE_DADOS')
+      .select('*')
+      .eq('"NÚMERO DO PEDIDO"', orderId)
+
+    if (orderError) throw orderError
+    if (!orderData || orderData.length === 0)
+      throw new Error('Pedido não encontrado.')
+
+    const firstItem = orderData[0]
+    const clientId = firstItem['CÓDIGO DO CLIENTE']
+    const employeeId = firstItem['CODIGO FUNCIONARIO']
+
+    const { data: clientData } = await supabase
+      .from('CLIENTES')
+      .select('*')
+      .eq('CODIGO', clientId)
+      .single()
+
+    const { data: employeeData } = await supabase
+      .from('FUNCIONARIOS')
+      .select('*')
+      .eq('id', employeeId)
+      .single()
+
+    const { data: paymentsData } = await supabase
+      .from('RECEBIMENTOS')
+      .select('*')
+      .eq('venda_id', orderId)
+
+    const items = orderData.map((d) => ({
+      produtoNome: d.MERCADORIA,
+      produtoCodigo: d['COD. PRODUTO'],
+      tipo: d['TIPO'],
+      precoUnitario: d['PREÇO VENDIDO'] ? parseCurrency(d['PREÇO VENDIDO']) : 0,
+      saldoInicial: Number(d['SALDO INICIAL']) || 0,
+      contagem: Number(d.CONTAGEM) || 0,
+      quantVendida: Number(d['QUANTIDADE VENDIDA']) || 0,
+      saldoFinal: Number(d['SALDO FINAL']) || 0,
+      valorVendido: parseCurrency(d['VALOR VENDIDO']),
+      novasConsignacoes: d['NOVAS CONSIGNAÇÕES']
+        ? parseCurrency(d['NOVAS CONSIGNAÇÕES'])
+        : 0,
+      recolhido: d['RECOLHIDO'] ? parseCurrency(d['RECOLHIDO']) : 0,
+    }))
+
+    const totalVendido = items.reduce(
+      (acc, item) => acc + (item.valorVendido || 0),
+      0,
+    )
+
+    const valorAcerto = orderData.reduce(
+      (acc, d) => acc + (Number(d['VALOR DEVIDO']) || 0),
+      0,
+    )
+
+    const valorDesconto = Math.max(0, totalVendido - valorAcerto)
+
+    const installments = (paymentsData || [])
+      .filter((p) => (p.valor_registrado || 0) > 0)
+      .map((p) => ({
+        method: p.forma_pagamento,
+        dueDate: p.vencimento,
+        value: p.valor_registrado,
+      }))
+
+    let history: any[] = []
+    let monthlyAverage = 0
+
+    if (clientId) {
+      try {
+        history = await this.getHistoryForPdf(clientId)
+        monthlyAverage = history.length > 0 ? history[0].mediaMensal || 0 : 0
+      } catch (histError) {
+        console.error('Failed to fetch history for PDF', histError)
+      }
+    }
+
+    const payload = {
+      reportType: type === 'standard' ? 'detailed-order' : 'thermal-history',
+      format: type === 'standard' ? 'a4' : '80mm',
+      client: clientData,
+      employee: employeeData,
+      items: items,
+      date: firstItem['DATA DO ACERTO'] || new Date().toISOString(),
+      orderNumber: orderId,
+      totalVendido: totalVendido,
+      valorDesconto: valorDesconto,
+      valorAcerto: valorAcerto,
+      installments: installments,
+      history,
+      monthlyAverage,
+      payments: [],
+    }
+
+    const { data: pdfBlob, error: pdfError } = await supabase.functions.invoke(
+      'generate-pdf',
+      {
+        body: payload,
+      },
+    )
+
+    if (pdfError) throw pdfError
+    if (!(pdfBlob instanceof Blob)) throw new Error('Falha ao gerar PDF')
+
+    return pdfBlob
   },
 }
