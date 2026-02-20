@@ -72,8 +72,9 @@ export interface HistoryRow {
     createdAt?: string
   }[]
   collectionActionCount?: number
-  // Add required fields for collection actions if missing in original
   cliente_nome?: string
+  isAjuste?: boolean
+  quantidadeAlterada?: number
 }
 
 interface AcertoHistoryTableProps {
@@ -405,7 +406,7 @@ export function AcertoHistoryTable({
                 <TableHeader className="bg-muted/50">
                   <TableRow>
                     <TableHead className="w-[80px]">Pedido</TableHead>
-                    <TableHead>Data do Acerto</TableHead>
+                    <TableHead>Data</TableHead>
                     <TableHead>Vendedor</TableHead>
                     <TableHead className="text-right text-blue-600 font-bold">
                       Média Mensal
@@ -440,6 +441,43 @@ export function AcertoHistoryTable({
                     </TableRow>
                   ) : (
                     history.map((row) => {
+                      if (row.isAjuste) {
+                        return (
+                          <TableRow
+                            key={`ajuste-${row.id}`}
+                            className="hover:bg-muted/30 bg-muted/10"
+                          >
+                            <TableCell className="font-mono font-medium text-xs text-muted-foreground">
+                              #{row.id}
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              <div className="flex flex-col">
+                                <span>
+                                  {row.data
+                                    ? format(parseISO(row.data), 'dd/MM/yyyy', {
+                                        locale: ptBR,
+                                      })
+                                    : '-'}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell>{row.vendedor || '-'}</TableCell>
+                            <TableCell
+                              colSpan={5}
+                              className="text-center text-muted-foreground italic text-sm py-4"
+                            >
+                              Ajuste de Estoque / Captação Inicial (Qtd
+                              Alterada:{' '}
+                              <span className="font-bold">
+                                {row.quantidadeAlterada}
+                              </span>
+                              )
+                            </TableCell>
+                            <TableCell className="text-center">-</TableCell>
+                          </TableRow>
+                        )
+                      }
+
                       const saldoAPagarDisplay = row.saldoAPagar
 
                       return (

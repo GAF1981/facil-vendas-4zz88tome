@@ -223,159 +223,177 @@ export const bancoDeDadosService = {
   },
 
   async getAcertoHistory(clienteId: number) {
-    const { data, error } = await supabase
-      .from('BANCO_DE_DADOS')
-      .select(
-        '"NÚMERO DO PEDIDO", "DATA DO ACERTO", "HORA DO ACERTO", "FUNCIONÁRIO", "VALOR VENDIDO", "DESCONTO POR GRUPO"',
-      )
-      .eq('"CÓDIGO DO CLIENTE"', clienteId)
-      .order('"DATA DO ACERTO"', { ascending: false })
-      .order('"HORA DO ACERTO"', { ascending: false })
+    // 1. Fetch from debitos_historico for consolidated orders
+    const { data: debitosData, error: debitosError } = await supabase
+      .from('debitos_historico')
+      .select('*')
+      .eq('cliente_codigo', clienteId)
+      .order('data_acerto', { ascending: false })
+      .order('pedido_id', { ascending: false })
       .limit(1000)
 
-    if (error) throw error
-    if (!data || data.length === 0) return []
+    if (debitosError) throw debitosError
 
-    const orderIds = [
-      ...new Set(
-        data
-          .map((item) => item['NÚMERO DO PEDIDO'])
-          .filter((id) => id !== null && id !== undefined),
-      ),
-    ] as number[]
+    // 2. Fetch from AJUSTE_SALDO_INICIAL for stock load aggregations
+    const { data: ajustesData, error: ajustesError } = await supabase
+      .from('AJUSTE_SALDO_INICIAL')
+      .select('*')
+      .eq('cliente_id', clienteId)
+      .order('data_acerto', { ascending: false })
+      .limit(100)
 
-    let paymentsMap = new Map<number, any>()
-    let collectionCountsMap = new Map<number, number>()
+    if (ajustesError) throw ajustesError
+
+    const orderIds = debitosData?.map((d) => d.pedido_id) || []
+
+    const paymentsMap = new Map<number, any>()
+    const collectionCountsMap = new Map<number, number>()
 
     if (orderIds.length > 0) {
-      // 1. Fetch Receipts
-      const { data: paymentsData, error: paymentsError } = await supabase
+      // Fetch Receipts details
+      const { data: paymentsData } = await supabase
         .from('RECEBIMENTOS')
         .select(
           'id, venda_id, valor_pago, valor_registrado, forma_pagamento, vencimento, created_at, FUNCIONARIOS(nome_completo)',
         )
         .in('venda_id', orderIds)
 
-      if (paymentsError) {
-        console.error('Error fetching receipts:', paymentsError)
-      } else if (paymentsData) {
-        paymentsData.forEach((p: any) => {
-          if (!p.venda_id) return
-          const existing = paymentsMap.get(p.venda_id) || {
-            total: 0,
-            methods: new Set<string>(),
-            details: [],
-          }
-          existing.total += p.valor_pago || 0
-          if (p.forma_pagamento) existing.methods.add(p.forma_pagamento)
-          existing.details.push({
-            id: p.id,
-            method: p.forma_pagamento,
-            value: p.valor_pago || 0,
-            registeredValue: p.valor_registrado || 0,
-            date: p.vencimento || '',
-            employeeName: p.FUNCIONARIOS?.nome_completo || 'N/A',
-            createdAt: p.created_at || '',
-          })
-          paymentsMap.set(p.venda_id, existing)
+      paymentsData?.forEach((p: any) => {
+        if (!p.venda_id) return
+        const existing = paymentsMap.get(p.venda_id) || {
+          total: 0,
+          methods: new Set<string>(),
+          details: [],
+        }
+        existing.total += p.valor_pago || 0
+        if (p.forma_pagamento) existing.methods.add(p.forma_pagamento)
+        existing.details.push({
+          id: p.id,
+          method: p.forma_pagamento,
+          value: p.valor_pago || 0,
+          registeredValue: p.valor_registrado || 0,
+          date: p.vencimento || '',
+          employeeName: p.FUNCIONARIOS?.nome_completo || 'N/A',
+          createdAt: p.created_at || '',
         })
-      }
+        paymentsMap.set(p.venda_id, existing)
+      })
 
-      // 2. Fetch Collection Action Counts
-      const { data: actionsData, error: actionsError } = await supabase
+      // Fetch Collection Action Counts
+      const { data: actionsData } = await supabase
         .from('acoes_cobranca')
         .select('pedido_id')
         .in('pedido_id', orderIds)
 
-      if (actionsError) {
-        console.error('Error fetching collection actions:', actionsError)
-      } else if (actionsData) {
-        actionsData.forEach((a) => {
-          if (a.pedido_id) {
-            collectionCountsMap.set(
-              a.pedido_id,
-              (collectionCountsMap.get(a.pedido_id) || 0) + 1,
-            )
-          }
-        })
-      }
+      actionsData?.forEach((a) => {
+        if (a.pedido_id) {
+          collectionCountsMap.set(
+            a.pedido_id,
+            (collectionCountsMap.get(a.pedido_id) || 0) + 1,
+          )
+        }
+      })
     }
 
-    const ordersMap = new Map<number, any>()
-    data.forEach((row) => {
-      const orderId = row['NÚMERO DO PEDIDO']
-      if (!orderId) return
-      if (!ordersMap.has(orderId)) {
-        ordersMap.set(orderId, {
-          id: orderId,
-          data: row['DATA DO ACERTO'],
-          hora: row['HORA DO ACERTO'],
-          vendedor: row['FUNCIONÁRIO'],
-          valorVendaTotal: 0,
-          desconto: row['DESCONTO POR GRUPO'],
-        })
+    // 3. Map Debitos
+    const debitosEntries = (debitosData || []).map((row) => {
+      const paymentInfo = paymentsMap.get(row.pedido_id)
+      let dataStr = ''
+      let horaStr = row.hora_acerto || ''
+
+      if (row.data_acerto) {
+        try {
+          if (row.data_acerto.includes('T')) {
+            dataStr = row.data_acerto.split('T')[0]
+            if (!horaStr) {
+              horaStr = row.data_acerto.split('T')[1].substring(0, 5)
+            }
+          } else {
+            dataStr = row.data_acerto.split(' ')[0]
+          }
+        } catch (e) {
+          dataStr = row.data_acerto
+        }
       }
-      const order = ordersMap.get(orderId)
-      order.valorVendaTotal += parseCurrency(row['VALOR VENDIDO'])
+
+      return {
+        id: row.pedido_id,
+        data: dataStr,
+        hora: horaStr,
+        vendedor: row.vendedor_nome || '-',
+        valorVendaTotal: row.valor_venda || 0,
+        saldoAPagar: row.saldo_a_pagar || 0,
+        valorPago: row.valor_pago || 0,
+        debito: row.debito || 0,
+        desconto: row.desconto || 0,
+        methods: paymentInfo ? Array.from(paymentInfo.methods).join(', ') : '-',
+        paymentDetails: paymentInfo ? paymentInfo.details : [],
+        collectionActionCount: collectionCountsMap.get(row.pedido_id) || 0,
+        mediaMensal: row.media_mensal || null,
+        isAjuste: false,
+      }
     })
 
-    const orders = Array.from(ordersMap.values()).sort((a, b) => {
+    // 4. Map Ajustes (Aggregated)
+    const ajustesMap = new Map<string, any>()
+    ;(ajustesData || []).forEach((row) => {
+      const key = row.numero_pedido
+        ? `pedido_${row.numero_pedido}`
+        : `data_${row.data_acerto?.split('T')[0]}_${row.vendedor_id}`
+      if (!ajustesMap.has(key)) {
+        let dataStr = ''
+        if (row.data_acerto) {
+          dataStr = row.data_acerto.includes('T')
+            ? row.data_acerto.split('T')[0]
+            : row.data_acerto.split(' ')[0]
+        }
+        ajustesMap.set(key, {
+          id: row.numero_pedido || row.id,
+          data: dataStr,
+          hora: '00:00',
+          vendedor: row.vendedor_nome || '-',
+          valorVendaTotal: 0,
+          saldoAPagar: 0,
+          valorPago: 0,
+          debito: 0,
+          mediaMensal: null,
+          isAjuste: true,
+          quantidadeAlterada: 0,
+        })
+      }
+      ajustesMap.get(key).quantidadeAlterada += row.quantidade_alterada || 0
+    })
+
+    const ajustesEntries = Array.from(ajustesMap.values())
+
+    // 5. Combine and Sort
+    const combined = [...debitosEntries, ...ajustesEntries].sort((a, b) => {
       const dtA = new Date(`${a.data}T${a.hora || '00:00:00'}`).getTime()
       const dtB = new Date(`${b.data}T${b.hora || '00:00:00'}`).getTime()
       return dtB - dtA
     })
 
-    const result = orders.map((order) => {
-      const descontoStr = order.desconto || '0'
-      const descontoVal = parseCurrency(descontoStr.replace('%', ''))
-      const discountFactor = descontoVal > 1 ? descontoVal / 100 : descontoVal
-      const valorDesconto = order.valorVendaTotal * discountFactor
-      const saldoAPagar = order.valorVendaTotal - valorDesconto
-      const paymentInfo = paymentsMap.get(order.id)
-      const valorPago = paymentInfo ? paymentInfo.total : 0
-      const uniqueMethods = paymentInfo
-        ? Array.from(paymentInfo.methods).join(', ')
-        : '-'
-      const paymentDetails = paymentInfo ? paymentInfo.details : []
-      const debito = saldoAPagar - valorPago
-      const collectionActionCount = collectionCountsMap.get(order.id) || 0
-
-      return {
-        ...order,
-        saldoAPagar,
-        valorPago,
-        debito: debito,
-        methods: uniqueMethods,
-        paymentDetails,
-        collectionActionCount,
-        mediaMensal: null as number | null,
-      }
-    })
-
-    // Calculate monthly average iteratively
-    for (let i = 0; i < result.length; i++) {
-      const current = result[i]
-      let mediaMensal = null
-      if (i < result.length - 1) {
-        const previous = result[i + 1]
+    // Calculate Media Mensal sequentially for Acertos if not provided by view
+    const acertosOnly = combined.filter((c) => !c.isAjuste)
+    for (let i = 0; i < acertosOnly.length; i++) {
+      const current = acertosOnly[i]
+      if (!current.mediaMensal && i < acertosOnly.length - 1) {
+        const previous = acertosOnly[i + 1]
         try {
-          const currentDateTime = `${current.data}T${current.hora || '00:00:00'}`
-          const prevDateTime = `${previous.data}T${previous.hora || '00:00:00'}`
-          const dateCurrent = new Date(currentDateTime)
-          const datePrev = new Date(prevDateTime)
-          const diffTime = Math.abs(dateCurrent.getTime() - datePrev.getTime())
+          const d1 = new Date(`${current.data}T${current.hora || '00:00:00'}`)
+          const d2 = new Date(`${previous.data}T${previous.hora || '00:00:00'}`)
+          const diffTime = Math.abs(d1.getTime() - d2.getTime())
           const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
           if (diffDays > 0) {
-            const factor = diffDays / 30
-            mediaMensal = current.valorVendaTotal / factor
+            current.mediaMensal = current.valorVendaTotal / (diffDays / 30)
           }
         } catch (e) {
-          console.warn('Error calculating monthly average for row', i, e)
+          // ignore
         }
       }
-      result[i].mediaMensal = mediaMensal
     }
-    return result
+
+    return combined
   },
 
   async getHistoryForPdf(clienteId: number) {
