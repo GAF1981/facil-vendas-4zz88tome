@@ -1,6 +1,6 @@
 {
   "_versions": {
-    "generate-pdf": 99,
+    "generate-pdf": 100,
     "auto-finalize-rota": 2,
     "send-route-report": 14
   }

@@ -13,6 +13,7 @@ import { AcertoHistoryTable } from '@/components/acerto/AcertoHistoryTable'
 import { ProductSelector } from '@/components/acerto/ProductSelector'
 import { ZeroStockAlert } from '@/components/acerto/ZeroStockAlert'
 import { KitSelectorDialog } from '@/components/acerto/KitSelectorDialog'
+import { ClientDebtSelectorDialog } from '@/components/acerto/ClientDebtSelectorDialog'
 import { ClientRow } from '@/types/client'
 import { Employee } from '@/types/employee'
 import { AcertoItem, PendingStockAdjustment } from '@/types/acerto'
@@ -42,6 +43,7 @@ import {
   Copy,
   ArrowRight,
   RefreshCw,
+  Banknote,
 } from 'lucide-react'
 import { parseCurrency } from '@/lib/formatters'
 import { fechamentoService } from '@/services/fechamentoService'
@@ -65,6 +67,7 @@ export default function AcertoPage() {
   const [signatureOpen, setSignatureOpen] = useState(false)
   const [zeroStockDialogOpen, setZeroStockDialogOpen] = useState(false)
   const [isCaptacao, setIsCaptacao] = useState(false)
+  const [collectionDialogOpen, setCollectionDialogOpen] = useState(false)
 
   // Default to 80mm as per user story requirement for thermal printer optimization
   const [pdfFormat, setPdfFormat] = useState<'A4' | '80mm'>('80mm')
@@ -902,7 +905,7 @@ export default function AcertoPage() {
               title="Copiar Saldo Inicial para Saldo Final em todos os itens"
             >
               <RefreshCw className="mr-2 h-4 w-4" />
-              Repetir saldo inicial no saldo final
+              Repetir Saldo Inicial no Saldo Final
             </Button>
             <Button
               variant="outline"
@@ -914,6 +917,15 @@ export default function AcertoPage() {
             </Button>
             <KitSelectorDialog onSelect={handleAddKit} />
             <ProductSelector onSelect={handleAddProducts} />
+            <Button
+              variant="outline"
+              className="border-blue-200 text-blue-700 hover:bg-blue-50"
+              onClick={() => setCollectionDialogOpen(true)}
+              title="Registrar Ação de Cobrança para este cliente"
+            >
+              <Banknote className="mr-2 h-4 w-4" />
+              Registrar Ação de Cobrança
+            </Button>
           </div>
 
           <AcertoTable
@@ -1026,6 +1038,15 @@ export default function AcertoPage() {
         onConfirm={handleZeroStockConfirm}
         onCancel={() => setZeroStockDialogOpen(false)}
       />
+
+      {client && (
+        <ClientDebtSelectorDialog
+          open={collectionDialogOpen}
+          onOpenChange={setCollectionDialogOpen}
+          clientId={client.CODIGO}
+          clientName={client['NOME CLIENTE'] || ''}
+        />
+      )}
     </div>
   )
 }

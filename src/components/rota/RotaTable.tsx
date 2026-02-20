@@ -188,7 +188,7 @@ export function RotaTable({
 
                   <SortableHeader
                     column="debito"
-                    label="Débito"
+                    label="Valor a Pagar"
                     align="right"
                     className="min-w-[100px]"
                   />

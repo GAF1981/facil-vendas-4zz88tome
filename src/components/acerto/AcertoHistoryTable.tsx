@@ -417,7 +417,10 @@ export function AcertoHistoryTable({
                     <TableHead className="text-right text-green-600 font-semibold bg-green-50/50">
                       Valor Pago
                     </TableHead>
-                    <TableHead className="text-right text-red-600 font-semibold">
+                    <TableHead
+                      className="text-right text-red-600 font-semibold"
+                      title="Valor Pendente (Saldo a Pagar - Valor Pago)"
+                    >
                       Débito
                     </TableHead>
                     <TableHead className="text-center w-[120px]">
