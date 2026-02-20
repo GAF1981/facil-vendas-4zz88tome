@@ -13,15 +13,16 @@ interface AcertoSalesSummaryProps {
 export function AcertoSalesSummary({ items, client }: AcertoSalesSummaryProps) {
   const totalVendido = items.reduce((acc, item) => acc + item.valorVendido, 0)
 
-  // Calculate Discount
   const descontoStr = client?.Desconto || '0'
-  const descontoVal = parseCurrency(descontoStr.replace('%', ''))
-  // Heuristic: if value > 1, assume it's a percentage number (e.g. 20 -> 20%), so divide by 100.
-  // If value <= 1, assume it's a factor (e.g. 0.2 -> 20%).
-  // This matches the logic in bancoDeDadosService
-  const discountFactor = descontoVal > 1 ? descontoVal / 100 : descontoVal
+  let valorDesconto = 0
 
-  const valorDesconto = totalVendido * discountFactor
+  if (descontoStr.includes('%')) {
+    const pct = parseCurrency(descontoStr.replace('%', ''))
+    valorDesconto = totalVendido * (pct / 100)
+  } else {
+    valorDesconto = parseCurrency(descontoStr)
+  }
+
   const valorAcerto = totalVendido - valorDesconto
 
   return (
@@ -46,11 +47,9 @@ export function AcertoSalesSummary({ items, client }: AcertoSalesSummaryProps) {
           <div className="flex justify-between items-center p-2 bg-white dark:bg-card rounded border shadow-sm h-8">
             <span className="text-[10px] text-muted-foreground font-medium flex items-center gap-1">
               <Percent className="h-3 w-3" /> Desconto
-              {descontoVal > 0 && (
+              {descontoStr.includes('%') && (
                 <span className="text-[9px] ml-1 bg-red-100 text-red-700 px-1 rounded-full">
-                  {descontoStr.includes('%')
-                    ? descontoStr
-                    : `${(discountFactor * 100).toFixed(0)}%`}
+                  {descontoStr}
                 </span>
               )}
             </span>

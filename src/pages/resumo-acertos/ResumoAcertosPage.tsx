@@ -53,11 +53,9 @@ export default function ResumoAcertosPage() {
   const [selectedRouteId, setSelectedRouteId] = useState<string>('')
   const [data, setData] = useState<SettlementSummary[]>([])
 
-  // Employee Filter
   const [employees, setEmployees] = useState<Employee[]>([])
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('todos')
 
-  // Reprint State
   const [reprintingId, setReprintingId] = useState<number | null>(null)
 
   const { toast } = useToast()
@@ -114,7 +112,6 @@ export default function ResumoAcertosPage() {
     [routes, toast],
   )
 
-  // Realtime Subscription
   useEffect(() => {
     if (!selectedRouteId) return
 
@@ -138,7 +135,6 @@ export default function ResumoAcertosPage() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'ROTA' },
         () => {
-          // If rota status changes, we might need to refresh route list and data
           fetchRoutes().then(() => fetchData(selectedRouteId, true))
         },
       )
@@ -149,20 +145,17 @@ export default function ResumoAcertosPage() {
     }
   }, [selectedRouteId, fetchData])
 
-  // Initial Load
   useEffect(() => {
     fetchRoutes()
     fetchEmployees()
   }, [])
 
-  // Auto-filter based on logged in user
   useEffect(() => {
     if (loggedInUser && selectedEmployeeId === 'todos') {
       setSelectedEmployeeId(loggedInUser.id.toString())
     }
   }, [loggedInUser])
 
-  // Fetch data when selection changes
   useEffect(() => {
     if (selectedRouteId && routes.length > 0) {
       fetchData(selectedRouteId)
@@ -172,11 +165,10 @@ export default function ResumoAcertosPage() {
   const handleReprint = async (orderId: number) => {
     setReprintingId(orderId)
     try {
-      // Use acertoService.reprintOrder to ensure uniformity with Acerto Page logic
       const pdfBlob = await acertoService.reprintOrder(
         orderId,
         loggedInUser?.nome_completo,
-        '80mm', // Force 80mm as per requirement
+        '80mm',
       )
 
       const url = window.URL.createObjectURL(pdfBlob)
@@ -205,7 +197,6 @@ export default function ResumoAcertosPage() {
     }
   }
 
-  // Filter Data Client-Side
   const filteredData = useMemo(() => {
     if (selectedEmployeeId === 'todos') return data
     return data.filter(
@@ -215,7 +206,6 @@ export default function ResumoAcertosPage() {
 
   const selectedRoute = routes.find((r) => r.id.toString() === selectedRouteId)
 
-  // Financial Totals (Based on filtered data)
   const totalVendas = filteredData.reduce(
     (acc, curr) => acc + curr.totalSalesValue,
     0,
@@ -259,7 +249,6 @@ export default function ResumoAcertosPage() {
         </div>
       </div>
 
-      {/* Header & Selectors */}
       <Card className="border-l-4 border-l-blue-600 bg-blue-50/20">
         <CardHeader className="pb-2">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -402,7 +391,7 @@ export default function ResumoAcertosPage() {
         <Card className="bg-card border-purple-200 bg-purple-50/30">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-purple-700">
-              Total de Acertos
+              Total de Acertos Realizados
             </CardTitle>
             <FileText className="h-4 w-4 text-purple-600" />
           </CardHeader>

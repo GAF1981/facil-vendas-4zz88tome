@@ -186,7 +186,6 @@ export const bancoDeDadosService = {
       })
       .filter((i) => i !== null) as AcertoItem[]
 
-    // Sort items alphabetically by product name
     items.sort((a, b) => a.produtoNome.localeCompare(b.produtoNome))
 
     return { items, nextId: 0 }
@@ -223,7 +222,6 @@ export const bancoDeDadosService = {
   },
 
   async getAcertoHistory(clienteId: number) {
-    // 1. Fetch from debitos_historico for consolidated orders
     const { data: debitosData, error: debitosError } = await supabase
       .from('debitos_historico')
       .select('*')
@@ -234,7 +232,6 @@ export const bancoDeDadosService = {
 
     if (debitosError) throw debitosError
 
-    // 2. Fetch from AJUSTE_SALDO_INICIAL for stock load aggregations
     const { data: ajustesData, error: ajustesError } = await supabase
       .from('AJUSTE_SALDO_INICIAL')
       .select('*')
@@ -250,7 +247,6 @@ export const bancoDeDadosService = {
     const collectionCountsMap = new Map<number, number>()
 
     if (orderIds.length > 0) {
-      // Fetch Receipts details
       const { data: paymentsData } = await supabase
         .from('RECEBIMENTOS')
         .select(
@@ -279,7 +275,6 @@ export const bancoDeDadosService = {
         paymentsMap.set(p.venda_id, existing)
       })
 
-      // Fetch Collection Action Counts
       const { data: actionsData } = await supabase
         .from('acoes_cobranca')
         .select('pedido_id')
@@ -295,7 +290,6 @@ export const bancoDeDadosService = {
       })
     }
 
-    // 3. Map Debitos
     const debitosEntries = (debitosData || []).map((row) => {
       const paymentInfo = paymentsMap.get(row.pedido_id)
       let dataStr = ''
@@ -330,11 +324,11 @@ export const bancoDeDadosService = {
         paymentDetails: paymentInfo ? paymentInfo.details : [],
         collectionActionCount: collectionCountsMap.get(row.pedido_id) || 0,
         mediaMensal: row.media_mensal || null,
+        cliente_nome: row.cliente_nome,
         isAjuste: false,
       }
     })
 
-    // 4. Map Ajustes (Aggregated)
     const ajustesMap = new Map<string, any>()
     ;(ajustesData || []).forEach((row) => {
       const key = row.numero_pedido
@@ -357,6 +351,7 @@ export const bancoDeDadosService = {
           valorPago: 0,
           debito: 0,
           mediaMensal: null,
+          cliente_nome: row.cliente_nome,
           isAjuste: true,
           quantidadeAlterada: 0,
         })
@@ -366,14 +361,12 @@ export const bancoDeDadosService = {
 
     const ajustesEntries = Array.from(ajustesMap.values())
 
-    // 5. Combine and Sort
     const combined = [...debitosEntries, ...ajustesEntries].sort((a, b) => {
       const dtA = new Date(`${a.data}T${a.hora || '00:00:00'}`).getTime()
       const dtB = new Date(`${b.data}T${b.hora || '00:00:00'}`).getTime()
       return dtB - dtA
     })
 
-    // Calculate Media Mensal sequentially for Acertos if not provided by view
     const acertosOnly = combined.filter((c) => !c.isAjuste)
     for (let i = 0; i < acertosOnly.length; i++) {
       const current = acertosOnly[i]
@@ -407,7 +400,6 @@ export const bancoDeDadosService = {
 
     if (debitosError) throw debitosError
 
-    // Fetch initial stock adjustments
     const { data: ajustesData, error: ajustesError } = await supabase
       .from('AJUSTE_SALDO_INICIAL')
       .select('*')
@@ -445,12 +437,11 @@ export const bancoDeDadosService = {
 
     const ajustesEntries = Array.from(ajustesEntriesMap.values())
 
-    // Transform initial data
     const debitosEntries = debitosData.map((row) => ({
       type: 'ACERTO',
       id: row.pedido_id,
       data: row.data_acerto,
-      hora: '00:00:00', // View might not have time, default
+      hora: '00:00:00',
       vendedor: row.vendedor_nome || '-',
       valorVendaTotal: row.valor_venda || 0,
       saldoAPagar: row.saldo_a_pagar || 0,
@@ -468,11 +459,9 @@ export const bancoDeDadosService = {
 
     const acertoEntries = combined.filter((e) => e.type === 'ACERTO')
 
-    // Iterate to calculate Media Mensal using same logic as UI
     const result = combined.map((row) => {
       let mediaMensal = row.mediaMensal || 0
 
-      // Only calculate if view didn't provide it
       if (row.type === 'ACERTO' && !mediaMensal) {
         const indexInAcertos = acertoEntries.findIndex((e) => e.id === row.id)
         if (indexInAcertos >= 0 && indexInAcertos < acertoEntries.length - 1) {
@@ -509,7 +498,7 @@ export const bancoDeDadosService = {
       }
     })
 
-    return result.slice(0, 10) // Return top 10 for PDF
+    return result.slice(0, 10)
   },
 
   async getOrderDetails(orderId: number) {
@@ -587,6 +576,21 @@ export const bancoDeDadosService = {
       priceMap.set(p.ID, parseCurrency(p.PREÇO))
     })
 
+    const totalSalesAll = items.reduce(
+      (acc, i) =>
+        acc + (priceMap.get(i.produtoId) || i.precoUnitario) * i.quantVendida,
+      0,
+    )
+
+    const descontoStr = client.Desconto || '0'
+    let discountFactor = 0
+    if (descontoStr.includes('%')) {
+      discountFactor = parseCurrency(descontoStr.replace('%', '')) / 100
+    } else {
+      const flat = parseCurrency(descontoStr)
+      discountFactor = totalSalesAll > 0 ? flat / totalSalesAll : 0
+    }
+
     const paymentString = payments
       .map(
         (p) =>
@@ -622,9 +626,6 @@ export const bancoDeDadosService = {
         recolhidoVal = Math.abs(diff)
       }
 
-      const descontoStr = client.Desconto || '0'
-      const descontoVal = parseCurrency(descontoStr.replace('%', ''))
-      const discountFactor = descontoVal > 1 ? descontoVal / 100 : descontoVal
       const valorConsignadoVendaVal = saldoFinal * currentPrice
       const valorConsignadoCustoVal =
         valorConsignadoVendaVal - valorConsignadoVendaVal * discountFactor

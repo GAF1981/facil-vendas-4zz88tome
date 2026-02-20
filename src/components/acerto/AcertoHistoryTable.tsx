@@ -1,12 +1,4 @@
 import { useEffect, useState } from 'react'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Dialog,
@@ -31,13 +23,21 @@ import {
   FileText,
   RotateCcw,
   Banknote,
-  User,
   Calendar,
+  User,
   Plus,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useUserStore } from '@/stores/useUserStore'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -61,6 +61,7 @@ export interface HistoryRow {
   valorPago: number
   debito: number
   mediaMensal: number | null
+  desconto?: number
   methods?: string
   paymentDetails?: {
     id: number
@@ -89,7 +90,6 @@ interface AcertoHistoryTableProps {
 
 export function AcertoHistoryTable({
   clientId,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   monthlyAverage,
   hideHeader = false,
   className,
@@ -102,7 +102,6 @@ export function AcertoHistoryTable({
   const [printingId, setPrintingId] = useState<number | null>(null)
   const { toast } = useToast()
 
-  // State for Payment Details Modal
   const [selectedPaymentDetails, setSelectedPaymentDetails] = useState<
     | {
         id: number
@@ -118,7 +117,6 @@ export function AcertoHistoryTable({
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [selectedOrderRef, setSelectedOrderRef] = useState<number | null>(null)
 
-  // State for Collection Actions Details Modal
   const [collectionActionsOpen, setCollectionActionsOpen] = useState(false)
   const [selectedCollectionActions, setSelectedCollectionActions] = useState<
     CollectionAction[]
@@ -129,7 +127,6 @@ export function AcertoHistoryTable({
     number | null
   >(null)
 
-  // Add Action Form State
   const [showAddActionForm, setShowAddActionForm] = useState(false)
   const [newAction, setNewAction] = useState({
     acao: '',
@@ -139,7 +136,6 @@ export function AcertoHistoryTable({
   })
   const [submittingAction, setSubmittingAction] = useState(false)
 
-  // Reversal State
   const [reversing, setReversing] = useState(false)
   const [reverseConfirmOpen, setReverseConfirmOpen] = useState(false)
   const [paymentToReverse, setPaymentToReverse] = useState<{
@@ -183,7 +179,7 @@ export function AcertoHistoryTable({
     setSelectedCollectionActions([])
     setSelectedOrderIdForActions(orderId)
     setCollectionActionsOpen(true)
-    setShowAddActionForm(false) // Reset form state
+    setShowAddActionForm(false)
     try {
       const actions = await cobrancaService.getCollectionActions(
         orderId.toString(),
@@ -223,7 +219,6 @@ export function AcertoHistoryTable({
 
     setSubmittingAction(true)
     try {
-      // Find client name from history
       const order = history.find((h) => h.id === selectedOrderIdForActions)
       const clientName = order?.cliente_nome || 'Cliente'
 
@@ -248,7 +243,6 @@ export function AcertoHistoryTable({
         className: 'bg-green-600 text-white',
       })
 
-      // Refresh list
       const actions = await cobrancaService.getCollectionActions(
         selectedOrderIdForActions.toString(),
       )
@@ -260,7 +254,6 @@ export function AcertoHistoryTable({
         motivo: '',
         novaDataCombinada: '',
       })
-      // Refresh history to update count bubble if needed
       if (!externalData) {
         loadHistory()
       }
@@ -282,7 +275,7 @@ export function AcertoHistoryTable({
       const pdfBlob = await acertoService.reprintOrder(
         order.id,
         loggedInUser?.nome_completo,
-        '80mm', // Always 80mm for receipt as per User Story
+        '80mm',
       )
       downloadPdf(pdfBlob, `Recibo_Pedido_${order.id}`)
     } catch (err) {
@@ -339,7 +332,7 @@ export function AcertoHistoryTable({
       setDetailsOpen(false)
       setReverseConfirmOpen(false)
       setPaymentToReverse(null)
-      loadHistory() // Refresh history to show updated values
+      loadHistory()
     } catch (error) {
       console.error(error)
       toast({
@@ -352,7 +345,6 @@ export function AcertoHistoryTable({
     }
   }
 
-  // Permission Check
   const canReverse =
     loggedInUser &&
     (Array.isArray(loggedInUser.setor)
@@ -401,194 +393,112 @@ export function AcertoHistoryTable({
               <p>Erro ao carregar o histórico de acertos.</p>
             </div>
           ) : (
-            <div className="rounded-md border overflow-hidden">
-              <Table>
-                <TableHeader className="bg-muted/50">
-                  <TableRow>
-                    <TableHead className="w-[80px]">Pedido</TableHead>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Vendedor</TableHead>
-                    <TableHead className="text-right text-blue-600 font-bold">
-                      Média Mensal
-                    </TableHead>
-                    <TableHead className="text-right">Valor da Venda</TableHead>
-                    <TableHead className="text-right text-blue-600 font-semibold bg-blue-50/50">
-                      Saldo a Pagar
-                    </TableHead>
-                    <TableHead className="text-right text-green-600 font-semibold bg-green-50/50">
-                      Valor Pago
-                    </TableHead>
-                    <TableHead
-                      className="text-right text-red-600 font-semibold"
-                      title="Valor Pendente (Saldo a Pagar - Valor Pago)"
-                    >
-                      Débito
-                    </TableHead>
-                    <TableHead className="text-center w-[120px]">
-                      Ações
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {history.length === 0 ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={9}
-                        className="h-24 text-center text-muted-foreground"
+            <div className="space-y-4">
+              {history.length === 0 ? (
+                <div className="text-center text-muted-foreground p-8 border rounded-md bg-muted/10">
+                  Nenhum histórico encontrado para este cliente.
+                </div>
+              ) : (
+                history.map((row) => {
+                  if (row.isAjuste) {
+                    return (
+                      <div
+                        key={`ajuste-${row.id}`}
+                        className="border rounded-md p-4 bg-muted/10 flex flex-col"
                       >
-                        Nenhum histórico encontrado para este cliente.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    history.map((row) => {
-                      if (row.isAjuste) {
-                        return (
-                          <TableRow
-                            key={`ajuste-${row.id}`}
-                            className="hover:bg-muted/30 bg-muted/10"
+                        <div className="font-bold text-sm mb-1 text-foreground">
+                          {row.data
+                            ? format(parseISO(row.data), 'dd/MM/yyyy', {
+                                locale: ptBR,
+                              })
+                            : '-'}{' '}
+                          #{row.id} {row.cliente_nome || ''}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          Ajuste de Estoque / Captação Inicial (Qtd Alterada:{' '}
+                          <span className="font-bold text-foreground">
+                            {row.quantidadeAlterada}
+                          </span>
+                          )
+                        </div>
+                      </div>
+                    )
+                  }
+
+                  return (
+                    <div
+                      key={row.id}
+                      className="border rounded-md p-4 bg-card hover:bg-muted/30 transition-colors shadow-sm"
+                    >
+                      <div className="flex justify-between items-start mb-3 border-b pb-2">
+                        <div className="font-bold text-sm text-foreground">
+                          {row.data
+                            ? format(parseISO(row.data), 'dd/MM/yyyy', {
+                                locale: ptBR,
+                              })
+                            : '-'}{' '}
+                          #{row.id} {row.cliente_nome || ''}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                            onClick={() => handleShowCollectionActions(row.id)}
+                            title="Ações de Cobrança"
                           >
-                            <TableCell className="font-mono font-medium text-xs text-muted-foreground">
-                              #{row.id}
-                            </TableCell>
-                            <TableCell className="font-medium">
-                              <div className="flex flex-col">
-                                <span>
-                                  {row.data
-                                    ? format(parseISO(row.data), 'dd/MM/yyyy', {
-                                        locale: ptBR,
-                                      })
-                                    : '-'}
-                                </span>
-                              </div>
-                            </TableCell>
-                            <TableCell>{row.vendedor || '-'}</TableCell>
-                            <TableCell
-                              colSpan={5}
-                              className="text-center text-muted-foreground italic text-sm py-4"
-                            >
-                              Ajuste de Estoque / Captação Inicial (Qtd
-                              Alterada:{' '}
-                              <span className="font-bold">
-                                {row.quantidadeAlterada}
-                              </span>
-                              )
-                            </TableCell>
-                            <TableCell className="text-center">-</TableCell>
-                          </TableRow>
-                        )
-                      }
-
-                      const saldoAPagarDisplay = row.saldoAPagar
-
-                      return (
-                        <TableRow key={row.id} className="hover:bg-muted/30">
-                          <TableCell className="font-mono font-medium text-xs text-muted-foreground">
-                            #{row.id}
-                          </TableCell>
-                          <TableCell className="font-medium">
-                            <div className="flex flex-col">
-                              <span>
-                                {row.data
-                                  ? format(parseISO(row.data), 'dd/MM/yyyy', {
-                                      locale: ptBR,
-                                    })
-                                  : '-'}
-                              </span>
-                              <span className="text-xs text-muted-foreground">
-                                {row.hora
-                                  ? row.hora.split(':').slice(0, 2).join(':')
-                                  : ''}
-                              </span>
-                            </div>
-                          </TableCell>
-                          <TableCell>{row.vendedor || '-'}</TableCell>
-                          <TableCell className="text-right font-mono font-bold text-blue-600">
-                            {row.mediaMensal !== null
-                              ? `R$ ${formatCurrency(row.mediaMensal)}`
-                              : '-'}
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                            R$ {formatCurrency(row.valorVendaTotal)}
-                          </TableCell>
-                          <TableCell className="text-right font-mono font-medium text-blue-600 bg-blue-50/30">
-                            R$ {formatCurrency(saldoAPagarDisplay)}
-                          </TableCell>
-                          <TableCell className="text-right font-mono font-medium text-green-600 bg-green-50/30 p-2">
-                            <div className="flex items-center justify-end gap-2">
-                              <span>R$ {formatCurrency(row.valorPago)}</span>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 text-green-700 hover:text-green-800 hover:bg-green-200"
-                                onClick={() => handleShowDetails(row)}
-                                title="Ver detalhes"
-                              >
-                                <Search className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                          <TableCell
-                            className={cn(
-                              'text-right font-mono font-medium',
-                              row.debito > 0.01
-                                ? 'text-red-600'
-                                : row.debito < -0.01
-                                  ? 'text-green-600'
-                                  : 'text-gray-400',
+                            <Banknote className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-primary"
+                            onClick={() => handleShowDetails(row)}
+                            title="Ver Detalhes"
+                          >
+                            <Search className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
+                            onClick={() => handleReprintOrder(row)}
+                            disabled={printingId === row.id}
+                            title="Imprimir Recibo"
+                          >
+                            {printingId === row.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <FileText className="h-4 w-4" />
                             )}
-                          >
-                            R$ {formatCurrency(row.debito)}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <div className="flex justify-center gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 relative"
-                                onClick={() =>
-                                  handleShowCollectionActions(row.id)
-                                }
-                                title="Ações de Cobrança"
-                              >
-                                <Banknote className="h-4 w-4 text-muted-foreground hover:text-primary" />
-                                {row.collectionActionCount !== undefined &&
-                                  row.collectionActionCount > 0 && (
-                                    <span className="absolute -top-1.5 -right-1 text-[10px] font-bold text-red-500 bg-red-100 rounded-full px-1 min-w-[14px] h-[14px] flex items-center justify-center border border-red-200">
-                                      {row.collectionActionCount}
-                                    </span>
-                                  )}
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => handleShowDetails(row)}
-                                title="Ver Detalhes"
-                              >
-                                <Search className="h-4 w-4 text-muted-foreground hover:text-primary" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => handleReprintOrder(row)}
-                                disabled={printingId === row.id}
-                                title="Gerar PDF"
-                              >
-                                {printingId === row.id ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <FileText className="h-4 w-4 text-green-600 hover:text-green-800" />
-                                )}
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })
-                  )}
-                </TableBody>
-              </Table>
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between text-sm text-muted-foreground">
+                          <span>
+                            Venda: R$ {formatCurrency(row.valorVendaTotal)}
+                          </span>
+                          <span>
+                            Desconto: R$ {formatCurrency(row.desconto || 0)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-sm text-muted-foreground">
+                          <span>Pago: R$ {formatCurrency(row.valorPago)}</span>
+                          <span className="font-bold text-foreground">
+                            A pagar (débito): R$ {formatCurrency(row.debito)}
+                          </span>
+                        </div>
+                        <div className="text-sm text-muted-foreground pt-1">
+                          Média Mensal: R${' '}
+                          {formatCurrency(row.mediaMensal || 0)}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })
+              )}
             </div>
           )}
         </CardContent>

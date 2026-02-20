@@ -55,12 +55,12 @@ export const acertoService = {
       {
         body: {
           ...data,
-          reportType: 'acerto', // Explicitly type as acerto for edge function routing
+          reportType: 'acerto',
           preview: options?.preview ?? false,
           signature: options?.signature ?? null,
           format: options?.format ?? '80mm',
         },
-        responseType: 'blob', // Important for file download
+        responseType: 'blob',
       } as any,
     )
 
@@ -96,7 +96,6 @@ export const acertoService = {
     )
   },
 
-  // Shared logic for generating document data structure from Order ID
   async generateDocument(
     orderId: number,
     acertoTipo: string,
@@ -143,19 +142,15 @@ export const acertoService = {
 
     const client = await clientsService.getById(clientId)
 
-    // Fetch last Acerto Date for this client
     const lastAcertoInfo = await bancoDeDadosService.getLastAcerto(clientId)
     const lastAcertoDate = lastAcertoInfo?.date || null
 
-    // Fetch History
     const history = await bancoDeDadosService.getHistoryForPdf(clientId)
-    const recentHistory = history.slice(0, 10) // Limit to 10 most recent
+    const recentHistory = history.slice(0, 10)
     const lastOrder = recentHistory.length > 0 ? recentHistory[0] : null
 
-    // Fetch Monthly Average for the PDF report
     const monthlyAverage = await bancoDeDadosService.getMonthlyAverage(clientId)
 
-    // Fetch Collection Actions (Installments)
     const collectionActions = await cobrancaService.getCollectionActions(
       orderId.toString(),
     )
@@ -174,25 +169,20 @@ export const acertoService = {
       saldoFinal: item['SALDO FINAL'] || 0,
     }))
 
-    // Sort items alphabetically for the PDF
     items.sort((a, b) =>
       (a.produtoNome || '').localeCompare(b.produtoNome || ''),
     )
 
-    // Construct detailed payments list from DB records
     const detailedPayments = dbPayments
       .map((p) => ({
         method: p.forma_pagamento as string,
         value: p.valor_pago || 0,
         paidValue: p.valor_pago || 0,
-        // Join with FUNCIONARIOS allows us to get name
         employee: (p as any).FUNCIONARIOS?.nome_completo || 'N/D',
         date: p.data_pagamento || p.created_at || '',
       }))
       .filter((p) => p.value > 0)
 
-    // Construct pending installments list
-    // Priority: collection actions -> standard DB payments (unpaid)
     let pendingInstallments: any[] = []
 
     if (collectionActions && collectionActions.length > 0) {
@@ -205,7 +195,6 @@ export const acertoService = {
           })) || [],
       )
     } else {
-      // Fallback to standard unpaid payments from DB
       pendingInstallments = dbPayments
         .filter((p) => (p.valor_pago || 0) < (p.valor_registrado || 0))
         .map((p) => ({
@@ -215,7 +204,6 @@ export const acertoService = {
         }))
     }
 
-    // Reconstruction of simple payments array for backward compatibility / logic
     const payments: any[] = dbPayments.map((p) => {
       return {
         method: p.forma_pagamento as any,
@@ -227,14 +215,17 @@ export const acertoService = {
     })
 
     const totalVendido = items.reduce((acc, i) => acc + i.valorVendido, 0)
-    const descontoVal = parseCurrency(descontoStr.replace('%', ''))
-    const discountFactor = descontoVal > 1 ? descontoVal / 100 : descontoVal
-    const valorDesconto = totalVendido * discountFactor
+    let valorDesconto = 0
+    if (descontoStr.includes('%')) {
+      const pct = parseCurrency(descontoStr.replace('%', ''))
+      valorDesconto = totalVendido * (pct / 100)
+    } else {
+      valorDesconto = parseCurrency(descontoStr)
+    }
     const valorAcerto = totalVendido - valorDesconto
     const valorPago = payments.reduce((acc, p) => acc + p.paidValue, 0)
     const debito = Math.max(0, valorAcerto - valorPago)
 
-    // New Metrics for Summary
     const totalItemsSold = items.reduce(
       (acc, i) => acc + (i.quantVendida > 0 ? 1 : 0),
       0,
@@ -256,17 +247,17 @@ export const acertoService = {
       valorAcerto,
       valorPago,
       debito,
-      payments, // kept for compatibility
-      detailedPayments, // New detailed structure
-      pendingInstallments, // New detailed structure
-      installments: pendingInstallments, // Mapped for thermal print consistency
+      payments,
+      detailedPayments,
+      pendingInstallments,
+      installments: pendingInstallments,
       orderNumber: orderId,
       preview: false,
       signature: null,
       isReceipt,
       issuerName,
       lastOrder: lastOrder ? { id: lastOrder.id, date: lastOrder.data } : null,
-      history: recentHistory, // Pass history to PDF
+      history: recentHistory,
       monthlyAverage,
       totalItemsSold,
       totalQuantitySold,
@@ -281,7 +272,6 @@ export const acertoService = {
     userId: number,
     userName: string,
   ) {
-    // 1. Update RECEBIMENTOS to set valor_pago = 0
     const { error: updateError } = await supabase
       .from('RECEBIMENTOS')
       .update({ valor_pago: 0 })
@@ -289,7 +279,6 @@ export const acertoService = {
 
     if (updateError) throw updateError
 
-    // 2. Log action to system_logs
     const { error: logError } = await supabase.from('system_logs').insert({
       type: 'PAYMENT_REVERSAL',
       description: `Estorno de pagamento (ID: ${paymentId}) do pedido #${orderId}`,
@@ -300,7 +289,6 @@ export const acertoService = {
 
     if (logError) console.error('Error logging reversal:', logError)
 
-    // 3. Update debt history to reflect the change
     const { error: rpcError } = await supabase.rpc(
       'update_debito_historico_order',
       {
