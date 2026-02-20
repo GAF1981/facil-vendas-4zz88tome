@@ -1765,6 +1765,35 @@ export type Database = {
         }
         Relationships: []
       }
+      metas_funcionarios: {
+        Row: {
+          created_at: string
+          funcionario_id: number
+          id: number
+          meta_diaria: number
+        }
+        Insert: {
+          created_at?: string
+          funcionario_id: number
+          id?: number
+          meta_diaria?: number
+        }
+        Update: {
+          created_at?: string
+          funcionario_id?: number
+          id?: number
+          meta_diaria?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "metas_funcionarios_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: true
+            referencedRelation: "FUNCIONARIOS"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       NOTA_FISCAL: {
         Row: {
           cliente_id: number
@@ -2951,6 +2980,10 @@ export const Constants = {
 //   FOREIGN KEY kit_items_produto_id_fkey: FOREIGN KEY (produto_id) REFERENCES "PRODUTOS"("ID") ON DELETE CASCADE
 // Table: kits
 //   PRIMARY KEY kits_pkey: PRIMARY KEY (id)
+// Table: metas_funcionarios
+//   FOREIGN KEY metas_funcionarios_funcionario_id_fkey: FOREIGN KEY (funcionario_id) REFERENCES "FUNCIONARIOS"(id) ON DELETE CASCADE
+//   UNIQUE metas_funcionarios_funcionario_id_key: UNIQUE (funcionario_id)
+//   PRIMARY KEY metas_funcionarios_pkey: PRIMARY KEY (id)
 // Table: notas_fiscais_emitidas
 //   PRIMARY KEY notas_fiscais_emitidas_pkey: PRIMARY KEY (id)
 // Table: permissoes
@@ -3055,6 +3088,10 @@ export const Constants = {
 //     WITH CHECK: true
 //   Policy "Allow read access for authenticated users" (SELECT, PERMISSIVE) roles={authenticated}
 //     USING: true
+// Table: metas_funcionarios
+//   Policy "Enable all access for authenticated users" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: true
+//     WITH CHECK: true
 // Table: rota_motoqueiro_km
 //   Policy "Enable delete for authenticated users" (DELETE, PERMISSIVE) roles={public}
 //     USING: (auth.role() = 'authenticated'::text)
@@ -4472,6 +4509,8 @@ export const Constants = {
 //   CREATE INDEX idx_inativar_clientes_cliente_codigo ON public.inativar_clientes USING btree (cliente_codigo)
 //   CREATE INDEX idx_inativar_clientes_created_at ON public.inativar_clientes USING btree (created_at)
 //   CREATE INDEX idx_inativar_clientes_status ON public.inativar_clientes USING btree (status)
+// Table: metas_funcionarios
+//   CREATE UNIQUE INDEX metas_funcionarios_funcionario_id_key ON public.metas_funcionarios USING btree (funcionario_id)
 // Table: permissoes
 //   CREATE UNIQUE INDEX permissoes_setor_modulo_key ON public.permissoes USING btree (setor, modulo)
 // Table: sessoes_inventario

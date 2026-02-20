@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase/client'
-import { parseCurrency } from '@/lib/formatters'
+import { formatCurrency, parseCurrency } from '@/lib/formatters'
 import { parseISO, isAfter, isBefore, isEqual } from 'date-fns'
 import { Rota } from '@/types/rota'
 
@@ -89,6 +89,74 @@ export const resumoAcertosService = {
     if (startError) throw startError
 
     return newRota as Rota
+  },
+
+  async updateOrderPaymentTerms(
+    orderId: number,
+    newInstallments: { method: string; value: number; dueDate: string }[],
+  ) {
+    const { data: orderData, error: orderError } = await supabase
+      .from('BANCO_DE_DADOS')
+      .select('"CÓDIGO DO CLIENTE", "CODIGO FUNCIONARIO"')
+      .eq('"NÚMERO DO PEDIDO"', orderId)
+      .limit(1)
+      .maybeSingle()
+
+    if (orderError) throw orderError
+    if (!orderData) throw new Error('Pedido não encontrado no banco de dados.')
+
+    const clientId = orderData['CÓDIGO DO CLIENTE']
+    const employeeId = orderData['CODIGO FUNCIONARIO']
+
+    const { error: deleteError } = await supabase
+      .from('RECEBIMENTOS')
+      .delete()
+      .eq('venda_id', orderId)
+
+    if (deleteError) throw deleteError
+
+    const { data: activeRouteData } = await supabase
+      .from('ROTA')
+      .select('id')
+      .is('data_fim', null)
+      .order('data_inicio', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const activeRouteId = activeRouteData?.id || null
+
+    const inserts = newInstallments.map((inst) => ({
+      venda_id: orderId,
+      cliente_id: clientId,
+      funcionario_id: employeeId,
+      forma_pagamento: inst.method,
+      valor_registrado: inst.value,
+      valor_pago: 0,
+      vencimento: new Date(`${inst.dueDate}T12:00:00`).toISOString(),
+      ID_da_fêmea: orderId,
+      rota_id: activeRouteId,
+    }))
+
+    const { error: insertError } = await supabase
+      .from('RECEBIMENTOS')
+      .insert(inserts)
+
+    if (insertError) throw insertError
+
+    const paymentString = newInstallments
+      .map((p) => `${p.method} Reg: R$ ${formatCurrency(p.value)}`)
+      .join(' | ')
+
+    await supabase
+      .from('BANCO_DE_DADOS')
+      .update({ FORMA: paymentString } as any)
+      .eq('"NÚMERO DO PEDIDO"', orderId)
+
+    const { error: rpcError } = await supabase.rpc(
+      'update_debito_historico_order',
+      { p_pedido_id: orderId },
+    )
+    if (rpcError) throw rpcError
   },
 
   async getSettlements(rota: Rota) {

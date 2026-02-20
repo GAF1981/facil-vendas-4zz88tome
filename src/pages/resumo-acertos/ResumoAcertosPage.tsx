@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table,
@@ -35,6 +35,7 @@ import {
   User,
   FileText,
   Printer,
+  Edit3,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { Link } from 'react-router-dom'
@@ -45,6 +46,7 @@ import { useUserStore } from '@/stores/useUserStore'
 import { supabase } from '@/lib/supabase/client'
 import { acertoService } from '@/services/acertoService'
 import { format } from 'date-fns'
+import { EditPaymentDialog } from '@/components/resumo-acertos/EditPaymentDialog'
 
 export default function ResumoAcertosPage() {
   const { employee: loggedInUser } = useUserStore()
@@ -57,6 +59,8 @@ export default function ResumoAcertosPage() {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('todos')
 
   const [reprintingId, setReprintingId] = useState<number | null>(null)
+  const [editingPaymentOrder, setEditingPaymentOrder] =
+    useState<SettlementSummary | null>(null)
 
   const { toast } = useToast()
 
@@ -428,7 +432,7 @@ export default function ResumoAcertosPage() {
                   <TableHead>Pagto (BD)</TableHead>
                   <TableHead>Pagto (Receb.)</TableHead>
                   <TableHead className="text-right">Valor Pago</TableHead>
-                  <TableHead className="text-center w-[60px]">PDF</TableHead>
+                  <TableHead className="text-center w-[100px]">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -509,20 +513,31 @@ export default function ResumoAcertosPage() {
                         R$ {formatCurrency(row.totalPaid)}
                       </TableCell>
                       <TableCell className="text-center">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-primary"
-                          onClick={() => handleReprint(row.orderId)}
-                          disabled={reprintingId === row.orderId}
-                          title="Reimprimir Pedido (80mm)"
-                        >
-                          {reprintingId === row.orderId ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Printer className="h-4 w-4" />
-                          )}
-                        </Button>
+                        <div className="flex items-center justify-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-blue-600"
+                            onClick={() => setEditingPaymentOrder(row)}
+                            title="Editar Pagamento"
+                          >
+                            <Edit3 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-primary"
+                            onClick={() => handleReprint(row.orderId)}
+                            disabled={reprintingId === row.orderId}
+                            title="Reimprimir Pedido (80mm)"
+                          >
+                            {reprintingId === row.orderId ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Printer className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -532,6 +547,15 @@ export default function ResumoAcertosPage() {
           </div>
         </CardContent>
       </Card>
+
+      {editingPaymentOrder && (
+        <EditPaymentDialog
+          open={!!editingPaymentOrder}
+          onOpenChange={(open) => !open && setEditingPaymentOrder(null)}
+          order={editingPaymentOrder}
+          onSuccess={() => fetchData(selectedRouteId)}
+        />
+      )}
     </div>
   )
 }
