@@ -1,3 +1,25 @@
+-- Fix parse_currency_sql to avoid breaking types.ts generation with newlines
+CREATE OR REPLACE FUNCTION public.parse_currency_sql(val_str text)
+ RETURNS numeric
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+    IF val_str IS NULL OR TRIM(val_str) = '' THEN
+        RETURN 0;
+    END IF;
+    val_str := REGEXP_REPLACE(val_str, '[^0-9.,-]', '', 'g');
+    IF val_str ~ '^[0-9.]+,[0-9]+$' THEN
+        RETURN CAST(REPLACE(REPLACE(val_str, '.', ''), ',', '.') AS NUMERIC);
+    ELSIF val_str ~ '^[0-9,]+$' THEN
+        RETURN CAST(REPLACE(val_str, ',', '.') AS NUMERIC);
+    ELSE
+        RETURN CAST(val_str AS NUMERIC);
+    END IF;
+EXCEPTION WHEN OTHERS THEN
+    RETURN 0;
+END;
+$function$;
+
 -- Re-create the function to forcefully apply the exact (Sale - Discount) - Paid logic
 CREATE OR REPLACE FUNCTION public.update_debito_historico_order(p_pedido_id bigint)
 RETURNS void
@@ -59,10 +81,10 @@ BEGIN
 
     -- 3. Resolve Timestamp
     BEGIN
-        IF v_data_e_hora_str IS NOT NULL AND v_data_e_hora_str <> '' THEN
+        IF v_data_e_hora_str IS NOT NULL AND TRIM(v_data_e_hora_str) <> '' THEN
             v_final_timestamp := v_data_e_hora_str::TIMESTAMP;
-        ELSIF v_data_acerto_str IS NOT NULL AND v_data_acerto_str <> '' THEN
-             IF v_hora_acerto IS NOT NULL AND v_hora_acerto <> '' THEN
+        ELSIF v_data_acerto_str IS NOT NULL AND TRIM(v_data_acerto_str) <> '' THEN
+             IF v_hora_acerto IS NOT NULL AND TRIM(v_hora_acerto) <> '' THEN
                 v_final_timestamp := (v_data_acerto_str || ' ' || v_hora_acerto)::TIMESTAMP;
              ELSE
                 v_final_timestamp := v_data_acerto_str::TIMESTAMP;
@@ -161,7 +183,13 @@ BEGIN
     WITH vendas AS (
         SELECT 
             "NÚMERO DO PEDIDO" as pedido_id,
-            MAX(CASE WHEN "DATA E HORA" IS NOT NULL AND "DATA E HORA" <> '' THEN "DATA E HORA"::timestamp ELSE "DATA DO ACERTO"::timestamp END) as data_acerto,
+            MAX(
+                CASE 
+                    WHEN "DATA E HORA" IS NOT NULL AND TRIM("DATA E HORA") <> '' THEN "DATA E HORA"::timestamp 
+                    WHEN "DATA DO ACERTO" IS NOT NULL AND TRIM("DATA DO ACERTO") <> '' THEN "DATA DO ACERTO"::timestamp 
+                    ELSE NULL 
+                END
+            ) as data_acerto,
             MAX("HORA DO ACERTO") as hora_acerto,
             MAX("FUNCIONÁRIO") as vendedor_nome,
             MAX("CÓDIGO DO CLIENTE") as cliente_id,
