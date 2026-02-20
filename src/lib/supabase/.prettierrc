@@ -1,0 +1,10 @@
+{
+  "overrides": [
+    {
+      "files": "types.ts",
+      "options": {
+        "requirePragma": true
+      }
+    }
+  ]
+}
