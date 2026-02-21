@@ -1461,6 +1461,8 @@ export type Database = {
           funcionario_id: number
           id: number
           pix_aprovado: boolean | null
+          recolhido_at: string | null
+          recolhido_por_id: number | null
           responsavel_id: number | null
           rota_id: number
           saldo_acerto: number | null
@@ -1484,6 +1486,8 @@ export type Database = {
           funcionario_id: number
           id?: number
           pix_aprovado?: boolean | null
+          recolhido_at?: string | null
+          recolhido_por_id?: number | null
           responsavel_id?: number | null
           rota_id: number
           saldo_acerto?: number | null
@@ -1507,6 +1511,8 @@ export type Database = {
           funcionario_id?: number
           id?: number
           pix_aprovado?: boolean | null
+          recolhido_at?: string | null
+          recolhido_por_id?: number | null
           responsavel_id?: number | null
           rota_id?: number
           saldo_acerto?: number | null
@@ -1524,6 +1530,13 @@ export type Database = {
           {
             foreignKeyName: "fechamento_caixa_funcionario_id_fkey"
             columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "FUNCIONARIOS"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fechamento_caixa_recolhido_por_id_fkey"
+            columns: ["recolhido_por_id"]
             isOneToOne: false
             referencedRelation: "FUNCIONARIOS"
             referencedColumns: ["id"]
@@ -2970,6 +2983,7 @@ export const Constants = {
 // Table: fechamento_caixa
 //   FOREIGN KEY fechamento_caixa_funcionario_id_fkey: FOREIGN KEY (funcionario_id) REFERENCES "FUNCIONARIOS"(id)
 //   PRIMARY KEY fechamento_caixa_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY fechamento_caixa_recolhido_por_id_fkey: FOREIGN KEY (recolhido_por_id) REFERENCES "FUNCIONARIOS"(id)
 //   FOREIGN KEY fechamento_caixa_responsavel_id_fkey: FOREIGN KEY (responsavel_id) REFERENCES "FUNCIONARIOS"(id)
 //   FOREIGN KEY fechamento_caixa_rota_id_fkey: FOREIGN KEY (rota_id) REFERENCES "ROTA"(id)
 // Table: inativar_clientes

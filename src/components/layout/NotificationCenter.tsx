@@ -45,12 +45,12 @@ export function NotificationCenter() {
         )
       }
 
-      // Caixa Alert
+      // Caixa Alert - globally checks all open routes for the logged-in user
       try {
         const { data: caixaData, error: caixaError } = await supabase
           .from('fechamento_caixa')
           .select('id')
-          .eq('status', 'Aberto')
+          .in('status', ['ABERTO', 'Aberto']) // Case-sensitive exact match for ABERTO (and legacy Aberto)
           .eq('funcionario_id', employee.id)
           .limit(1)
 
@@ -120,7 +120,7 @@ export function NotificationCenter() {
           const { data: recData, error: recError } = await supabase
             .from('fechamento_caixa')
             .select('id')
-            .eq('status', 'Fechado')
+            .in('status', ['Fechado', 'FECHADO'])
             .is('recolhido_por_id', null)
             .limit(1)
 
