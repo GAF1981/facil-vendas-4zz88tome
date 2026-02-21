@@ -100,10 +100,6 @@ export function RotaFilters({
     )
   }
 
-  const deselectAllSellers = () => {
-    handleChange('vendedor', [])
-  }
-
   return (
     <Card className="w-full bg-card border-b shadow-sm rounded-none sm:rounded-md">
       <CardContent className="p-2">
@@ -188,7 +184,7 @@ export function RotaFilters({
               </div>
 
               {/* Vendedor */}
-              <div className="w-[120px]">
+              <div className="w-[130px]">
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -197,9 +193,14 @@ export function RotaFilters({
                       className="h-8 w-full justify-between text-xs px-2"
                     >
                       {filters.vendedor.length === 0 ? (
-                        <span className="text-muted-foreground">Vendedor</span>
+                        <span className="text-muted-foreground">
+                          Sem filtro
+                        </span>
                       ) : filters.vendedor.length === sellers.length ? (
                         'Todos'
+                      ) : filters.vendedor.length === 1 &&
+                        filters.vendedor[0] === 'none' ? (
+                        'Nenhum'
                       ) : filters.vendedor.length <= 1 ? (
                         sellers
                           .find((s) => s.id.toString() === filters.vendedor[0])
@@ -210,17 +211,17 @@ export function RotaFilters({
                       <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-[200px] p-0" align="start">
+                  <PopoverContent className="w-[240px] p-0" align="start">
                     <Command>
                       <CommandInput placeholder="Buscar vendedor..." />
                       <CommandList>
                         <CommandEmpty>Vendedor não encontrado.</CommandEmpty>
                         <CommandGroup>
-                          <div className="flex items-center gap-2 p-2 border-b">
+                          <div className="flex items-center gap-1 p-2 border-b flex-wrap justify-between">
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-6 text-[10px] px-2 w-full"
+                              className="h-6 text-[10px] px-2 flex-1"
                               onClick={selectAllSellers}
                             >
                               Todos
@@ -228,10 +229,18 @@ export function RotaFilters({
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-6 text-[10px] px-2 w-full"
-                              onClick={deselectAllSellers}
+                              className="h-6 text-[10px] px-2 flex-1"
+                              onClick={() => handleChange('vendedor', ['none'])}
                             >
                               Nenhum
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 text-[10px] px-2 flex-1"
+                              onClick={() => handleChange('vendedor', [])}
+                            >
+                              Sem filtro
                             </Button>
                           </div>
                           {sellers.map((seller) => (

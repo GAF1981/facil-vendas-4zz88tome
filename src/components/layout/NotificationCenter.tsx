@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ClipboardList, FileText, QrCode } from 'lucide-react'
+import { ClipboardList, FileText, QrCode, Wallet } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useUserStore } from '@/stores/useUserStore'
 import { cn } from '@/lib/utils'
@@ -10,6 +10,7 @@ export function NotificationCenter() {
   const [hasPendencia, setHasPendencia] = useState(false)
   const [hasNotaFiscal, setHasNotaFiscal] = useState(false)
   const [hasPix, setHasPix] = useState(false)
+  const [hasCaixaAberto, setHasCaixaAberto] = useState(false)
 
   useEffect(() => {
     // Session validation: only proceed if employee and valid ID are present
@@ -32,6 +33,25 @@ export function NotificationCenter() {
         // Silently fail on network/fetch errors
         console.warn(
           'Network or fetch error checking pendencia notifications:',
+          error,
+        )
+      }
+
+      // Caixa Alert
+      try {
+        const { data: caixaData, error: caixaError } = await supabase
+          .from('fechamento_caixa')
+          .select('id')
+          .eq('status', 'Aberto')
+          .eq('funcionario_id', employee.id)
+          .limit(1)
+
+        if (!caixaError) {
+          setHasCaixaAberto((caixaData?.length || 0) > 0)
+        }
+      } catch (error) {
+        console.warn(
+          'Network or fetch error checking caixa notifications:',
           error,
         )
       }
@@ -134,6 +154,12 @@ export function NotificationCenter() {
 
   return (
     <div className="flex items-center gap-1 sm:gap-3 mr-2 sm:mr-4 border-r pr-2 sm:pr-4">
+      <IconWrapper
+        icon={Wallet}
+        label="caixa"
+        alert={hasCaixaAberto}
+        to="/caixa"
+      />
       <IconWrapper
         icon={ClipboardList}
         label="pendências"

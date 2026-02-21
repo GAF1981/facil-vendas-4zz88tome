@@ -144,10 +144,13 @@ export default function RotaPage() {
       }
 
       if (filters.vendedor.length > 0) {
-        if (
-          !row.vendedor_id ||
-          !filters.vendedor.includes(row.vendedor_id.toString())
-        ) {
+        const hasNone = filters.vendedor.includes('none')
+        const matchesVendor =
+          row.vendedor_id &&
+          filters.vendedor.includes(row.vendedor_id.toString())
+        const matchesNone = hasNone && !row.vendedor_id
+
+        if (!matchesVendor && !matchesNone) {
           return false
         }
       }
@@ -530,6 +533,7 @@ export default function RotaPage() {
         loading={loading}
         onImportSuccess={loadData}
         isGerencialActive={isGerencialActive}
+        totalClients={rows.length}
       />
 
       <RotaFilters

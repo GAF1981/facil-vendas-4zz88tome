@@ -37,6 +37,7 @@ interface RotaHeaderProps {
   pendingClosures?: string[]
   onImportSuccess?: () => void
   isGerencialActive?: boolean
+  totalClients?: number
 }
 
 export function RotaHeader({
@@ -49,6 +50,7 @@ export function RotaHeader({
   hasPendingUpdates = false,
   onImportSuccess,
   isGerencialActive = true,
+  totalClients,
 }: RotaHeaderProps) {
   const displayRota = activeRota || lastRota
   const { canAccess } = usePermissions()
@@ -161,7 +163,7 @@ export function RotaHeader({
             Controle de Rota
           </h2>
           {displayRota ? (
-            <div className="text-sm text-muted-foreground flex items-center gap-2 truncate">
+            <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
               <span className="bg-primary/10 text-primary px-2 py-0.5 rounded font-mono font-bold">
                 #{displayRota.id}
               </span>
@@ -177,11 +179,16 @@ export function RotaHeader({
                     })}
                   </>
                 ) : (
-                  <span className="text-green-600 font-semibold ml-1">
-                    (Em andamento)
+                  <span className="text-green-700 font-semibold ml-2 bg-green-100 px-2 py-0.5 rounded border border-green-200 shadow-sm">
+                    (em andamento)
                   </span>
                 )}
               </span>
+              {totalClients !== undefined && (
+                <span className="text-blue-700 font-semibold ml-2 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 shadow-sm whitespace-nowrap">
+                  {totalClients} clientes
+                </span>
+              )}
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">
