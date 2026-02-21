@@ -41,16 +41,16 @@ export function NotificationCenter() {
       )
 
       if (isFinanceiro) {
-        // Nota Fiscal Alert - strictly exact 'Pendente' and NOT NULL order
+        // Nota Fiscal Alert - strictly exact 'Pendente' logic sync
         try {
           const { data: nfData1, error: nfError1 } = await supabase
             .from('BANCO_DE_DADOS')
             .select('"NÚMERO DO PEDIDO"')
             .not('"NÚMERO DO PEDIDO"', 'is', null)
-            .neq('nota_fiscal_emitida', 'Emitida')
             .or(
-              'nota_fiscal_emitida.eq.Pendente,nota_fiscal_cadastro.eq.SIM,nota_fiscal_venda.eq.SIM,solicitacao_nf.eq.SIM',
+              'nota_fiscal_cadastro.eq.SIM,nota_fiscal_venda.eq.SIM,solicitacao_nf.eq.SIM',
             )
+            .or('nota_fiscal_emitida.neq.Emitida,nota_fiscal_emitida.is.null')
             .limit(1)
 
           if (!nfError1) {

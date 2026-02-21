@@ -219,6 +219,8 @@ export default function ResumoAcertosPage() {
     (acc, curr) => acc + curr.totalDiscount,
     0,
   )
+  const percentualDesconto =
+    totalVendas > 0 ? (totalDescontos / totalVendas) * 100 : 0
   const totalPago = filteredData.reduce((acc, curr) => acc + curr.totalPaid, 0)
   const totalReceber = filteredData.reduce(
     (acc, curr) => acc + curr.valorDevido,
@@ -342,7 +344,7 @@ export default function ResumoAcertosPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {formatCurrency(totalVendas)}
+              R$ {formatCurrency(totalVendas)}
             </div>
             <p className="text-xs text-muted-foreground">
               Valor bruto de vendas
@@ -357,10 +359,17 @@ export default function ResumoAcertosPage() {
             <TrendingDown className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">
-              {formatCurrency(totalDescontos)}
+            <div className="flex items-center gap-2">
+              <div className="text-2xl font-bold text-red-600">
+                R$ {formatCurrency(totalDescontos)}
+              </div>
+              <div className="text-xs font-semibold bg-red-100 text-red-700 px-2 py-0.5 rounded-full">
+                {percentualDesconto.toFixed(2)}%
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground">Descontos aplicados</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Descontos aplicados
+            </p>
           </CardContent>
         </Card>
         <Card className="bg-card border-green-200 bg-green-50/30">
@@ -372,7 +381,7 @@ export default function ResumoAcertosPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-700">
-              {formatCurrency(totalPago)}
+              R$ {formatCurrency(totalPago)}
             </div>
             <p className="text-xs text-green-600/80">
               Recebimentos confirmados
@@ -388,7 +397,7 @@ export default function ResumoAcertosPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-700">
-              {formatCurrency(totalReceber)}
+              R$ {formatCurrency(totalReceber)}
             </div>
             <p className="text-xs text-blue-600/80">Pendências da rota</p>
           </CardContent>
