@@ -14,48 +14,67 @@ export function NotificationCenter() {
     if (!employee) return
 
     const checkNotifications = async () => {
-      // Pendência Alert
-      const { count: pendenciaCount } = await supabase
-        .from('PENDENCIAS')
-        .select('id', { count: 'exact', head: true })
-        .eq('resolvida', false)
-        .eq('responsavel_id', employee.id)
+      try {
+        // Pendência Alert
+        const { data: pendenciaData, error: pendenciaError } = await supabase
+          .from('PENDENCIAS')
+          .select('id')
+          .eq('resolvida', false)
+          .eq('responsavel_id', employee.id)
+          .limit(1)
 
-      setHasPendencia((pendenciaCount || 0) > 0)
+        if (!pendenciaError) {
+          setHasPendencia((pendenciaData?.length || 0) > 0)
+        }
 
-      const isFinanceiro = employee.setor?.some(
-        (s) => s.toLowerCase() === 'financeiro',
-      )
+        const isFinanceiro = employee.setor?.some(
+          (s) => s.toLowerCase() === 'financeiro',
+        )
 
-      if (isFinanceiro) {
-        // Nota Fiscal Alert
-        const { count: nfCount1 } = await supabase
-          .from('BANCO_DE_DADOS')
-          .select('"NÚMERO DO PEDIDO"', { count: 'exact', head: true })
-          .eq('nota_fiscal_emitida', 'Pendente')
+        if (isFinanceiro) {
+          // Nota Fiscal Alert
+          const { data: nfData1, error: nfError1 } = await supabase
+            .from('BANCO_DE_DADOS')
+            .select('"NÚMERO DO PEDIDO"')
+            .eq('nota_fiscal_emitida', 'Pendente')
+            .limit(1)
 
-        const { count: nfCount2 } = await supabase
-          .from('BANCO_DE_DADOS')
-          .select('"NÚMERO DO PEDIDO"', { count: 'exact', head: true })
-          .eq('solicitacao_nf', 'SIM')
-          .neq('nota_fiscal_emitida', 'Emitida')
+          const { data: nfData2, error: nfError2 } = await supabase
+            .from('BANCO_DE_DADOS')
+            .select('"NÚMERO DO PEDIDO"')
+            .eq('solicitacao_nf', 'SIM')
+            .neq('nota_fiscal_emitida', 'Emitida')
+            .limit(1)
 
-        setHasNotaFiscal((nfCount1 || 0) > 0 || (nfCount2 || 0) > 0)
+          if (!nfError1 && !nfError2) {
+            setHasNotaFiscal(
+              (nfData1?.length || 0) > 0 || (nfData2?.length || 0) > 0,
+            )
+          }
 
-        // Pix Alert
-        const { count: pixCount1 } = await supabase
-          .from('fechamento_caixa')
-          .select('id', { count: 'exact', head: true })
-          .gt('valor_pix', 0)
-          .is('pix_aprovado', null)
+          // Pix Alert
+          const { data: pixData1, error: pixError1 } = await supabase
+            .from('fechamento_caixa')
+            .select('id')
+            .gt('valor_pix', 0)
+            .is('pix_aprovado', null)
+            .limit(1)
 
-        const { count: pixCount2 } = await supabase
-          .from('fechamento_caixa')
-          .select('id', { count: 'exact', head: true })
-          .gt('valor_pix', 0)
-          .eq('pix_aprovado', false)
+          const { data: pixData2, error: pixError2 } = await supabase
+            .from('fechamento_caixa')
+            .select('id')
+            .gt('valor_pix', 0)
+            .eq('pix_aprovado', false)
+            .limit(1)
 
-        setHasPix((pixCount1 || 0) > 0 || (pixCount2 || 0) > 0)
+          if (!pixError1 && !pixError2) {
+            setHasPix(
+              (pixData1?.length || 0) > 0 || (pixData2?.length || 0) > 0,
+            )
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching notifications:', error)
       }
     }
 

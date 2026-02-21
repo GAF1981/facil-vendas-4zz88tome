@@ -135,14 +135,15 @@ export const fechamentoService = {
   },
 
   async checkExistingClosing(rotaId: number, funcionarioId: number) {
-    const { count, error } = await supabase
+    const { data, error } = await supabase
       .from('fechamento_caixa')
-      .select('id', { count: 'exact', head: true })
+      .select('id')
       .eq('rota_id', rotaId)
       .eq('funcionario_id', funcionarioId)
+      .limit(1)
 
     if (error) throw error
-    return (count || 0) > 0
+    return (data?.length || 0) > 0
   },
 
   async getClosureStatus(rotaId: number, funcionarioId: number) {
