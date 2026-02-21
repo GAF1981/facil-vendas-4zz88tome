@@ -3,6 +3,7 @@ import { ClipboardList, FileText, QrCode } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useUserStore } from '@/stores/useUserStore'
 import { cn } from '@/lib/utils'
+import { Link } from 'react-router-dom'
 
 export function NotificationCenter() {
   const { employee } = useUserStore()
@@ -40,7 +41,7 @@ export function NotificationCenter() {
       )
 
       if (isFinanceiro) {
-        // Nota Fiscal Alert
+        // Nota Fiscal Alert - strictly exact 'Pendente'
         try {
           const { data: nfData1, error: nfError1 } = await supabase
             .from('BANCO_DE_DADOS')
@@ -48,17 +49,8 @@ export function NotificationCenter() {
             .eq('nota_fiscal_emitida', 'Pendente')
             .limit(1)
 
-          const { data: nfData2, error: nfError2 } = await supabase
-            .from('BANCO_DE_DADOS')
-            .select('"NÚMERO DO PEDIDO"')
-            .eq('solicitacao_nf', 'SIM')
-            .neq('nota_fiscal_emitida', 'Emitida')
-            .limit(1)
-
-          if (!nfError1 && !nfError2) {
-            setHasNotaFiscal(
-              (nfData1?.length || 0) > 0 || (nfData2?.length || 0) > 0,
-            )
+          if (!nfError1) {
+            setHasNotaFiscal((nfData1?.length || 0) > 0)
           }
         } catch (error) {
           console.warn(
@@ -108,12 +100,17 @@ export function NotificationCenter() {
     icon: Icon,
     label,
     alert,
+    to,
   }: {
     icon: any
     label: string
     alert: boolean
+    to: string
   }) => (
-    <div className="flex flex-col items-center justify-center gap-0.5 w-11 sm:w-14">
+    <Link
+      to={to}
+      className="flex flex-col items-center justify-center gap-0.5 w-11 sm:w-14 hover:bg-muted/50 rounded p-1 transition-colors"
+    >
       <Icon
         className={cn(
           'h-4 w-4 sm:h-5 sm:w-5 transition-colors',
@@ -128,7 +125,7 @@ export function NotificationCenter() {
       >
         {label}
       </span>
-    </div>
+    </Link>
   )
 
   return (
@@ -137,6 +134,7 @@ export function NotificationCenter() {
         icon={ClipboardList}
         label="pendencia"
         alert={hasPendencia}
+        to="/pendencias"
       />
       {employee?.setor?.some(
         (s) => typeof s === 'string' && s.toLowerCase() === 'financeiro',
@@ -146,8 +144,14 @@ export function NotificationCenter() {
             icon={FileText}
             label="nota fiscal"
             alert={hasNotaFiscal}
+            to="/nota-fiscal"
           />
-          <IconWrapper icon={QrCode} label="Pix" alert={hasPix} />
+          <IconWrapper
+            icon={QrCode}
+            label="Pix"
+            alert={hasPix}
+            to="/fechamentos"
+          />
         </>
       )}
     </div>

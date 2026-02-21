@@ -8,7 +8,6 @@ import { Rota, RotaFilterState, RotaRow, SortConfig } from '@/types/rota'
 import { Employee } from '@/types/employee'
 import { useToast } from '@/hooks/use-toast'
 import { useRotaFilterStore } from '@/stores/useRotaFilterStore'
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { parseISO, isBefore, isAfter, isValid } from 'date-fns'
 import { usePermissions } from '@/hooks/use-permissions'
 import { useUserStore } from '@/stores/useUserStore'
@@ -21,28 +20,55 @@ export default function RotaPage() {
   const [loading, setLoading] = useState(false)
   const [sellers, setSellers] = useState<Employee[]>([])
 
-  const [isSelectionMode, setIsSelectionMode] = useState(false)
+  const { employee: loggedInUser } = useUserStore()
+  const { selectedEmployeeIds, setSelectedEmployeeIds } = useRotaFilterStore()
+
+  const [isSelectionMode, setIsSelectionMode] = useState(true)
+  const [isFiltrosActive, setIsFiltrosActive] = useState(true)
+  const [isGerencialActive, setIsGerencialActive] = useState(true)
 
   const [isBulkFillOpen, setIsBulkFillOpen] = useState(false)
 
-  const { selectedEmployeeIds, setSelectedEmployeeIds } = useRotaFilterStore()
-  const [filters, setFilters] = useState<RotaFilterState>({
-    search: '',
-    x_na_rota: 'todos',
-    agregado: 'todos',
-    vendedor: selectedEmployeeIds,
-    proximo_vendedor: 'todos',
-    municipio: 'todos',
-    grupo_rota: 'todos',
-    debito_min: '',
-    debito_max: '',
-    data_acerto_start: '',
-    data_acerto_end: '',
-    projecao_min: '',
-    estoque_min: '',
-    estoque_max: '',
-    vencimento_status: 'todos',
+  const [filters, setFilters] = useState<RotaFilterState>(() => {
+    const initialVendedor =
+      selectedEmployeeIds.length > 0
+        ? selectedEmployeeIds
+        : loggedInUser
+          ? [loggedInUser.id.toString()]
+          : []
+
+    return {
+      search: '',
+      x_na_rota: 'todos',
+      agregado: 'todos',
+      vendedor: initialVendedor,
+      proximo_vendedor: 'todos',
+      municipio: 'todos',
+      grupo_rota: 'todos',
+      debito_min: '',
+      debito_max: '',
+      data_acerto_start: '',
+      data_acerto_end: '',
+      projecao_min: '',
+      estoque_min: '',
+      estoque_max: '',
+      vencimento_status: 'todos',
+    }
   })
+
+  // Sync to ensure loggedInUser is applied if store hydration takes a cycle
+  useEffect(() => {
+    if (
+      selectedEmployeeIds.length === 0 &&
+      loggedInUser &&
+      filters.vendedor.length === 0
+    ) {
+      setFilters((prev) => ({
+        ...prev,
+        vendedor: [loggedInUser.id.toString()],
+      }))
+    }
+  }, [loggedInUser, selectedEmployeeIds, filters.vendedor.length])
 
   useEffect(() => {
     setSelectedEmployeeIds(filters.vendedor)
@@ -54,10 +80,7 @@ export default function RotaPage() {
   })
 
   const { toast } = useToast()
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { canAccess } = usePermissions()
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { employee: loggedInUser } = useUserStore()
 
   useEffect(() => {
     loadData()
@@ -506,6 +529,7 @@ export default function RotaPage() {
         onExport={handleExport}
         loading={loading}
         onImportSuccess={loadData}
+        isGerencialActive={isGerencialActive}
       />
 
       <RotaFilters
@@ -516,6 +540,10 @@ export default function RotaPage() {
         routes={routeGroups}
         isSelectionMode={isSelectionMode}
         toggleSelectionMode={setIsSelectionMode}
+        isFiltrosActive={isFiltrosActive}
+        toggleFiltros={setIsFiltrosActive}
+        isGerencialActive={isGerencialActive}
+        toggleGerencial={setIsGerencialActive}
         activeRotaId={activeRota?.id}
         onDataChange={loadData}
       />
@@ -528,6 +556,7 @@ export default function RotaPage() {
         sortConfig={sortConfig}
         loading={loading}
         isSelectionMode={isSelectionMode}
+        isFiltrosActive={isFiltrosActive}
         onBulkTransfer={activeRota ? handleBulkTransfer : undefined}
         onBulkClear={activeRota ? handleBulkClear : undefined}
         onBulkFill={activeRota ? () => setIsBulkFillOpen(true) : undefined}

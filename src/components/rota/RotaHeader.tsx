@@ -34,8 +34,9 @@ interface RotaHeaderProps {
   onExport: () => void
   loading: boolean
   hasPendingUpdates?: boolean
-  pendingClosures?: string[] // Legacy prop, we will use internal logic
+  pendingClosures?: string[]
   onImportSuccess?: () => void
+  isGerencialActive?: boolean
 }
 
 export function RotaHeader({
@@ -46,12 +47,10 @@ export function RotaHeader({
   onExport,
   loading,
   hasPendingUpdates = false,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  pendingClosures: legacyPendingClosures = [],
   onImportSuccess,
+  isGerencialActive = true,
 }: RotaHeaderProps) {
   const displayRota = activeRota || lastRota
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { canAccess } = usePermissions()
   const { employee } = useUserStore()
   const [summaryData, setSummaryData] = useState<CaixaSummaryRow[]>([])
@@ -200,10 +199,12 @@ export function RotaHeader({
           )}
 
           <div className="flex items-start gap-2">
-            <RotaImportDialog
-              activeRota={activeRota}
-              onSuccess={onImportSuccess}
-            />
+            {!isGerencialActive && (
+              <RotaImportDialog
+                activeRota={activeRota}
+                onSuccess={onImportSuccess}
+              />
+            )}
 
             <Button
               onClick={onExport}
@@ -262,7 +263,7 @@ export function RotaHeader({
                   </Popover>
                 )}
 
-                {hasPendingRoute && (
+                {!isGerencialActive && hasPendingRoute && (
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
@@ -373,30 +374,32 @@ export function RotaHeader({
                   </Popover>
                 )}
 
-                <div className="relative group">
-                  <Button
-                    onClick={onEnd}
-                    disabled={isBlocked}
-                    variant="destructive"
-                    className="w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {loading ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Square className="mr-2 h-4 w-4" />
+                {!isGerencialActive && (
+                  <div className="relative group">
+                    <Button
+                      onClick={onEnd}
+                      disabled={isBlocked}
+                      variant="destructive"
+                      className="w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {loading ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Square className="mr-2 h-4 w-4" />
+                      )}
+                      {isHighLevelAdmin && hasIssues
+                        ? 'Forçar Finalização'
+                        : 'Finalizar Rota'}
+                    </Button>
+                    {isBlocked && !loading && !hasPendingUpdates && (
+                      <div className="absolute top-full right-0 mt-1 w-64 p-2 bg-black/80 text-white text-xs rounded hidden group-hover:block z-50 text-center">
+                        Não é possível finalizar. Existem caixas não fechados ou
+                        pendentes de confirmação.
+                        {!isHighLevelAdmin && ' (Restrito a Admin)'}
+                      </div>
                     )}
-                    {isHighLevelAdmin && hasIssues
-                      ? 'Forçar Finalização'
-                      : 'Finalizar Rota'}
-                  </Button>
-                  {isBlocked && !loading && !hasPendingUpdates && (
-                    <div className="absolute top-full right-0 mt-1 w-64 p-2 bg-black/80 text-white text-xs rounded hidden group-hover:block z-50 text-center">
-                      Não é possível finalizar. Existem caixas não fechados ou
-                      pendentes de confirmação.
-                      {!isHighLevelAdmin && ' (Restrito a Admin)'}
-                    </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </>
             )
           )}

@@ -36,7 +36,10 @@ interface RotaFiltersProps {
   routes: string[]
   isSelectionMode: boolean
   toggleSelectionMode: (value: boolean) => void
-  // Optional props for compatibility if passed from parent, even if not used for buttons here
+  isFiltrosActive: boolean
+  toggleFiltros: (value: boolean) => void
+  isGerencialActive: boolean
+  toggleGerencial: (value: boolean) => void
   activeRotaId?: number
   onDataChange?: () => void
 }
@@ -49,6 +52,10 @@ export function RotaFilters({
   routes,
   isSelectionMode,
   toggleSelectionMode,
+  isFiltrosActive,
+  toggleFiltros,
+  isGerencialActive,
+  toggleGerencial,
 }: RotaFiltersProps) {
   const handleChange = (key: keyof RotaFilterState, value: any) => {
     setFilters({ ...filters, [key]: value })
@@ -293,6 +300,30 @@ export function RotaFilters({
             />
             <Label htmlFor="selection-mode" className="text-xs cursor-pointer">
               Simplificado
+            </Label>
+          </div>
+
+          <div className="flex items-center space-x-2 border-l pl-2 ml-2">
+            <Switch
+              id="filtros-mode"
+              checked={isFiltrosActive}
+              onCheckedChange={toggleFiltros}
+              className="scale-75"
+            />
+            <Label htmlFor="filtros-mode" className="text-xs cursor-pointer">
+              filtros
+            </Label>
+          </div>
+
+          <div className="flex items-center space-x-2 border-l pl-2 ml-2">
+            <Switch
+              id="gerencial-mode"
+              checked={isGerencialActive}
+              onCheckedChange={toggleGerencial}
+              className="scale-75"
+            />
+            <Label htmlFor="gerencial-mode" className="text-xs cursor-pointer">
+              gerencial
             </Label>
           </div>
 

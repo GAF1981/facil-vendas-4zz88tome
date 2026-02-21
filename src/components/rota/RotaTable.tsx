@@ -60,6 +60,7 @@ interface RotaTableProps {
   sortConfig: SortConfig
   loading?: boolean
   isSelectionMode: boolean
+  isFiltrosActive?: boolean
   onBulkTransfer?: () => void
   onBulkClear?: () => void
   onBulkFill?: () => void
@@ -75,6 +76,7 @@ export function RotaTable({
   sortConfig,
   loading = false,
   isSelectionMode,
+  isFiltrosActive = true,
   onBulkTransfer,
   onBulkClear,
   onBulkFill,
@@ -163,6 +165,9 @@ export function RotaTable({
 
   const today = new Date()
 
+  const colSpanCount =
+    22 - (isSelectionMode ? 6 : 0) - (isFiltrosActive ? 6 : 0)
+
   return (
     <>
       <div className="rounded-md border bg-card overflow-hidden shadow-sm flex flex-col h-full">
@@ -179,12 +184,14 @@ export function RotaTable({
                     Cliente
                   </TableHead>
 
-                  <SortableHeader
-                    column="municipio"
-                    label="Município"
-                    align="left"
-                    className="min-w-[120px]"
-                  />
+                  {!isFiltrosActive && (
+                    <SortableHeader
+                      column="municipio"
+                      label="Município"
+                      align="left"
+                      className="min-w-[120px]"
+                    />
+                  )}
 
                   <SortableHeader
                     column="debito"
@@ -219,58 +226,63 @@ export function RotaTable({
                     className="min-w-[100px]"
                   />
 
-                  <TableHead className="min-w-[140px] font-bold text-xs">
-                    Vendedor
-                  </TableHead>
+                  {!isFiltrosActive && (
+                    <TableHead className="min-w-[140px] font-bold text-xs">
+                      Vendedor
+                    </TableHead>
+                  )}
 
-                  {/* NEW COLUMN: Próxima */}
-                  <TableHead className="min-w-[200px] font-bold text-xs bg-muted/30">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="truncate">Próxima</span>
-                      <div className="flex items-center gap-1">
-                        {onBulkFill && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-5 w-5 text-blue-600 hover:bg-blue-100 hover:text-blue-800"
-                            onClick={onBulkFill}
-                            title="Preencher Todos"
-                          >
-                            <Users className="h-3 w-3" />
-                          </Button>
-                        )}
-                        {onBulkTransfer && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-5 w-5 text-purple-600 hover:bg-purple-100 hover:text-purple-800"
-                            onClick={onBulkTransfer}
-                            title="Transferir Todos (Batch)"
-                          >
-                            <ArrowRightLeft className="h-3 w-3" />
-                          </Button>
-                        )}
-                        {onBulkClear && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-5 w-5 text-red-400 hover:bg-red-100 hover:text-red-600"
-                            onClick={onBulkClear}
-                            title="Limpar Todos (Batch)"
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        )}
+                  {!isFiltrosActive && (
+                    <TableHead className="min-w-[200px] font-bold text-xs bg-muted/30">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate">Próxima</span>
+                        <div className="flex items-center gap-1">
+                          {onBulkFill && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5 text-blue-600 hover:bg-blue-100 hover:text-blue-800"
+                              onClick={onBulkFill}
+                              title="Preencher Todos"
+                            >
+                              <Users className="h-3 w-3" />
+                            </Button>
+                          )}
+                          {onBulkTransfer && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5 text-purple-600 hover:bg-purple-100 hover:text-purple-800"
+                              onClick={onBulkTransfer}
+                              title="Transferir Todos (Batch)"
+                            >
+                              <ArrowRightLeft className="h-3 w-3" />
+                            </Button>
+                          )}
+                          {onBulkClear && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5 text-red-400 hover:bg-red-100 hover:text-red-600"
+                              onClick={onBulkClear}
+                              title="Limpar Todos (Batch)"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </TableHead>
+                    </TableHead>
+                  )}
 
-                  <SortableHeader
-                    column="grupo_rota"
-                    label="Rota/Grupo"
-                    align="left"
-                    className="min-w-[120px]"
-                  />
+                  {!isFiltrosActive && (
+                    <SortableHeader
+                      column="grupo_rota"
+                      label="Rota/Grupo"
+                      align="left"
+                      className="min-w-[120px]"
+                    />
+                  )}
 
                   <SortableHeader
                     column="valor_consignado"
@@ -303,12 +315,14 @@ export function RotaTable({
                     </TableHead>
                   )}
 
-                  <SortableHeader
-                    column="x_na_rota"
-                    label="xRota"
-                    align="center"
-                    className="w-[80px]"
-                  />
+                  {!isFiltrosActive && (
+                    <SortableHeader
+                      column="x_na_rota"
+                      label="xRota"
+                      align="center"
+                      className="w-[80px]"
+                    />
+                  )}
 
                   {!isSelectionMode && (
                     <TableHead className="text-center font-bold text-xs w-[80px]">
@@ -327,9 +341,11 @@ export function RotaTable({
                     Dias
                   </TableHead>
 
-                  <TableHead className="w-[100px] text-center font-bold text-xs">
-                    Status
-                  </TableHead>
+                  {!isFiltrosActive && (
+                    <TableHead className="w-[100px] text-center font-bold text-xs">
+                      Status
+                    </TableHead>
+                  )}
 
                   {!isSelectionMode && (
                     <TableHead className="w-[60px] text-center font-bold text-xs">
@@ -355,7 +371,7 @@ export function RotaTable({
                 {rows.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={isSelectionMode ? 16 : 22}
+                      colSpan={colSpanCount}
                       className="h-32 text-center text-muted-foreground"
                     >
                       <div className="flex flex-col items-center justify-center gap-2">
@@ -477,12 +493,14 @@ export function RotaTable({
                           </div>
                         </TableCell>
 
-                        <TableCell
-                          className="truncate max-w-[120px]"
-                          title={row.client.MUNICÍPIO || ''}
-                        >
-                          {row.client.MUNICÍPIO || '-'}
-                        </TableCell>
+                        {!isFiltrosActive && (
+                          <TableCell
+                            className="truncate max-w-[120px]"
+                            title={row.client.MUNICÍPIO || ''}
+                          >
+                            {row.client.MUNICÍPIO || '-'}
+                          </TableCell>
+                        )}
 
                         <TableCell className="text-right font-medium">
                           <div className="flex flex-col items-end">
@@ -590,81 +608,38 @@ export function RotaTable({
                             : '-'}
                         </TableCell>
 
-                        <TableCell>
-                          <Select
-                            disabled={disabled}
-                            value={row.vendedor_id?.toString() || 'none'}
-                            onValueChange={(val) =>
-                              onUpdateRow(
-                                row.client.CODIGO,
-                                'vendedor_id',
-                                val === 'none' ? null : parseInt(val),
-                              )
-                            }
-                          >
-                            <SelectTrigger
-                              className={cn(
-                                'h-7 w-full text-xs truncate',
-                                row.vendedor_id
-                                  ? 'font-medium'
-                                  : 'text-muted-foreground',
-                                row.is_completed || row.x_na_rota > 3
-                                  ? 'bg-white/20 border-white/30 text-white placeholder:text-white/70'
-                                  : 'text-foreground',
-                              )}
-                            >
-                              <SelectValue placeholder="Selecione..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem
-                                value="none"
-                                className="text-muted-foreground"
-                              >
-                                Nenhum
-                              </SelectItem>
-                              {sellers.map((s) => (
-                                <SelectItem key={s.id} value={s.id.toString()}>
-                                  {s.nome_completo}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-
-                        <TableCell className="bg-muted/10 p-1">
-                          <div className="flex items-center gap-1">
+                        {!isFiltrosActive && (
+                          <TableCell>
                             <Select
                               disabled={disabled}
-                              value={
-                                row.proximo_vendedor_id?.toString() || 'none'
-                              }
+                              value={row.vendedor_id?.toString() || 'none'}
                               onValueChange={(val) =>
                                 onUpdateRow(
                                   row.client.CODIGO,
-                                  'proximo_vendedor_id',
+                                  'vendedor_id',
                                   val === 'none' ? null : parseInt(val),
                                 )
                               }
                             >
                               <SelectTrigger
                                 className={cn(
-                                  'h-7 w-full text-xs truncate border-dashed flex-1',
-                                  row.proximo_vendedor_id
-                                    ? 'font-medium text-purple-600 bg-purple-50 border-purple-200'
-                                    : 'text-muted-foreground/70',
+                                  'h-7 w-full text-xs truncate',
+                                  row.vendedor_id
+                                    ? 'font-medium'
+                                    : 'text-muted-foreground',
                                   row.is_completed || row.x_na_rota > 3
-                                    ? 'bg-white/10 border-white/30 text-white/90 placeholder:text-white/50'
-                                    : '',
+                                    ? 'bg-white/20 border-white/30 text-white placeholder:text-white/70'
+                                    : 'text-foreground',
                                 )}
                               >
-                                <SelectValue placeholder="Próximo..." />
+                                <SelectValue placeholder="Selecione..." />
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem
                                   value="none"
                                   className="text-muted-foreground"
                                 >
-                                  Manter Atual
+                                  Nenhum
                                 </SelectItem>
                                 {sellers.map((s) => (
                                   <SelectItem
@@ -676,58 +651,110 @@ export function RotaTable({
                                 ))}
                               </SelectContent>
                             </Select>
-                            {row.proximo_vendedor_id && (
-                              <div className="flex items-center gap-0.5">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className={cn(
-                                    'h-6 w-6',
-                                    row.is_completed || row.x_na_rota > 3
-                                      ? 'text-white/70 hover:bg-white/20 hover:text-white'
-                                      : 'text-blue-600 hover:text-blue-700 hover:bg-blue-50',
-                                  )}
-                                  onClick={() =>
-                                    onTransferRow && onTransferRow(row)
-                                  }
-                                  title="Transferir para Vendedor Atual"
-                                >
-                                  <ArrowLeft className="h-3 w-3" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className={cn(
-                                    'h-6 w-6',
-                                    row.is_completed || row.x_na_rota > 3
-                                      ? 'text-white/70 hover:bg-white/20 hover:text-white'
-                                      : 'text-red-400 hover:text-red-600 hover:bg-red-50',
-                                  )}
-                                  onClick={() =>
-                                    onUpdateRow(
-                                      row.client.CODIGO,
-                                      'proximo_vendedor_id',
-                                      null,
-                                    )
-                                  }
-                                  title="Limpar (Manter Atual)"
-                                >
-                                  <X className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
+                          </TableCell>
+                        )}
 
-                        <TableCell
-                          className={cn(
-                            'truncate max-w-[120px]',
-                            textClass || 'text-muted-foreground',
-                          )}
-                          title={row.client['GRUPO ROTA'] || ''}
-                        >
-                          {row.client['GRUPO ROTA'] || '-'}
-                        </TableCell>
+                        {!isFiltrosActive && (
+                          <TableCell className="bg-muted/10 p-1">
+                            <div className="flex items-center gap-1">
+                              <Select
+                                disabled={disabled}
+                                value={
+                                  row.proximo_vendedor_id?.toString() || 'none'
+                                }
+                                onValueChange={(val) =>
+                                  onUpdateRow(
+                                    row.client.CODIGO,
+                                    'proximo_vendedor_id',
+                                    val === 'none' ? null : parseInt(val),
+                                  )
+                                }
+                              >
+                                <SelectTrigger
+                                  className={cn(
+                                    'h-7 w-full text-xs truncate border-dashed flex-1',
+                                    row.proximo_vendedor_id
+                                      ? 'font-medium text-purple-600 bg-purple-50 border-purple-200'
+                                      : 'text-muted-foreground/70',
+                                    row.is_completed || row.x_na_rota > 3
+                                      ? 'bg-white/10 border-white/30 text-white/90 placeholder:text-white/50'
+                                      : '',
+                                  )}
+                                >
+                                  <SelectValue placeholder="Próximo..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem
+                                    value="none"
+                                    className="text-muted-foreground"
+                                  >
+                                    Manter Atual
+                                  </SelectItem>
+                                  {sellers.map((s) => (
+                                    <SelectItem
+                                      key={s.id}
+                                      value={s.id.toString()}
+                                    >
+                                      {s.nome_completo}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              {row.proximo_vendedor_id && (
+                                <div className="flex items-center gap-0.5">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className={cn(
+                                      'h-6 w-6',
+                                      row.is_completed || row.x_na_rota > 3
+                                        ? 'text-white/70 hover:bg-white/20 hover:text-white'
+                                        : 'text-blue-600 hover:text-blue-700 hover:bg-blue-50',
+                                    )}
+                                    onClick={() =>
+                                      onTransferRow && onTransferRow(row)
+                                    }
+                                    title="Transferir para Vendedor Atual"
+                                  >
+                                    <ArrowLeft className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className={cn(
+                                      'h-6 w-6',
+                                      row.is_completed || row.x_na_rota > 3
+                                        ? 'text-white/70 hover:bg-white/20 hover:text-white'
+                                        : 'text-red-400 hover:text-red-600 hover:bg-red-50',
+                                    )}
+                                    onClick={() =>
+                                      onUpdateRow(
+                                        row.client.CODIGO,
+                                        'proximo_vendedor_id',
+                                        null,
+                                      )
+                                    }
+                                    title="Limpar (Manter Atual)"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                        )}
+
+                        {!isFiltrosActive && (
+                          <TableCell
+                            className={cn(
+                              'truncate max-w-[120px]',
+                              textClass || 'text-muted-foreground',
+                            )}
+                            title={row.client['GRUPO ROTA'] || ''}
+                          >
+                            {row.client['GRUPO ROTA'] || '-'}
+                          </TableCell>
+                        )}
 
                         <TableCell
                           className={cn(
@@ -790,34 +817,36 @@ export function RotaTable({
                           </TableCell>
                         )}
 
-                        <TableCell className="text-center">
-                          <div className="flex justify-center">
-                            <Input
-                              type="number"
-                              min={0}
-                              max={99}
-                              disabled={disabled || row.is_completed}
-                              value={row.is_completed ? 0 : row.x_na_rota}
-                              onChange={(e) =>
-                                onUpdateRow(
-                                  row.client.CODIGO,
-                                  'x_na_rota',
-                                  parseInt(e.target.value) || 0,
-                                )
-                              }
-                              className={cn(
-                                'h-7 w-[60px] text-center text-xs p-1',
-                                row.x_na_rota > 3 && !row.is_completed
-                                  ? 'bg-[#4c1d95] text-white border-purple-900 font-bold'
-                                  : row.x_na_rota > 0
-                                    ? 'bg-secondary/50 font-medium text-foreground'
-                                    : 'text-muted-foreground',
-                                row.is_completed &&
-                                  'bg-green-700 text-white border-green-500',
-                              )}
-                            />
-                          </div>
-                        </TableCell>
+                        {!isFiltrosActive && (
+                          <TableCell className="text-center">
+                            <div className="flex justify-center">
+                              <Input
+                                type="number"
+                                min={0}
+                                max={99}
+                                disabled={disabled || row.is_completed}
+                                value={row.is_completed ? 0 : row.x_na_rota}
+                                onChange={(e) =>
+                                  onUpdateRow(
+                                    row.client.CODIGO,
+                                    'x_na_rota',
+                                    parseInt(e.target.value) || 0,
+                                  )
+                                }
+                                className={cn(
+                                  'h-7 w-[60px] text-center text-xs p-1',
+                                  row.x_na_rota > 3 && !row.is_completed
+                                    ? 'bg-[#4c1d95] text-white border-purple-900 font-bold'
+                                    : row.x_na_rota > 0
+                                      ? 'bg-secondary/50 font-medium text-foreground'
+                                      : 'text-muted-foreground',
+                                  row.is_completed &&
+                                    'bg-green-700 text-white border-green-500',
+                                )}
+                              />
+                            </div>
+                          </TableCell>
+                        )}
 
                         {!isSelectionMode && (
                           <TableCell className="text-center font-mono text-[10px]">
@@ -842,42 +871,44 @@ export function RotaTable({
                             : '-'}
                         </TableCell>
 
-                        <TableCell className="text-center">
-                          <div className="flex flex-col items-center gap-1">
-                            {row.vencimento_status === 'VENCIDO' && (
-                              <Badge
-                                variant="destructive"
-                                className="text-[9px] px-1 h-4 flex items-center gap-1"
-                              >
-                                <AlertCircle className="w-2 h-2" /> Vencida
-                              </Badge>
-                            )}
-                            {row.vencimento_status === 'A VENCER' && (
-                              <Badge
-                                variant="outline"
-                                className="text-green-700 border-green-300 bg-green-100 text-[9px] px-1 h-4"
-                              >
-                                A Vencer
-                              </Badge>
-                            )}
-                            {row.vencimento_status === 'PAGO' && (
-                              <Badge
-                                variant="outline"
-                                className="text-green-600 border-green-200 bg-green-50 text-[9px] px-1 h-4"
-                              >
-                                PAGO
-                              </Badge>
-                            )}
-                            {row.has_pendency && (
-                              <Badge
-                                variant="secondary"
-                                className="bg-orange-100 text-orange-700 hover:bg-orange-200 text-[9px] px-1 h-4 border-orange-200 border"
-                              >
-                                PENDÊNCIA
-                              </Badge>
-                            )}
-                          </div>
-                        </TableCell>
+                        {!isFiltrosActive && (
+                          <TableCell className="text-center">
+                            <div className="flex flex-col items-center gap-1">
+                              {row.vencimento_status === 'VENCIDO' && (
+                                <Badge
+                                  variant="destructive"
+                                  className="text-[9px] px-1 h-4 flex items-center gap-1"
+                                >
+                                  <AlertCircle className="w-2 h-2" /> Vencida
+                                </Badge>
+                              )}
+                              {row.vencimento_status === 'A VENCER' && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-green-700 border-green-300 bg-green-100 text-[9px] px-1 h-4"
+                                >
+                                  A Vencer
+                                </Badge>
+                              )}
+                              {row.vencimento_status === 'PAGO' && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-green-600 border-green-200 bg-green-50 text-[9px] px-1 h-4"
+                                >
+                                  PAGO
+                                </Badge>
+                              )}
+                              {row.has_pendency && (
+                                <Badge
+                                  variant="secondary"
+                                  className="bg-orange-100 text-orange-700 hover:bg-orange-200 text-[9px] px-1 h-4 border-orange-200 border"
+                                >
+                                  PENDÊNCIA
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                        )}
 
                         {!isSelectionMode && (
                           <TableCell className="text-center">
