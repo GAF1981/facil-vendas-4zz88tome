@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ClipboardList, FileText, QrCode, Wallet } from 'lucide-react'
+import { ClipboardList, FileText, QrCode, Wallet, Banknote } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useUserStore } from '@/stores/useUserStore'
 import { cn } from '@/lib/utils'
@@ -11,6 +11,14 @@ export function NotificationCenter() {
   const [hasNotaFiscal, setHasNotaFiscal] = useState(false)
   const [hasPix, setHasPix] = useState(false)
   const [hasCaixaAberto, setHasCaixaAberto] = useState(false)
+  const [hasRecolhido, setHasRecolhido] = useState(false)
+
+  const isFinanceiroOuAdmin =
+    employee?.setor?.some(
+      (s) =>
+        typeof s === 'string' &&
+        ['financeiro', 'administrador', 'gerente'].includes(s.toLowerCase()),
+    ) || false
 
   useEffect(() => {
     // Session validation: only proceed if employee and valid ID are present
@@ -56,11 +64,7 @@ export function NotificationCenter() {
         )
       }
 
-      const isFinanceiro = employee.setor?.some(
-        (s) => typeof s === 'string' && s.toLowerCase() === 'financeiro',
-      )
-
-      if (isFinanceiro) {
+      if (isFinanceiroOuAdmin) {
         // Nota Fiscal Alert - strictly exact 'Pendente' logic sync
         try {
           const { data: nfData1, error: nfError1 } = await supabase
@@ -110,6 +114,25 @@ export function NotificationCenter() {
             error,
           )
         }
+
+        // Recolhido Alert
+        try {
+          const { data: recData, error: recError } = await supabase
+            .from('fechamento_caixa')
+            .select('id')
+            .eq('status', 'Fechado')
+            .is('recolhido_por_id', null)
+            .limit(1)
+
+          if (!recError) {
+            setHasRecolhido((recData?.length || 0) > 0)
+          }
+        } catch (error) {
+          console.warn(
+            'Network or fetch error checking recolhido notifications:',
+            error,
+          )
+        }
       }
     }
 
@@ -118,7 +141,7 @@ export function NotificationCenter() {
     // Refresh notifications every 30 seconds
     const interval = setInterval(checkNotifications, 30000)
     return () => clearInterval(interval)
-  }, [employee])
+  }, [employee, isFinanceiroOuAdmin])
 
   const IconWrapper = ({
     icon: Icon,
@@ -166,9 +189,7 @@ export function NotificationCenter() {
         alert={hasPendencia}
         to="/pendencias"
       />
-      {employee?.setor?.some(
-        (s) => typeof s === 'string' && s.toLowerCase() === 'financeiro',
-      ) && (
+      {isFinanceiroOuAdmin && (
         <>
           <IconWrapper
             icon={FileText}
@@ -180,6 +201,12 @@ export function NotificationCenter() {
             icon={QrCode}
             label="pix"
             alert={hasPix}
+            to="/fechamentos"
+          />
+          <IconWrapper
+            icon={Banknote}
+            label="recolhido"
+            alert={hasRecolhido}
             to="/fechamentos"
           />
         </>

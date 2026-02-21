@@ -22,6 +22,7 @@ import {
   FileText,
   CalendarClock,
   Printer,
+  Banknote,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -142,6 +143,44 @@ export function FechamentoTable({ data, onRefresh }: FechamentoTableProps) {
     }
   }
 
+  const handleMarkRecolhido = async (item: FechamentoCaixa) => {
+    if (!employee) {
+      toast({
+        title: 'Erro',
+        description: 'Usuário não identificado.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setLoadingIds((prev) => new Set(prev).add(item.id))
+    try {
+      await fechamentoService.markAsRecolhido(item.id, employee.id)
+
+      toast({
+        title: 'Recolhido',
+        description: `Valores de ${item.funcionario?.nome_completo} recolhidos com sucesso.`,
+        className: 'bg-green-600 text-white',
+      })
+
+      onRefresh()
+    } catch (error) {
+      console.error(error)
+      toast({
+        title: 'Erro',
+        description: 'Falha ao registrar recolhimento.',
+        variant: 'destructive',
+      })
+      onRefresh()
+    } finally {
+      setLoadingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(item.id)
+        return next
+      })
+    }
+  }
+
   const handleGeneratePdf = async (
     item: FechamentoCaixa,
     format: 'A4' | '80mm' = 'A4',
@@ -205,6 +244,7 @@ export function FechamentoTable({ data, onRefresh }: FechamentoTableProps) {
               Saldo Acerto
             </TableHead>
             <TableHead className="text-center">Responsável</TableHead>
+            <TableHead className="text-center w-[120px]">Recolhido</TableHead>
             <TableHead className="text-right">Ação</TableHead>
           </TableRow>
         </TableHeader>
@@ -212,7 +252,7 @@ export function FechamentoTable({ data, onRefresh }: FechamentoTableProps) {
           {data.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={12}
+                colSpan={13}
                 className="h-24 text-center text-muted-foreground"
               >
                 Nenhum fechamento iniciado para esta rota.
@@ -381,6 +421,38 @@ export function FechamentoTable({ data, onRefresh }: FechamentoTableProps) {
 
                   <TableCell className="text-center text-xs text-muted-foreground">
                     {item.responsavel?.nome_completo || '-'}
+                  </TableCell>
+
+                  {/* New Recolhido Column */}
+                  <TableCell className="text-center">
+                    {isClosed ? (
+                      item.recolhido_por_id ? (
+                        <div className="flex flex-col items-center justify-center">
+                          <CheckCheck className="h-4 w-4 text-green-600 mb-1" />
+                          <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                            {item.recolhedor?.nome_completo?.split(' ')[0] ||
+                              'OK'}
+                          </span>
+                        </div>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-full h-8 text-xs border-orange-200 text-orange-700 hover:bg-orange-50"
+                          onClick={() => handleMarkRecolhido(item)}
+                          disabled={isLoading || isGeneratingPdf}
+                        >
+                          {isLoading ? (
+                            <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                          ) : (
+                            <Banknote className="mr-2 h-3 w-3" />
+                          )}
+                          Recolher
+                        </Button>
+                      )
+                    ) : (
+                      <span className="text-xs text-muted-foreground">-</span>
+                    )}
                   </TableCell>
 
                   <TableCell className="text-right">

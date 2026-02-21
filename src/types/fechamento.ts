@@ -22,12 +22,17 @@ export interface FechamentoCaixa {
   responsavel_id: number | null
   status: 'Aberto' | 'Fechado'
   created_at: string
+  recolhido_por_id: number | null
+  recolhido_at: string | null
   // Joins
   funcionario?: {
     nome_completo: string
     foto_url?: string | null
   }
   responsavel?: {
+    nome_completo: string
+  }
+  recolhedor?: {
     nome_completo: string
   }
 }

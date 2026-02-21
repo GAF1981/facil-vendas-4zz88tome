@@ -12,7 +12,8 @@ export const fechamentoService = {
         `
         *,
         funcionario:FUNCIONARIOS!funcionario_id ( nome_completo, foto_url ),
-        responsavel:FUNCIONARIOS!responsavel_id ( nome_completo )
+        responsavel:FUNCIONARIOS!responsavel_id ( nome_completo ),
+        recolhedor:FUNCIONARIOS!fechamento_caixa_recolhido_por_id_fkey ( nome_completo )
       `,
       )
       .eq('rota_id', rotaId)
@@ -156,6 +157,18 @@ export const fechamentoService = {
 
     if (error) throw error
     return data?.status || null
+  },
+
+  async markAsRecolhido(id: number, recolhedorId: number) {
+    const { error } = await supabase
+      .from('fechamento_caixa')
+      .update({
+        recolhido_por_id: recolhedorId,
+        recolhido_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+
+    if (error) throw error
   },
 
   async generateClosingPdf(
