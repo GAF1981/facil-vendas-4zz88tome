@@ -1,0 +1,71 @@
+BEGIN;
+
+-- 1. acoes_cobranca_vencimentos (Child of acoes_cobranca)
+DELETE FROM public."acoes_cobranca_vencimentos"
+WHERE "acao_cobranca_id" IN (
+    SELECT id FROM public."acoes_cobranca"
+    WHERE "pedido_id" IN (768, 769, 770, 772, 774, 777, 780, 788, 789, 790, 791, 792)
+);
+
+-- 2. acoes_cobranca
+DELETE FROM public."acoes_cobranca"
+WHERE "pedido_id" IN (768, 769, 770, 772, 774, 777, 780, 788, 789, 790, 791, 792);
+
+-- 3. AÇOES DE COBRANÇA_BACKUP
+DELETE FROM public."AÇOES DE COBRANÇA_BACKUP"
+WHERE "NÚMERO DO PEDIDO" IN (768, 769, 770, 772, 774, 777, 780, 788, 789, 790, 791, 792);
+
+-- 4. PIX
+DELETE FROM public."PIX"
+WHERE "venda_id" IN (768, 769, 770, 772, 774, 777, 780, 788, 789, 790, 791, 792);
+
+-- 5. RECEBIMENTOS
+DELETE FROM public."RECEBIMENTOS"
+WHERE "venda_id" IN (768, 769, 770, 772, 774, 777, 780, 788, 789, 790, 791, 792);
+
+-- 6. debitos_historico
+DELETE FROM public."debitos_historico"
+WHERE "pedido_id" IN (768, 769, 770, 772, 774, 777, 780, 788, 789, 790, 791, 792);
+
+-- 7. inativar_clientes
+DELETE FROM public."inativar_clientes"
+WHERE "pedido_id" IN (768, 769, 770, 772, 774, 777, 780, 788, 789, 790, 791, 792);
+
+-- 8. notas_fiscais_emitidas
+DELETE FROM public."notas_fiscais_emitidas"
+WHERE "pedido_id" IN (768, 769, 770, 772, 774, 777, 780, 788, 789, 790, 791, 792);
+
+-- 9. NOTA_FISCAL
+DELETE FROM public."NOTA_FISCAL"
+WHERE "venda_id" IN (768, 769, 770, 772, 774, 777, 780, 788, 789, 790, 791, 792);
+
+-- 10. RELATORIO_DE_ESTOQUE
+DELETE FROM public."RELATORIO_DE_ESTOQUE"
+WHERE "numero_pedido" IN (768, 769, 770, 772, 774, 777, 780, 788, 789, 790, 791, 792);
+
+-- 11. AJUSTE_SALDO_INICIAL
+DELETE FROM public."AJUSTE_SALDO_INICIAL"
+WHERE "numero_pedido" IN (768, 769, 770, 772, 774, 777, 780, 788, 789, 790, 791, 792);
+
+-- 12. ESTOQUE GERAL SALDO INICIAL
+DELETE FROM public."ESTOQUE GERAL SALDO INICIAL"
+WHERE "pedido_id" IN (768, 769, 770, 772, 774, 777, 780, 788, 789, 790, 791, 792);
+
+-- 13. ESTOQUE CARRO tables
+DELETE FROM public."ESTOQUE CARRO: CARRO PARA O CLIENTE"
+WHERE "pedido" IN (768, 769, 770, 772, 774, 777, 780, 788, 789, 790, 791, 792);
+
+DELETE FROM public."ESTOQUE CARRO: CARRO PARA O ESTOQUE"
+WHERE "pedido" IN (768, 769, 770, 772, 774, 777, 780, 788, 789, 790, 791, 792);
+
+DELETE FROM public."ESTOQUE CARRO: CLIENTE PARA O CARRO"
+WHERE "pedido" IN (768, 769, 770, 772, 774, 777, 780, 788, 789, 790, 791, 792);
+
+DELETE FROM public."ESTOQUE CARRO: ESTOQUE PARA O CARRO"
+WHERE "pedido" IN (768, 769, 770, 772, 774, 777, 780, 788, 789, 790, 791, 792);
+
+-- 14. BANCO_DE_DADOS
+DELETE FROM public."BANCO_DE_DADOS"
+WHERE "NÚMERO DO PEDIDO" IN (768, 769, 770, 772, 774, 777, 780, 788, 789, 790, 791, 792);
+
+COMMIT;
