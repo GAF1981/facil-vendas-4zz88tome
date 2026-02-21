@@ -540,6 +540,14 @@ export const bancoDeDadosService = {
     const employeeId = dbItems[0]['CODIGO FUNCIONARIO']
     const nfVenda = dbItems[0].nota_fiscal_venda || 'NÃO'
 
+    let originalDate = dbItems[0]['DATA E HORA']
+    if (!originalDate) {
+      const d = dbItems[0]['DATA DO ACERTO']
+      const t = dbItems[0]['HORA DO ACERTO'] || '00:00:00'
+      originalDate = `${d}T${t}`
+    }
+    const sessionId = dbItems[0].session_id
+
     const codigos = [
       ...new Set(dbItems.map((i: any) => i['COD. PRODUTO']).filter(Boolean)),
     ]
@@ -614,6 +622,8 @@ export const bancoDeDadosService = {
       items,
       payments,
       nfVenda,
+      originalDate,
+      sessionId,
     }
   },
 
@@ -650,6 +660,7 @@ export const bancoDeDadosService = {
     payments: PaymentEntry[],
     notaFiscalVenda: string,
     orderId: number,
+    sessionId?: number | null,
   ) {
     await supabase
       .from('ESTOQUE CARRO: CARRO PARA O CLIENTE')
@@ -674,6 +685,7 @@ export const bancoDeDadosService = {
       payments,
       notaFiscalVenda,
       orderId,
+      sessionId,
     )
   },
 
@@ -686,6 +698,7 @@ export const bancoDeDadosService = {
     payments: PaymentEntry[],
     notaFiscalVenda: string,
     customOrderNumber?: number,
+    customSessionId?: number | null,
   ): Promise<number> {
     const nextPedido =
       customOrderNumber ?? (await this.reserveNextOrderNumber())
@@ -766,7 +779,7 @@ export const bancoDeDadosService = {
         valorConsignadoVendaVal - valorConsignadoVendaVal * discountFactor
       const itemDebt = valorVendidoVal * (1 - discountFactor)
 
-      return {
+      const row: any = {
         'NÚMERO DO PEDIDO': nextPedido,
         'DATA DO ACERTO': dataAcertoStr,
         'HORA DO ACERTO': horaAcerto,
@@ -801,6 +814,12 @@ export const bancoDeDadosService = {
         nota_fiscal_venda: nfVenda,
         nota_fiscal_emitida: statusNf,
       }
+
+      if (customSessionId !== undefined && customSessionId !== null) {
+        row.session_id = customSessionId
+      }
+
+      return row
     })
 
     const { error } = await supabase

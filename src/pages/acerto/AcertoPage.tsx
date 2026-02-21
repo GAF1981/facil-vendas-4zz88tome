@@ -73,6 +73,12 @@ export default function AcertoPage() {
   // Edit Mode States
   const [isEditMode, setIsEditMode] = useState(false)
   const [editOrderId, setEditOrderId] = useState<number | null>(null)
+  const [originalOrderDate, setOriginalOrderDate] = useState<string | null>(
+    null,
+  )
+  const [originalSessionId, setOriginalSessionId] = useState<number | null>(
+    null,
+  )
 
   // Default to 80mm as per user story requirement for thermal printer optimization
   const [pdfFormat, setPdfFormat] = useState<'A4' | '80mm'>('80mm')
@@ -127,7 +133,17 @@ export default function AcertoPage() {
     const eid = searchParams.get('editOrderId')
     const cid = searchParams.get('clientId')
 
-    if (eid && !isEditMode) {
+    if (eid && !isEditMode && loggedInUser) {
+      if (!canEditEmployee) {
+        toast({
+          title: 'Acesso Negado',
+          description: 'Você não tem permissão para editar pedidos.',
+          variant: 'destructive',
+        })
+        navigate('/resumo-acertos')
+        return
+      }
+
       const oid = Number(eid)
       if (!isNaN(oid) && oid > 0) {
         setLoadingAcerto(true)
@@ -144,6 +160,8 @@ export default function AcertoPage() {
               setPayments(details.payments)
               setSelectedEmployeeId(details.employeeId.toString())
               setNotaFiscal(details.nfVenda)
+              setOriginalOrderDate(details.originalDate)
+              setOriginalSessionId(details.sessionId)
 
               setClient(clientData)
 
@@ -200,7 +218,15 @@ export default function AcertoPage() {
           .finally(() => setLoadingAcerto(false))
       }
     }
-  }, [searchParams])
+  }, [
+    searchParams,
+    isEditMode,
+    loggedInUser,
+    canEditEmployee,
+    client,
+    navigate,
+    toast,
+  ])
 
   // Client Selection Effect
   useEffect(() => {
@@ -278,8 +304,10 @@ export default function AcertoPage() {
       setIsCaptacao(false)
       setIsEditMode(false)
       setEditOrderId(null)
+      setOriginalOrderDate(null)
+      setOriginalSessionId(null)
     }
-  }, [client, isEditMode])
+  }, [client, isEditMode, toast])
 
   // Calculations
   const totalSalesValue = items.reduce(
@@ -724,17 +752,30 @@ export default function AcertoPage() {
       // Retrieval handles sort.
 
       let finalOrderNumber: number
+      const orderDate =
+        isEditMode && originalOrderDate ? new Date(originalOrderDate) : now
 
       if (isEditMode && editOrderId) {
+        if (!canEditEmployee) {
+          toast({
+            title: 'Acesso Negado',
+            description: 'Você não tem permissão para editar pedidos.',
+            variant: 'destructive',
+          })
+          setSaving(false)
+          return
+        }
+
         finalOrderNumber = await bancoDeDadosService.editTransaction(
           client,
           emp,
           items,
-          now,
+          orderDate,
           isCaptacao ? 'Captação' : 'Acerto',
           payments,
           notaFiscal,
           editOrderId,
+          originalSessionId,
         )
       } else {
         finalOrderNumber = await bancoDeDadosService.saveTransaction(
@@ -854,7 +895,7 @@ export default function AcertoPage() {
           client,
           employee: emp,
           items: sortedItemsForPdf,
-          date: now.toISOString(),
+          date: orderDate.toISOString(),
           acertoTipo: isCaptacao ? 'Captação' : 'Acerto',
           totalVendido: totalSalesValue,
           valorDesconto: discountAmount,
@@ -896,9 +937,11 @@ export default function AcertoPage() {
         title: isCaptacao
           ? 'Captação Realizada'
           : isEditMode
-            ? 'Acerto Atualizado'
+            ? `Pedido #${finalOrderNumber} Atualizado`
             : 'Acerto Realizado',
-        description: 'Pedido salvo e PDF gerado com sucesso.',
+        description: isEditMode
+          ? 'O pedido foi atualizado e o PDF gerado com sucesso.'
+          : 'Pedido salvo e PDF gerado com sucesso.',
         className: 'bg-green-600 text-white',
       })
 
@@ -909,6 +952,8 @@ export default function AcertoPage() {
 
       setIsEditMode(false)
       setEditOrderId(null)
+      setOriginalOrderDate(null)
+      setOriginalSessionId(null)
 
       if (flagInactivation) {
         navigate('/inativar-clientes')
