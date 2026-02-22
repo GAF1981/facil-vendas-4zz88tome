@@ -36,6 +36,7 @@ import {
 } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import {
   Save,
   Printer,
@@ -45,8 +46,11 @@ import {
   RefreshCw,
   Banknote,
   Edit3,
+  Package,
+  AlertCircle,
 } from 'lucide-react'
 import { parseCurrency } from '@/lib/formatters'
+import { cn } from '@/lib/utils'
 import { fechamentoService } from '@/services/fechamentoService'
 import { rotaService } from '@/services/rotaService'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -69,6 +73,7 @@ export default function AcertoPage() {
   const [zeroStockDialogOpen, setZeroStockDialogOpen] = useState(false)
   const [isCaptacao, setIsCaptacao] = useState(false)
   const [collectionDialogOpen, setCollectionDialogOpen] = useState(false)
+  const [isVendaMercadoria, setIsVendaMercadoria] = useState(false)
 
   // Edit Mode States
   const [isEditMode, setIsEditMode] = useState(false)
@@ -306,6 +311,7 @@ export default function AcertoPage() {
       setEditOrderId(null)
       setOriginalOrderDate(null)
       setOriginalSessionId(null)
+      setIsVendaMercadoria(false)
     }
   }, [client, isEditMode, toast])
 
@@ -728,6 +734,22 @@ export default function AcertoPage() {
       (acc, item) => acc + (item.saldoFinal || 0),
       0,
     )
+
+    if (isVendaMercadoria) {
+      if (totalStock > 0) {
+        toast({
+          title: 'Erro de Validação',
+          description:
+            'Venda de Mercadorias. O saldo final deverá ser igual a 0!!!',
+          variant: 'destructive',
+        })
+        return
+      }
+
+      executeSave(false)
+      return
+    }
+
     if (totalStock === 0) {
       setZeroStockDialogOpen(true)
     } else {
@@ -954,6 +976,7 @@ export default function AcertoPage() {
       setEditOrderId(null)
       setOriginalOrderDate(null)
       setOriginalSessionId(null)
+      setIsVendaMercadoria(false)
 
       if (flagInactivation) {
         navigate('/inativar-clientes')
@@ -1040,6 +1063,18 @@ export default function AcertoPage() {
 
           <div className="flex justify-end gap-2 flex-wrap">
             <Button
+              variant={isVendaMercadoria ? 'default' : 'outline'}
+              onClick={() => setIsVendaMercadoria(!isVendaMercadoria)}
+              className={cn(
+                isVendaMercadoria &&
+                  'bg-amber-600 hover:bg-amber-700 text-white border-amber-600',
+              )}
+              title="Venda de todo o estoque"
+            >
+              <Package className="mr-2 h-4 w-4" />
+              Venda de Mercadoria
+            </Button>
+            <Button
               variant="outline"
               onClick={handleRepeatInitialToCount}
               title="Copiar Saldo Inicial para Contagem em todos os itens"
@@ -1075,6 +1110,19 @@ export default function AcertoPage() {
               Registrar Ação de Cobrança
             </Button>
           </div>
+
+          {isVendaMercadoria && (
+            <Alert className="bg-amber-50 border-amber-200 animate-fade-in">
+              <AlertCircle className="h-4 w-4 text-amber-600" />
+              <AlertTitle className="text-amber-800 font-bold">
+                venda de mercadoria
+              </AlertTitle>
+              <AlertDescription className="text-amber-700">
+                Modo de venda de estoque completo ativado. O saldo final de
+                todos os produtos deve ser zero.
+              </AlertDescription>
+            </Alert>
+          )}
 
           <AcertoTable
             items={items}
@@ -1144,28 +1192,56 @@ export default function AcertoPage() {
               Pré-visualizar PDF
             </Button>
 
-            <Button
-              size="lg"
-              onClick={handlePreSaveValidation}
-              disabled={saving || items.length === 0}
-              className="min-w-[200px]"
+            <div
+              onClickCapture={(e) => {
+                if (
+                  isVendaMercadoria &&
+                  items.some((i) => (i.saldoFinal || 0) > 0)
+                ) {
+                  e.stopPropagation()
+                  e.preventDefault()
+                  toast({
+                    title: 'Erro de Validação',
+                    description:
+                      'Venda de Mercadorias. O saldo final deverá ser igual a 0!!!',
+                    variant: 'destructive',
+                  })
+                }
+              }}
             >
-              {saving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Salvando...
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  {isCaptacao
-                    ? 'Finalizar Captação'
-                    : isEditMode
-                      ? 'Salvar Alterações'
-                      : 'Finalizar Acerto'}
-                </>
-              )}
-            </Button>
+              <Button
+                size="lg"
+                onClick={handlePreSaveValidation}
+                disabled={
+                  saving ||
+                  items.length === 0 ||
+                  (isVendaMercadoria &&
+                    items.some((i) => (i.saldoFinal || 0) > 0))
+                }
+                className={cn(
+                  'min-w-[200px]',
+                  isVendaMercadoria &&
+                    items.some((i) => (i.saldoFinal || 0) > 0) &&
+                    'opacity-50 cursor-not-allowed',
+                )}
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    {isCaptacao
+                      ? 'Finalizar Captação'
+                      : isEditMode
+                        ? 'Salvar Alterações'
+                        : 'Finalizar Acerto'}
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
 
           <div className="pt-8">
