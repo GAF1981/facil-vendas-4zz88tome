@@ -31,7 +31,7 @@ import {
   Filter,
   RefreshCw,
   Printer,
-  Edit2,
+  Eye,
 } from 'lucide-react'
 import { notaFiscalService } from '@/services/notaFiscalService'
 import { rotaService } from '@/services/rotaService'
@@ -50,6 +50,7 @@ import {
 import { Label } from '@/components/ui/label'
 import { useUserStore } from '@/stores/useUserStore'
 import { Rota } from '@/types/rota'
+import { supabase } from '@/lib/supabase/client'
 
 export default function NotaFiscalPage() {
   const [loading, setLoading] = useState(true)
@@ -70,6 +71,11 @@ export default function NotaFiscalPage() {
   )
   const [invoiceNumber, setInvoiceNumber] = useState('')
   const [submitting, setSubmitting] = useState(false)
+
+  // Items Dialog
+  const [itemsDialogOpen, setItemsDialogOpen] = useState(false)
+  const [selectedOrderItems, setSelectedOrderItems] = useState<any[]>([])
+  const [loadingItems, setLoadingItems] = useState(false)
 
   const { toast } = useToast()
   const { employee } = useUserStore()
@@ -226,6 +232,29 @@ export default function NotaFiscalPage() {
       })
     } finally {
       setGeneratingPdf(false)
+    }
+  }
+
+  const handleViewItems = async (orderId: number) => {
+    setItemsDialogOpen(true)
+    setLoadingItems(true)
+    try {
+      const { data: dbData } = await supabase
+        .from('BANCO_DE_DADOS')
+        .select(
+          'MERCADORIA, "COD. PRODUTO", "QUANTIDADE VENDIDA", "PREÇO VENDIDO", "VALOR VENDIDO", codigo_interno, codigo_barras' as any,
+        )
+        .eq('"NÚMERO DO PEDIDO"', orderId)
+      setSelectedOrderItems(dbData || [])
+    } catch (error) {
+      console.error('Error fetching items', error)
+      toast({
+        title: 'Erro',
+        description: 'Falha ao carregar itens do pedido.',
+        variant: 'destructive',
+      })
+    } finally {
+      setLoadingItems(false)
     }
   }
 
@@ -446,16 +475,24 @@ export default function NotaFiscalPage() {
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
-                      {item.notaFiscalEmitida === 'Pendente' && (
-                        <div className="flex justify-end gap-2">
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleViewItems(item.orderId)}
+                          title="Ver Itens do Pedido"
+                        >
+                          <Eye className="h-4 w-4 text-muted-foreground hover:text-primary" />
+                        </Button>
+                        {item.notaFiscalEmitida === 'Pendente' && (
                           <Button
                             size="sm"
                             onClick={() => handleEmitClick(item)}
                           >
                             Emitir
                           </Button>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -495,6 +532,72 @@ export default function NotaFiscalPage() {
             >
               {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={itemsDialogOpen} onOpenChange={setItemsDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Itens do Pedido</DialogTitle>
+          </DialogHeader>
+          {loadingItems ? (
+            <div className="flex justify-center p-8">
+              <Loader2 className="animate-spin h-8 w-8 text-primary" />
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Produto</TableHead>
+                  <TableHead>Código Interno</TableHead>
+                  <TableHead>Código de Barras</TableHead>
+                  <TableHead className="text-center">Quantidade</TableHead>
+                  <TableHead className="text-right">Preço</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {selectedOrderItems.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={6}
+                      className="text-center text-muted-foreground"
+                    >
+                      Nenhum item encontrado.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  selectedOrderItems.map((item, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="font-medium">
+                        {item.MERCADORIA || '-'}
+                      </TableCell>
+                      <TableCell className="font-mono text-muted-foreground">
+                        {item.codigo_interno || item['COD. PRODUTO'] || '-'}
+                      </TableCell>
+                      <TableCell className="font-mono text-muted-foreground">
+                        {item.codigo_barras || '-'}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {item['QUANTIDADE VENDIDA']}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        R$ {item['PREÇO VENDIDO'] || '0,00'}
+                      </TableCell>
+                      <TableCell className="text-right font-bold">
+                        R$ {item['VALOR VENDIDO'] || '0,00'}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setItemsDialogOpen(false)}>
+              Fechar
             </Button>
           </DialogFooter>
         </DialogContent>

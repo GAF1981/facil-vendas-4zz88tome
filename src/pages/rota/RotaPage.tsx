@@ -53,6 +53,7 @@ export default function RotaPage() {
       estoque_min: '',
       estoque_max: '',
       vencimento_status: 'todos',
+      pendencias: 'todos',
     }
   })
 
@@ -178,6 +179,12 @@ export default function RotaPage() {
 
       if (filters.vencimento_status !== 'todos') {
         if (row.vencimento_status !== filters.vencimento_status) return false
+      }
+
+      if (filters.pendencias === 'com_pendencia') {
+        if (!row.has_pendency) return false
+      } else if (filters.pendencias === 'sem_pendencia') {
+        if (row.has_pendency) return false
       }
 
       if (filters.debito_min && row.debito < parseFloat(filters.debito_min))

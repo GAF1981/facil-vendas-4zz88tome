@@ -64,6 +64,7 @@ export interface RotaFilterState {
   estoque_min: string
   estoque_max: string
   vencimento_status: string | 'todos'
+  pendencias?: string | 'todos' // Added filter
 }
 
 export type SortDirection = 'asc' | 'desc'

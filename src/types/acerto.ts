@@ -4,6 +4,8 @@ export interface AcertoItem {
   uid: string // Temporary ID for UI handling
   produtoId: number
   produtoCodigo?: number | null
+  codigoInterno?: string | null
+  codigoBarras?: string | null
   produtoNome: string
   tipo: string | null
   precoUnitario: number

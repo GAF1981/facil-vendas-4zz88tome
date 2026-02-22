@@ -17,7 +17,6 @@ import { parseCurrency } from '@/lib/formatters'
 export const cobrancaService = {
   // ... existing code ...
   async getDebts(): Promise<ClientDebt[]> {
-    // ... same implementation as before ...
     const today = startOfDay(new Date())
 
     const { data: debtsData, error: debtsError } = await supabase
@@ -837,7 +836,7 @@ export const cobrancaService = {
   ): Promise<Blob> {
     const { data: orderData, error: orderError } = await supabase
       .from('BANCO_DE_DADOS')
-      .select('*')
+      .select('*, codigo_interno, codigo_barras' as any)
       .eq('"NÚMERO DO PEDIDO"', orderId)
 
     if (orderError) throw orderError
@@ -868,6 +867,8 @@ export const cobrancaService = {
     const items = orderData.map((d) => ({
       produtoNome: d.MERCADORIA,
       produtoCodigo: d['COD. PRODUTO'],
+      codigoInterno: d.codigo_interno || '',
+      codigoBarras: d.codigo_barras || '',
       tipo: d['TIPO'],
       precoUnitario: d['PREÇO VENDIDO'] ? parseCurrency(d['PREÇO VENDIDO']) : 0,
       saldoInicial: Number(d['SALDO INICIAL']) || 0,

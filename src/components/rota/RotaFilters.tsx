@@ -78,6 +78,7 @@ export function RotaFilters({
       estoque_min: '',
       estoque_max: '',
       vencimento_status: 'todos',
+      pendencias: 'todos',
     })
   }
 
@@ -308,6 +309,23 @@ export function RotaFilters({
                     <SelectItem value="todos">Status: Todos</SelectItem>
                     <SelectItem value="VENCIDO">Vencido</SelectItem>
                     <SelectItem value="A VENCER">A Vencer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Pendências Filter */}
+              <div className="w-[120px]">
+                <Select
+                  value={filters.pendencias || 'todos'}
+                  onValueChange={(v) => handleChange('pendencias', v)}
+                >
+                  <SelectTrigger className="h-8 text-xs px-2">
+                    <SelectValue placeholder="Pendências" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Pend.: Todas</SelectItem>
+                    <SelectItem value="com_pendencia">Com Pendência</SelectItem>
+                    <SelectItem value="sem_pendencia">Sem Pendência</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

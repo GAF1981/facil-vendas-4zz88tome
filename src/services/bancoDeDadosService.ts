@@ -157,7 +157,7 @@ export const bancoDeDadosService = {
     }
 
     const items: AcertoItem[] = dbItems
-      .map((dbItem) => {
+      .map((dbItem: any) => {
         const product = products.find(
           (p) => p.CODIGO === dbItem['COD. PRODUTO'],
         )
@@ -173,6 +173,8 @@ export const bancoDeDadosService = {
           uid: Math.random().toString(36).substr(2, 9),
           produtoId: product.ID,
           produtoCodigo: dbItem['COD. PRODUTO'],
+          codigoInterno: product.codigo_interno || dbItem.codigo_interno || '',
+          codigoBarras: product['CÓDIGO BARRAS'] || dbItem.codigo_barras || '',
           produtoNome: dbItem['MERCADORIA'] || product.PRODUTO || 'Sem nome',
           tipo: dbItem['TIPO'],
           precoUnitario: precoUnitario,
@@ -553,7 +555,7 @@ export const bancoDeDadosService = {
     ]
     const { data: products } = await supabase
       .from('PRODUTOS')
-      .select('ID, CODIGO, PRODUTO')
+      .select('ID, CODIGO, PRODUTO, codigo_interno, "CÓDIGO BARRAS"')
       .in('CODIGO', codigos)
 
     const items: AcertoItem[] = dbItems.map((dbItem: any) => {
@@ -562,6 +564,8 @@ export const bancoDeDadosService = {
         uid: Math.random().toString(36).substr(2, 9),
         produtoId: p?.ID || 0,
         produtoCodigo: dbItem['COD. PRODUTO'],
+        codigoInterno: dbItem.codigo_interno || p?.codigo_interno || '',
+        codigoBarras: dbItem.codigo_barras || p?.['CÓDIGO BARRAS'] || '',
         produtoNome: dbItem['MERCADORIA'] || p?.PRODUTO || '',
         tipo: dbItem['TIPO'],
         precoUnitario: parseCurrency(dbItem['PREÇO VENDIDO']),
@@ -790,6 +794,8 @@ export const bancoDeDadosService = {
         FUNCIONÁRIO: employee.nome_completo,
         'DESCONTO POR GRUPO': client.Desconto,
         'COD. PRODUTO': item.produtoCodigo ?? null,
+        codigo_interno: item.codigoInterno,
+        codigo_barras: item.codigoBarras,
         MERCADORIA: item.produtoNome,
         TIPO: item.tipo,
         FORMA: formaPagamento,
@@ -918,7 +924,7 @@ export const bancoDeDadosService = {
   ): Promise<Blob> {
     const { data: orderData, error: orderError } = await supabase
       .from('BANCO_DE_DADOS')
-      .select('*')
+      .select('*, codigo_interno, codigo_barras' as any)
       .eq('"NÚMERO DO PEDIDO"', orderId)
 
     if (orderError) throw orderError
@@ -946,21 +952,40 @@ export const bancoDeDadosService = {
       .select('*')
       .eq('venda_id', orderId)
 
-    const items = orderData.map((d) => ({
-      produtoNome: d.MERCADORIA,
-      produtoCodigo: d['COD. PRODUTO'],
-      tipo: d['TIPO'],
-      precoUnitario: d['PREÇO VENDIDO'] ? parseCurrency(d['PREÇO VENDIDO']) : 0,
-      saldoInicial: Number(d['SALDO INICIAL']) || 0,
-      contagem: Number(d.CONTAGEM) || 0,
-      quantVendida: Number(d['QUANTIDADE VENDIDA']) || 0,
-      saldoFinal: Number(d['SALDO FINAL']) || 0,
-      valorVendido: parseCurrency(d['VALOR VENDIDO']),
-      novasConsignacoes: d['NOVAS CONSIGNAÇÕES']
-        ? parseCurrency(d['NOVAS CONSIGNAÇÕES'])
-        : 0,
-      recolhido: d['RECOLHIDO'] ? parseCurrency(d['RECOLHIDO']) : 0,
-    }))
+    const productIds = [
+      ...new Set(orderData.map((d: any) => d['COD. PRODUTO']).filter(Boolean)),
+    ]
+    let productsData: any[] = []
+    if (productIds.length > 0) {
+      const { data } = await supabase
+        .from('PRODUTOS')
+        .select('ID, codigo_interno, "CÓDIGO BARRAS"')
+        .in('ID', productIds)
+      productsData = data || []
+    }
+
+    const items = orderData.map((d: any) => {
+      const p = productsData.find((prod) => prod.ID === d['COD. PRODUTO'])
+      return {
+        produtoNome: d.MERCADORIA,
+        produtoCodigo: d['COD. PRODUTO'],
+        codigoInterno: d.codigo_interno || p?.codigo_interno || '',
+        codigoBarras: d.codigo_barras || p?.['CÓDIGO BARRAS'] || '',
+        tipo: d['TIPO'],
+        precoUnitario: d['PREÇO VENDIDO']
+          ? parseCurrency(d['PREÇO VENDIDO'])
+          : 0,
+        saldoInicial: Number(d['SALDO INICIAL']) || 0,
+        contagem: Number(d.CONTAGEM) || 0,
+        quantVendida: Number(d['QUANTIDADE VENDIDA']) || 0,
+        saldoFinal: Number(d['SALDO FINAL']) || 0,
+        valorVendido: parseCurrency(d['VALOR VENDIDO']),
+        novasConsignacoes: d['NOVAS CONSIGNAÇÕES']
+          ? parseCurrency(d['NOVAS CONSIGNAÇÕES'])
+          : 0,
+        recolhido: d['RECOLHIDO'] ? parseCurrency(d['RECOLHIDO']) : 0,
+      }
+    })
 
     const totalVendido = items.reduce(
       (acc, item) => acc + (item.valorVendido || 0),
