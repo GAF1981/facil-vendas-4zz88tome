@@ -21,7 +21,12 @@ export default function RotaPage() {
   const [sellers, setSellers] = useState<Employee[]>([])
 
   const { employee: loggedInUser } = useUserStore()
-  const { selectedEmployeeIds, setSelectedEmployeeIds } = useRotaFilterStore()
+  const {
+    selectedEmployeeIds,
+    setSelectedEmployeeIds,
+    hasSetDefaultSeller,
+    setHasSetDefaultSeller,
+  } = useRotaFilterStore()
 
   const [isSelectionMode, setIsSelectionMode] = useState(true)
   const [isFiltrosActive, setIsFiltrosActive] = useState(true)
@@ -30,12 +35,17 @@ export default function RotaPage() {
   const [isBulkFillOpen, setIsBulkFillOpen] = useState(false)
 
   const [filters, setFilters] = useState<RotaFilterState>(() => {
-    const initialVendedor =
-      selectedEmployeeIds.length > 0
-        ? selectedEmployeeIds
-        : loggedInUser
-          ? [loggedInUser.id.toString()]
-          : []
+    let initialVendedor: string[] = []
+
+    if (hasSetDefaultSeller) {
+      initialVendedor = selectedEmployeeIds
+    } else {
+      if (selectedEmployeeIds.length > 0) {
+        initialVendedor = selectedEmployeeIds
+      } else if (loggedInUser) {
+        initialVendedor = [loggedInUser.id.toString()]
+      }
+    }
 
     return {
       search: '',
@@ -59,17 +69,24 @@ export default function RotaPage() {
 
   // Sync to ensure loggedInUser is applied if store hydration takes a cycle
   useEffect(() => {
-    if (
-      selectedEmployeeIds.length === 0 &&
-      loggedInUser &&
-      filters.vendedor.length === 0
-    ) {
-      setFilters((prev) => ({
-        ...prev,
-        vendedor: [loggedInUser.id.toString()],
-      }))
+    if (!hasSetDefaultSeller && loggedInUser) {
+      if (filters.vendedor.length === 0 && selectedEmployeeIds.length === 0) {
+        setFilters((prev) => ({
+          ...prev,
+          vendedor: [loggedInUser.id.toString()],
+        }))
+        setSelectedEmployeeIds([loggedInUser.id.toString()])
+      }
+      setHasSetDefaultSeller(true)
     }
-  }, [loggedInUser, selectedEmployeeIds, filters.vendedor.length])
+  }, [
+    loggedInUser,
+    hasSetDefaultSeller,
+    filters.vendedor.length,
+    selectedEmployeeIds.length,
+    setSelectedEmployeeIds,
+    setHasSetDefaultSeller,
+  ])
 
   useEffect(() => {
     setSelectedEmployeeIds(filters.vendedor)
