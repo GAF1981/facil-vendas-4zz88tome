@@ -361,11 +361,23 @@ export default function PendenciasPage() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <div
-                              className="max-w-[300px] truncate"
-                              title={pendencia.descricao_pendencia}
-                            >
-                              {pendencia.descricao_pendencia}
+                            <div className="flex flex-col gap-1">
+                              <div
+                                className="max-w-[300px] truncate"
+                                title={pendencia.descricao_pendencia}
+                              >
+                                {pendencia.descricao_pendencia}
+                              </div>
+                              <div className="sm:hidden text-[10px] text-muted-foreground flex items-center gap-1 mt-1">
+                                <Users className="w-3 h-3" />
+                                Responsável:{' '}
+                                {pendencia.responsavel_id
+                                  ? employees.find(
+                                      (e) => e.id === pendencia.responsavel_id,
+                                    )?.nome_completo ||
+                                    `ID: ${pendencia.responsavel_id}`
+                                  : 'Todos'}
+                              </div>
                             </div>
                           </TableCell>
                           <TableCell className="text-center">

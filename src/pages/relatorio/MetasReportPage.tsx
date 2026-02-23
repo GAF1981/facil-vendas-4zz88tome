@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   Card,
   CardContent,
@@ -14,7 +14,9 @@ import {
   endOfMonth,
   eachDayOfInterval,
   format,
-  isWeekend,
+  getDaysInMonth,
+  isSameMonth,
+  parseISO,
 } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import {
@@ -54,6 +56,7 @@ import {
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { Label } from '@/components/ui/label'
+import { ManageExceptionsDialog } from '@/components/relatorio/ManageExceptionsDialog'
 
 const MetasReportPage = () => {
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
@@ -67,7 +70,8 @@ const MetasReportPage = () => {
   const [dailyAcertos, setDailyAcertos] = useState<Map<string, number>>(
     new Map(),
   )
-  const [currentMeta, setCurrentMeta] = useState<number>(0)
+  const [currentMetaMensal, setCurrentMetaMensal] = useState<number>(0)
+  const [exceptionDates, setExceptionDates] = useState<string[]>([])
 
   // Dialog State
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -76,6 +80,15 @@ const MetasReportPage = () => {
   const [isSavingMeta, setIsSavingMeta] = useState(false)
 
   const { toast } = useToast()
+
+  const fetchExceptions = useCallback(async () => {
+    try {
+      const data = await metasService.getExceptionDays()
+      setExceptionDates(data.map((d: any) => d.data))
+    } catch (e) {
+      console.error('Failed to load exceptions', e)
+    }
+  }, [])
 
   useEffect(() => {
     const fetchEmployees = async () => {
@@ -87,7 +100,8 @@ const MetasReportPage = () => {
       }
     }
     fetchEmployees()
-  }, [])
+    fetchExceptions()
+  }, [fetchExceptions])
 
   const handleSearch = async () => {
     if (!selectedEmployeeId || !dateRange?.from || !dateRange?.to) {
@@ -106,7 +120,7 @@ const MetasReportPage = () => {
       const endStr = format(dateRange.to, 'yyyy-MM-dd')
 
       const metaInfo = await metasService.getMeta(funcId)
-      setCurrentMeta(metaInfo?.meta_diaria || 0)
+      setCurrentMetaMensal(metaInfo?.meta_mensal || 0)
 
       const acertos = await metasService.getAcertos(funcId, startStr, endStr)
       setDailyAcertos(acertos)
@@ -134,7 +148,7 @@ const MetasReportPage = () => {
     setIsSavingMeta(true)
     try {
       const funcId = parseInt(dialogEmployeeId, 10)
-      const meta = parseInt(dialogMetaValue, 10)
+      const meta = parseFloat(dialogMetaValue)
       await metasService.upsertMeta(funcId, meta)
       toast({
         title: 'Sucesso',
@@ -159,31 +173,37 @@ const MetasReportPage = () => {
     }
   }
 
-  const isHoliday = (date: Date) => {
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const day = String(date.getDate()).padStart(2, '0')
-    const mmdd = `${month}-${day}`
-    const holidays = [
-      '01-01',
-      '04-21',
-      '05-01',
-      '09-07',
-      '10-12',
-      '11-02',
-      '11-15',
-      '12-25',
-    ]
-    return holidays.includes(mmdd)
-  }
+  const checkIsException = useCallback(
+    (date: Date) => {
+      const dateStr = format(date, 'yyyy-MM-dd')
+      if (exceptionDates.includes(dateStr)) return true
+      return false
+    },
+    [exceptionDates],
+  )
 
   const reportData = useMemo(() => {
     if (!dateRange?.from || !dateRange?.to) return []
 
+    const currentMonth = dateRange.from
+    const daysInMonth = getDaysInMonth(currentMonth)
+
+    let exceptionsInMonth = 0
+    exceptionDates.forEach((d) => {
+      const ed = parseISO(d)
+      if (isSameMonth(ed, currentMonth)) {
+        exceptionsInMonth++
+      }
+    })
+
+    const workingDays = Math.max(1, daysInMonth - exceptionsInMonth)
+    const dailyMeta = currentMetaMensal / workingDays
+
     const days = eachDayOfInterval({ start: dateRange.from, end: dateRange.to })
     return days.map((day) => {
       const dateStr = format(day, 'yyyy-MM-dd')
-      const isBusinessDay = !isWeekend(day) && !isHoliday(day)
-      const metaForDay = isBusinessDay ? currentMeta : 0
+      const isException = checkIsException(day)
+      const metaForDay = isException ? 0 : parseFloat(dailyMeta.toFixed(2))
       const acertos = dailyAcertos.get(dateStr) || 0
       const apuracao = acertos - metaForDay
 
@@ -193,10 +213,16 @@ const MetasReportPage = () => {
         acertos,
         metaForDay,
         apuracao,
-        isBusinessDay,
+        isException,
       }
     })
-  }, [dateRange, dailyAcertos, currentMeta])
+  }, [
+    dateRange,
+    dailyAcertos,
+    currentMetaMensal,
+    checkIsException,
+    exceptionDates,
+  ])
 
   const summary = useMemo(() => {
     let totalAcertos = 0
@@ -209,11 +235,15 @@ const MetasReportPage = () => {
       totalApuracao += row.apuracao
     })
 
-    return { totalAcertos, totalMetas, totalApuracao }
+    return {
+      totalAcertos,
+      totalMetas: parseFloat(totalMetas.toFixed(2)),
+      totalApuracao: parseFloat(totalApuracao.toFixed(2)),
+    }
   }, [reportData])
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in pb-20">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
@@ -224,57 +254,68 @@ const MetasReportPage = () => {
           </p>
         </div>
 
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              Adicionar Meta
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Configurar Meta Diária</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Funcionário</Label>
-                <Select
-                  value={dialogEmployeeId}
-                  onValueChange={setDialogEmployeeId}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um funcionário" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {employees.map((emp) => (
-                      <SelectItem key={emp.id} value={emp.id.toString()}>
-                        {emp.nome_completo}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Meta Diária (Quantidade de Acertos)</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  value={dialogMetaValue}
-                  onChange={(e) => setDialogMetaValue(e.target.value)}
-                  placeholder="Ex: 15"
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button onClick={handleSaveMeta} disabled={isSavingMeta}>
-                {isSavingMeta ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : null}
-                Salvar Meta
+        <div className="flex flex-wrap items-center gap-2">
+          <ManageExceptionsDialog
+            onExceptionsChanged={() => {
+              fetchExceptions().then(() => {
+                if (selectedEmployeeId) handleSearch()
+              })
+            }}
+          />
+
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="w-4 h-4 mr-2" />
+                Adicionar Meta
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Configurar Meta Mensal</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>Funcionário</Label>
+                  <Select
+                    value={dialogEmployeeId}
+                    onValueChange={setDialogEmployeeId}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione um funcionário" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {employees.map((emp) => (
+                        <SelectItem key={emp.id} value={emp.id.toString()}>
+                          {emp.nome_completo}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Meta Mensal (Quantidade de Acertos)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={dialogMetaValue}
+                    onChange={(e) => setDialogMetaValue(e.target.value)}
+                    placeholder="Ex: 300"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button onClick={handleSaveMeta} disabled={isSavingMeta}>
+                  {isSavingMeta ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : null}
+                  Salvar Meta
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <Card>
@@ -393,27 +434,27 @@ const MetasReportPage = () => {
                   {reportData.map((row, idx) => (
                     <TableRow
                       key={idx}
-                      className={!row.isBusinessDay ? 'bg-muted/50' : ''}
+                      className={row.isException ? 'bg-muted/50' : ''}
                     >
                       <TableCell>
                         {format(row.date, 'dd/MM/yyyy', { locale: ptBR })}
-                        {!row.isBusinessDay && (
+                        {row.isException && (
                           <span className="ml-2 text-xs text-muted-foreground">
-                            (Fim de semana/Feriado)
+                            (Exceção/Feriado)
                           </span>
                         )}
                       </TableCell>
                       <TableCell className="text-right font-medium">
                         {row.acertos}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right text-muted-foreground">
                         {row.metaForDay}
                       </TableCell>
                       <TableCell
                         className={`text-right font-bold ${row.apuracao < 0 ? 'text-red-600' : row.apuracao > 0 ? 'text-green-600' : ''}`}
                       >
                         {row.apuracao > 0 ? '+' : ''}
-                        {row.apuracao}
+                        {parseFloat(row.apuracao.toFixed(2))}
                       </TableCell>
                     </TableRow>
                   ))}

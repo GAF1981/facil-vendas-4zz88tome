@@ -54,6 +54,10 @@ const calculateThermalHeight = (body: any) => {
     reportType === 'employee-cash-summary'
   ) {
     let h = 650
+    const expenses = body.expenses || []
+    if (expenses.length > 0) {
+      h += 40 + expenses.length * 15
+    }
     const settlements = body.settlements || []
     if (settlements.length > 0) {
       h += 60
@@ -579,7 +583,38 @@ Deno.serve(async (req) => {
         })
         y -= 25
 
-        drawText('TOTAL SAIDA (DESPESAS):', margins.left, y, { size: 10 })
+        const expenses = body.expenses || []
+        if (expenses.length > 0) {
+          drawText('Descrição', margins.left, y, { size: 9, font: fontBold })
+          drawText('Valor', width - margins.right, y, {
+            size: 9,
+            font: fontBold,
+            align: 'right',
+          })
+          y -= 15
+          for (const exp of expenses) {
+            checkPageBreak(20)
+            const desc = (exp.detalhamento || exp.grupo || 'Despesa').substring(
+              0,
+              30,
+            )
+            drawText(desc, margins.left, y, { size: 9 })
+            drawText(
+              `R$ ${formatCurrency(exp.valor)}`,
+              width - margins.right,
+              y,
+              { size: 9, align: 'right' },
+            )
+            y -= 12
+          }
+          drawLine(y, 0.5)
+          y -= 15
+        }
+
+        drawText('TOTAL SAIDA (DESPESAS):', margins.left, y, {
+          size: 10,
+          font: fontBold,
+        })
         drawText(`R$ ${formatCurrency(vDespesas)}`, width - margins.right, y, {
           size: 10,
           font: fontBold,
@@ -784,7 +819,38 @@ Deno.serve(async (req) => {
         })
         y -= 15
 
-        drawText('TOTAL SAIDA (DESPESAS):', margins.left, y, { size: 9 })
+        const expenses = body.expenses || []
+        if (expenses.length > 0) {
+          drawText('Descrição', margins.left, y, { size: 8, font: fontBold })
+          drawText('Valor', width - margins.right, y, {
+            size: 8,
+            font: fontBold,
+            align: 'right',
+          })
+          y -= 12
+          for (const exp of expenses) {
+            checkPageBreak(20)
+            const desc = (exp.detalhamento || exp.grupo || 'Despesa').substring(
+              0,
+              20,
+            )
+            drawText(desc, margins.left, y, { size: 8 })
+            drawText(
+              `R$ ${formatCurrency(exp.valor)}`,
+              width - margins.right,
+              y,
+              { size: 8, align: 'right' },
+            )
+            y -= 12
+          }
+          drawLine(y, 0.5)
+          y -= 10
+        }
+
+        drawText('TOTAL SAIDA (DESPESAS):', margins.left, y, {
+          size: 9,
+          font: fontBold,
+        })
         drawText(`R$ ${formatCurrency(vDespesas)}`, width - margins.right, y, {
           size: 9,
           align: 'right',

@@ -13,11 +13,11 @@ export const metasService = {
     return data as MetaFuncionario | null
   },
 
-  async upsertMeta(funcionarioId: number, metaDiaria: number) {
+  async upsertMeta(funcionarioId: number, metaMensal: number) {
     const { error } = await supabase
       .from('metas_funcionarios' as any)
       .upsert(
-        { funcionario_id: funcionarioId, meta_diaria: metaDiaria },
+        { funcionario_id: funcionarioId, meta_mensal: metaMensal },
         { onConflict: 'funcionario_id' },
       )
 
@@ -58,5 +58,29 @@ export const metasService = {
     })
 
     return result
+  },
+
+  async getExceptionDays() {
+    const { data, error } = await supabase
+      .from('meta_excecoes' as any)
+      .select('*')
+      .order('data')
+    if (error) throw error
+    return data || []
+  },
+
+  async addExceptionDay(data: string, descricao: string) {
+    const { error } = await supabase
+      .from('meta_excecoes' as any)
+      .insert({ data, descricao })
+    if (error) throw error
+  },
+
+  async deleteExceptionDay(id: number) {
+    const { error } = await supabase
+      .from('meta_excecoes' as any)
+      .delete()
+      .eq('id', id)
+    if (error) throw error
   },
 }

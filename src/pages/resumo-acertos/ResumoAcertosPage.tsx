@@ -36,6 +36,9 @@ import {
   FileText,
   Printer,
   Edit3,
+  Trash2,
+  Filter,
+  CalendarDays,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { Link, useNavigate } from 'react-router-dom'
@@ -45,8 +48,10 @@ import { employeesService } from '@/services/employeesService'
 import { useUserStore } from '@/stores/useUserStore'
 import { supabase } from '@/lib/supabase/client'
 import { acertoService } from '@/services/acertoService'
-import { format } from 'date-fns'
+import { format, startOfMonth, endOfMonth } from 'date-fns'
 import { EditPaymentDialog } from '@/components/resumo-acertos/EditPaymentDialog'
+import { DateRangePicker } from '@/components/common/DateRangePicker'
+import { DateRange } from 'react-day-picker'
 
 export default function ResumoAcertosPage() {
   const { employee: loggedInUser } = useUserStore()
@@ -57,6 +62,12 @@ export default function ResumoAcertosPage() {
 
   const [employees, setEmployees] = useState<Employee[]>([])
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('todos')
+
+  const [filterMode, setFilterMode] = useState<'periodo' | 'rota'>('periodo')
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: startOfMonth(new Date()),
+    to: endOfMonth(new Date()),
+  })
 
   const [reprintingId, setReprintingId] = useState<number | null>(null)
   const [editingPaymentOrder, setEditingPaymentOrder] =
@@ -94,15 +105,28 @@ export default function ResumoAcertosPage() {
   }
 
   const fetchData = useCallback(
-    async (routeId: string, isBackground = false) => {
-      if (!routeId) return
+    async (isBackground = false) => {
       if (!isBackground) setLoading(true)
       try {
-        const route = routes.find((r) => r.id.toString() === routeId)
-        if (route) {
-          const settlements = await resumoAcertosService.getSettlements(route)
-          setData(settlements)
+        let settlements: SettlementSummary[] = []
+        if (filterMode === 'rota' && selectedRouteId) {
+          const route = routes.find((r) => r.id.toString() === selectedRouteId)
+          if (route) {
+            settlements = await resumoAcertosService.getSettlements({
+              rota: route,
+            })
+          }
+        } else if (
+          filterMode === 'periodo' &&
+          dateRange?.from &&
+          dateRange?.to
+        ) {
+          settlements = await resumoAcertosService.getSettlements({
+            startDate: format(dateRange.from, 'yyyy-MM-dd'),
+            endDate: format(dateRange.to, 'yyyy-MM-dd'),
+          })
         }
+        setData(settlements)
       } catch (error) {
         console.error(error)
         toast({
@@ -114,33 +138,31 @@ export default function ResumoAcertosPage() {
         if (!isBackground) setLoading(false)
       }
     },
-    [routes, toast],
+    [routes, selectedRouteId, filterMode, dateRange, toast],
   )
 
   useEffect(() => {
-    if (!selectedRouteId) return
-
     const channel = supabase
       .channel('resumo-acertos-realtime')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'BANCO_DE_DADOS' },
         () => {
-          fetchData(selectedRouteId, true)
+          fetchData(true)
         },
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'RECEBIMENTOS' },
         () => {
-          fetchData(selectedRouteId, true)
+          fetchData(true)
         },
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'ROTA' },
         () => {
-          fetchRoutes().then(() => fetchData(selectedRouteId, true))
+          fetchRoutes().then(() => fetchData(true))
         },
       )
       .subscribe()
@@ -148,7 +170,7 @@ export default function ResumoAcertosPage() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [selectedRouteId, fetchData])
+  }, [fetchData])
 
   useEffect(() => {
     fetchRoutes()
@@ -162,10 +184,12 @@ export default function ResumoAcertosPage() {
   }, [loggedInUser])
 
   useEffect(() => {
-    if (selectedRouteId && routes.length > 0) {
-      fetchData(selectedRouteId)
+    if (filterMode === 'rota' && selectedRouteId && routes.length > 0) {
+      fetchData()
+    } else if (filterMode === 'periodo' && dateRange?.from && dateRange?.to) {
+      fetchData()
     }
-  }, [selectedRouteId, routes, fetchData])
+  }, [filterMode, selectedRouteId, dateRange, routes, fetchData])
 
   const handleReprint = async (orderId: number) => {
     setReprintingId(orderId)
@@ -199,6 +223,35 @@ export default function ResumoAcertosPage() {
       })
     } finally {
       setReprintingId(null)
+    }
+  }
+
+  const handleDeleteOrder = async (orderId: number) => {
+    if (
+      !confirm(
+        `Esta ação é irreversível e apagará todos os dados relacionados ao pedido. Deseja continuar?`,
+      )
+    ) {
+      return
+    }
+
+    try {
+      const { error } = await supabase.rpc('delete_full_order', {
+        p_order_id: orderId,
+      })
+      if (error) throw error
+      toast({
+        title: 'Sucesso',
+        description: 'Pedido excluído com sucesso.',
+        className: 'bg-green-50 border-green-200 text-green-900',
+      })
+      fetchData()
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao excluir',
+        description: err.message || 'Erro inesperado.',
+        variant: 'destructive',
+      })
     }
   }
 
@@ -258,37 +311,66 @@ export default function ResumoAcertosPage() {
 
       <Card className="border-l-4 border-l-blue-600 bg-blue-50/20">
         <CardHeader className="pb-2">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <div className="flex items-center gap-2 text-lg font-semibold">
-                <MapIcon className="h-5 w-5 text-blue-600" />
-                Seletor de Rota
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <Filter className="h-4 w-4 text-blue-600" />
+                Modo de Filtro
               </div>
               <Select
-                value={selectedRouteId}
-                onValueChange={setSelectedRouteId}
+                value={filterMode}
+                onValueChange={(val: any) => setFilterMode(val)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione a rota" />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {routes.map((route) => (
-                    <SelectItem key={route.id} value={route.id.toString()}>
-                      Rota #{route.id} (
-                      {safeFormatDate(route.data_inicio, 'dd/MM')}
-                      {route.data_fim
-                        ? ` - ${safeFormatDate(route.data_fim, 'dd/MM')}`
-                        : ' - Atual'}
-                      )
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="periodo">Por Período</SelectItem>
+                  <SelectItem value="rota">Por Rota</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
+            {filterMode === 'rota' ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  <MapIcon className="h-4 w-4 text-blue-600" />
+                  Seletor de Rota
+                </div>
+                <Select
+                  value={selectedRouteId}
+                  onValueChange={setSelectedRouteId}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a rota" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {routes.map((route) => (
+                      <SelectItem key={route.id} value={route.id.toString()}>
+                        Rota #{route.id} (
+                        {safeFormatDate(route.data_inicio, 'dd/MM')}
+                        {route.data_fim
+                          ? ` - ${safeFormatDate(route.data_fim, 'dd/MM')}`
+                          : ' - Atual'}
+                        )
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  <CalendarDays className="h-4 w-4 text-blue-600" />
+                  Período
+                </div>
+                <DateRangePicker date={dateRange} setDate={setDateRange} />
+              </div>
+            )}
+
             <div className="space-y-2">
-              <div className="flex items-center gap-2 text-lg font-semibold">
-                <User className="h-5 w-5 text-blue-600" />
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <User className="h-4 w-4 text-blue-600" />
                 Filtrar por Funcionário
               </div>
               <Select
@@ -311,7 +393,7 @@ export default function ResumoAcertosPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {selectedRoute ? (
+          {filterMode === 'rota' && selectedRoute ? (
             <div className="flex flex-wrap gap-4 pt-2 text-sm">
               <div className="bg-background border px-3 py-1 rounded-md">
                 <span className="text-muted-foreground mr-2">Início:</span>
@@ -328,11 +410,11 @@ export default function ResumoAcertosPage() {
                 </span>
               </div>
             </div>
-          ) : (
+          ) : filterMode === 'rota' && !selectedRoute ? (
             <div className="text-amber-600 font-medium">
               Nenhuma rota encontrada.
             </div>
-          )}
+          ) : null}
         </CardContent>
       </Card>
 
@@ -558,6 +640,15 @@ export default function ResumoAcertosPage() {
                               <Printer className="h-4 w-4" />
                             )}
                           </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-red-600"
+                            onClick={() => handleDeleteOrder(row.orderId)}
+                            title="Excluir Pedido Permanentemente"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -574,7 +665,7 @@ export default function ResumoAcertosPage() {
           open={!!editingPaymentOrder}
           onOpenChange={(open) => !open && setEditingPaymentOrder(null)}
           order={editingPaymentOrder}
-          onSuccess={() => fetchData(selectedRouteId)}
+          onSuccess={() => fetchData()}
         />
       )}
     </div>

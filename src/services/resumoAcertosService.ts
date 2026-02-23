@@ -171,21 +171,38 @@ export const resumoAcertosService = {
     if (rpcError) throw rpcError
   },
 
-  async getSettlements(rota: Rota) {
-    const routeStart = parseISO(rota.data_inicio)
-    const routeEnd = rota.data_fim ? parseISO(rota.data_fim) : new Date()
-
-    const datePartStart = rota.data_inicio.split('T')[0]
-    const datePartEnd = rota.data_fim ? rota.data_fim.split('T')[0] : null
-
+  async getSettlements(options: {
+    rota?: Rota
+    startDate?: string
+    endDate?: string
+  }) {
     let query = supabase
       .from('BANCO_DE_DADOS')
       .select('*')
-      .gte('"DATA DO ACERTO"', datePartStart)
       .not('"NÚMERO DO PEDIDO"', 'is', null)
 
-    if (datePartEnd) {
-      query = query.lte('"DATA DO ACERTO"', datePartEnd)
+    let routeStart: Date | null = null
+    let routeEnd: Date | null = null
+
+    if (options.rota) {
+      routeStart = parseISO(options.rota.data_inicio)
+      routeEnd = options.rota.data_fim
+        ? parseISO(options.rota.data_fim)
+        : new Date()
+
+      const datePartStart = options.rota.data_inicio.split('T')[0]
+      const datePartEnd = options.rota.data_fim
+        ? options.rota.data_fim.split('T')[0]
+        : null
+
+      query = query.gte('"DATA DO ACERTO"', datePartStart)
+      if (datePartEnd) {
+        query = query.lte('"DATA DO ACERTO"', datePartEnd)
+      }
+    } else if (options.startDate && options.endDate) {
+      query = query
+        .gte('"DATA DO ACERTO"', options.startDate)
+        .lte('"DATA DO ACERTO"', options.endDate)
     }
 
     const { data: dbData, error: dbError } = await query
@@ -199,21 +216,23 @@ export const resumoAcertosService = {
       const timeStr = row['HORA DO ACERTO'] || '00:00:00'
       if (!dateStr) return
 
-      const rowDateTimeStr = `${dateStr}T${timeStr}`
-      let rowDateTime: Date
-      try {
-        rowDateTime = parseISO(rowDateTimeStr)
-      } catch (e) {
-        return
+      if (options.rota) {
+        const rowDateTimeStr = `${dateStr}T${timeStr}`
+        let rowDateTime: Date
+        try {
+          rowDateTime = parseISO(rowDateTimeStr)
+        } catch (e) {
+          return
+        }
+
+        const isAfterOrEqualStart =
+          isAfter(rowDateTime, routeStart!) || isEqual(rowDateTime, routeStart!)
+        const isBeforeOrEqualEnd =
+          isBefore(rowDateTime, routeEnd!) || isEqual(rowDateTime, routeEnd!)
+
+        if (!isAfterOrEqualStart) return
+        if (options.rota.data_fim && !isBeforeOrEqualEnd) return
       }
-
-      const isAfterOrEqualStart =
-        isAfter(rowDateTime, routeStart) || isEqual(rowDateTime, routeStart)
-      const isBeforeOrEqualEnd =
-        isBefore(rowDateTime, routeEnd) || isEqual(rowDateTime, routeEnd)
-
-      if (!isAfterOrEqualStart) return
-      if (rota.data_fim && !isBeforeOrEqualEnd) return
 
       const orderId = row['NÚMERO DO PEDIDO']
       if (!ordersMap.has(orderId)) {

@@ -25,7 +25,7 @@ export const fechamentoService = {
 
   async createClosing(rota: Rota, funcionarioId: number) {
     // 1. Calculate Financial Totals
-    const settlements = await resumoAcertosService.getSettlements(rota)
+    const settlements = await resumoAcertosService.getSettlements({ rota })
 
     // Filter settlements for this employee
     const employeeSettlements = settlements.filter(
@@ -202,7 +202,7 @@ export const fechamentoService = {
     )
 
     // 4. Fetch Settlements (Detailed Table Data)
-    const allSettlements = await resumoAcertosService.getSettlements(rota)
+    const allSettlements = await resumoAcertosService.getSettlements({ rota })
     const settlements = allSettlements.filter(
       (s) => s.employeeId === fechamento.funcionario_id,
     )
