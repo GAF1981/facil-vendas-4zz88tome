@@ -17,6 +17,7 @@ import {
   isWeekend,
   startOfDay,
   isAfter,
+  parseISO,
 } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import {
@@ -33,7 +34,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogFooter,
 } from '@/components/ui/dialog'
 import {
   Table,
@@ -43,17 +43,19 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { employeesService } from '@/services/employeesService'
 import { metasService } from '@/services/metasService'
 import { Employee } from '@/types/employee'
+import { MetaPeriodo } from '@/types/meta'
 import {
   Target,
   TrendingUp,
   CheckCircle,
   Search,
-  Plus,
   Loader2,
   PieChart,
+  Trash2,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { Label } from '@/components/ui/label'
@@ -73,12 +75,18 @@ const MetasReportPage = () => {
     new Map(),
   )
   const [currentMetaDiaria, setCurrentMetaDiaria] = useState<number>(0)
+  const [periodGoals, setPeriodGoals] = useState<MetaPeriodo[]>([])
   const [exceptionDates, setExceptionDates] = useState<any[]>([])
 
   // Dialog State
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [dialogEmployeeId, setDialogEmployeeId] = useState<string>('')
   const [dialogMetaValue, setDialogMetaValue] = useState<string>('')
+  const [periodDateRange, setPeriodDateRange] = useState<
+    DateRange | undefined
+  >()
+  const [periodMetaValue, setPeriodMetaValue] = useState<string>('')
+  const [dialogPeriodGoals, setDialogPeriodGoals] = useState<MetaPeriodo[]>([])
   const [isSavingMeta, setIsSavingMeta] = useState(false)
 
   const { toast } = useToast()
@@ -105,6 +113,24 @@ const MetasReportPage = () => {
     fetchExceptions()
   }, [fetchExceptions])
 
+  useEffect(() => {
+    if (isDialogOpen && dialogEmployeeId) {
+      const empId = parseInt(dialogEmployeeId, 10)
+      metasService.getMeta(empId).then((res) => {
+        setDialogMetaValue(res?.meta_diaria?.toString() || '')
+      })
+      metasService.getMetasPeriodos(empId).then((res) => {
+        setDialogPeriodGoals(res)
+      })
+    } else if (!isDialogOpen) {
+      setDialogEmployeeId('')
+      setDialogMetaValue('')
+      setPeriodMetaValue('')
+      setPeriodDateRange(undefined)
+      setDialogPeriodGoals([])
+    }
+  }, [isDialogOpen, dialogEmployeeId])
+
   const handleSearch = async () => {
     if (!selectedEmployeeId || !dateRange?.from || !dateRange?.to) {
       toast({
@@ -124,6 +150,9 @@ const MetasReportPage = () => {
       const metaInfo = await metasService.getMeta(funcId)
       setCurrentMetaDiaria(metaInfo?.meta_diaria || 0)
 
+      const periodos = await metasService.getMetasPeriodos(funcId)
+      setPeriodGoals(periodos)
+
       const acertos = await metasService.getAcertos(funcId, startStr, endStr)
       setDailyAcertos(acertos)
     } catch (error: any) {
@@ -138,11 +167,11 @@ const MetasReportPage = () => {
     }
   }
 
-  const handleSaveMeta = async () => {
+  const handleSaveMetaFixa = async () => {
     if (!dialogEmployeeId || !dialogMetaValue) {
       toast({
         title: 'Atenção',
-        description: 'Preencha todos os campos.',
+        description: 'Preencha o valor da meta.',
         variant: 'destructive',
       })
       return
@@ -154,12 +183,9 @@ const MetasReportPage = () => {
       await metasService.upsertMeta(funcId, meta)
       toast({
         title: 'Sucesso',
-        description: 'Meta atualizada com sucesso!',
+        description: 'Meta fixa atualizada com sucesso!',
         className: 'bg-green-600 text-white',
       })
-      setIsDialogOpen(false)
-      setDialogEmployeeId('')
-      setDialogMetaValue('')
 
       if (selectedEmployeeId === dialogEmployeeId) {
         handleSearch()
@@ -172,6 +198,76 @@ const MetasReportPage = () => {
       })
     } finally {
       setIsSavingMeta(false)
+    }
+  }
+
+  const handleSaveMetaPeriodo = async () => {
+    if (
+      !dialogEmployeeId ||
+      !periodMetaValue ||
+      !periodDateRange?.from ||
+      !periodDateRange?.to
+    ) {
+      toast({
+        title: 'Atenção',
+        description: 'Preencha o período e o valor da meta.',
+        variant: 'destructive',
+      })
+      return
+    }
+    setIsSavingMeta(true)
+    try {
+      const funcId = parseInt(dialogEmployeeId, 10)
+      const meta = parseFloat(periodMetaValue)
+      await metasService.addMetaPeriodo(
+        funcId,
+        format(periodDateRange.from, 'yyyy-MM-dd'),
+        format(periodDateRange.to, 'yyyy-MM-dd'),
+        meta,
+      )
+      toast({
+        title: 'Sucesso',
+        description: 'Meta por período adicionada!',
+        className: 'bg-green-600 text-white',
+      })
+
+      setPeriodMetaValue('')
+      setPeriodDateRange(undefined)
+
+      const periodos = await metasService.getMetasPeriodos(funcId)
+      setDialogPeriodGoals(periodos)
+
+      if (selectedEmployeeId === dialogEmployeeId) {
+        handleSearch()
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Erro',
+        description: error.message,
+        variant: 'destructive',
+      })
+    } finally {
+      setIsSavingMeta(false)
+    }
+  }
+
+  const handleDeletePeriodGoal = async (id: number) => {
+    try {
+      await metasService.deleteMetaPeriodo(id)
+      toast({ title: 'Meta removida com sucesso' })
+      const funcId = parseInt(dialogEmployeeId, 10)
+      const periodos = await metasService.getMetasPeriodos(funcId)
+      setDialogPeriodGoals(periodos)
+
+      if (selectedEmployeeId === dialogEmployeeId) {
+        handleSearch()
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Erro',
+        description: error.message,
+        variant: 'destructive',
+      })
     }
   }
 
@@ -203,9 +299,14 @@ const MetasReportPage = () => {
       const isNonWorkingDay = isException || isWknd
       const isFutureDate = isAfter(day, today)
 
-      const metaForDay = isNonWorkingDay
-        ? 0
+      const periodGoal = periodGoals.find(
+        (p) => dateStr >= p.data_inicio && dateStr <= p.data_fim,
+      )
+      const effectiveMeta = periodGoal
+        ? parseFloat(periodGoal.valor_meta.toString())
         : parseFloat(currentMetaDiaria.toFixed(2))
+
+      const metaForDay = isNonWorkingDay ? 0 : effectiveMeta
       const acertos = dailyAcertos.get(dateStr) || 0
       const apuracao = isFutureDate ? 0 : acertos - metaForDay
 
@@ -224,6 +325,7 @@ const MetasReportPage = () => {
     dateRange,
     dailyAcertos,
     currentMetaDiaria,
+    periodGoals,
     checkIsException,
     selectedEmployeeId,
   ])
@@ -236,7 +338,6 @@ const MetasReportPage = () => {
     const today = startOfDay(new Date())
 
     reportData.forEach((row) => {
-      // Only aggregate data up to today for summary accuracy
       if (!isAfter(row.date, today)) {
         totalAcertos += row.acertos
         totalMetas += row.metaForDay
@@ -278,53 +379,158 @@ const MetasReportPage = () => {
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                Adicionar Meta
+                <Target className="w-4 h-4 mr-2" />
+                Configurar Metas
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-2xl max-h-screen overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Configurar Meta Diária</DialogTitle>
+                <DialogTitle>Configurar Metas de Funcionários</DialogTitle>
               </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label>Funcionário</Label>
-                  <Select
-                    value={dialogEmployeeId}
-                    onValueChange={setDialogEmployeeId}
+              <Tabs defaultValue="fixa" className="w-full mt-4">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="fixa">Meta Fixa Diária</TabsTrigger>
+                  <TabsTrigger value="periodo">Meta por Período</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="fixa" className="space-y-4 pt-4">
+                  <div className="space-y-2">
+                    <Label>Funcionário</Label>
+                    <Select
+                      value={dialogEmployeeId}
+                      onValueChange={setDialogEmployeeId}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione um funcionário" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {employees.map((emp) => (
+                          <SelectItem key={emp.id} value={emp.id.toString()}>
+                            {emp.nome_completo}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Meta Fixa Diária (Acertos)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={dialogMetaValue}
+                      onChange={(e) => setDialogMetaValue(e.target.value)}
+                      placeholder="Ex: 15"
+                      disabled={!dialogEmployeeId}
+                    />
+                  </div>
+                  <Button
+                    onClick={handleSaveMetaFixa}
+                    disabled={isSavingMeta || !dialogEmployeeId}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione um funcionário" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {employees.map((emp) => (
-                        <SelectItem key={emp.id} value={emp.id.toString()}>
-                          {emp.nome_completo}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Meta Diária (Quantidade de Acertos)</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={dialogMetaValue}
-                    onChange={(e) => setDialogMetaValue(e.target.value)}
-                    placeholder="Ex: 15"
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button onClick={handleSaveMeta} disabled={isSavingMeta}>
-                  {isSavingMeta ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : null}
-                  Salvar Meta
-                </Button>
-              </DialogFooter>
+                    {isSavingMeta && (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    )}
+                    Salvar Meta Fixa
+                  </Button>
+                </TabsContent>
+
+                <TabsContent value="periodo" className="space-y-4 pt-4">
+                  <div className="space-y-2">
+                    <Label>Funcionário</Label>
+                    <Select
+                      value={dialogEmployeeId}
+                      onValueChange={setDialogEmployeeId}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione um funcionário" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {employees.map((emp) => (
+                          <SelectItem key={emp.id} value={emp.id.toString()}>
+                            {emp.nome_completo}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Período Específico</Label>
+                      <DateRangePicker
+                        date={periodDateRange}
+                        setDate={setPeriodDateRange}
+                        className="w-full"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Meta Diária no Período</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={periodMetaValue}
+                        onChange={(e) => setPeriodMetaValue(e.target.value)}
+                        placeholder="Ex: 20"
+                        disabled={!dialogEmployeeId}
+                      />
+                    </div>
+                  </div>
+                  <Button
+                    onClick={handleSaveMetaPeriodo}
+                    disabled={isSavingMeta || !dialogEmployeeId}
+                  >
+                    {isSavingMeta && (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    )}
+                    Adicionar Meta por Período
+                  </Button>
+
+                  {dialogEmployeeId && (
+                    <div className="mt-6 border rounded-md p-4 max-h-[300px] overflow-auto">
+                      <h4 className="font-semibold mb-4">
+                        Metas por Período Cadastradas
+                      </h4>
+                      <div className="space-y-2">
+                        {dialogPeriodGoals.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">
+                            Nenhuma meta por período cadastrada.
+                          </p>
+                        ) : (
+                          dialogPeriodGoals.map((pg) => (
+                            <div
+                              key={pg.id}
+                              className="flex items-center justify-between bg-muted/50 p-3 rounded-lg"
+                            >
+                              <div>
+                                <div className="font-medium text-sm">
+                                  {format(
+                                    parseISO(pg.data_inicio),
+                                    'dd/MM/yyyy',
+                                  )}{' '}
+                                  até{' '}
+                                  {format(parseISO(pg.data_fim), 'dd/MM/yyyy')}
+                                </div>
+                                <div className="text-xs text-indigo-500 font-medium mt-1">
+                                  Meta: {pg.valor_meta} acertos
+                                </div>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDeletePeriodGoal(pg.id)}
+                                className="text-red-500 shrink-0"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
             </DialogContent>
           </Dialog>
         </div>

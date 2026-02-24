@@ -160,8 +160,6 @@ export function CloseCashierDialog({
       })
 
       try {
-        await fechamentoService.generateClosingPdf(fechamento, 'A4')
-        await new Promise((resolve) => setTimeout(resolve, 1000))
         await fechamentoService.generateClosingPdf(fechamento, '80mm')
       } catch (pdfError) {
         console.error('Error generating PDF:', pdfError)

@@ -63,7 +63,7 @@ export default function ResumoAcertosPage() {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('todos')
 
-  const [filterMode, setFilterMode] = useState<'periodo' | 'rota'>('periodo')
+  const [filterMode, setFilterMode] = useState<'periodo' | 'rota'>('rota')
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date()),
@@ -81,7 +81,8 @@ export default function ResumoAcertosPage() {
       const allRoutes = await resumoAcertosService.getAllRoutes()
       setRoutes(allRoutes)
       if (allRoutes.length > 0 && !selectedRouteId) {
-        setSelectedRouteId(allRoutes[0].id.toString())
+        const activeRoute = allRoutes.find((r) => !r.data_fim) || allRoutes[0]
+        setSelectedRouteId(activeRoute.id.toString())
       }
       return allRoutes
     } catch (error) {
@@ -325,8 +326,8 @@ export default function ResumoAcertosPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="periodo">Por Período</SelectItem>
                   <SelectItem value="rota">Por Rota</SelectItem>
+                  <SelectItem value="periodo">Por Período</SelectItem>
                 </SelectContent>
               </Select>
             </div>

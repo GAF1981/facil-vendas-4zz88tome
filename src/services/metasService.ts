@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase/client'
-import { MetaFuncionario } from '@/types/meta'
+import { MetaFuncionario, MetaPeriodo } from '@/types/meta'
 
 export const metasService = {
   async getMeta(funcionarioId: number): Promise<MetaFuncionario | null> {
@@ -20,6 +20,42 @@ export const metasService = {
         { funcionario_id: funcionarioId, meta_diaria: metaDiaria },
         { onConflict: 'funcionario_id' },
       )
+
+    if (error) throw error
+  },
+
+  async getMetasPeriodos(funcionarioId: number): Promise<MetaPeriodo[]> {
+    const { data, error } = await supabase
+      .from('metas_periodos' as any)
+      .select('*')
+      .eq('funcionario_id', funcionarioId)
+      .order('data_inicio', { ascending: false })
+
+    if (error) throw error
+    return data as MetaPeriodo[]
+  },
+
+  async addMetaPeriodo(
+    funcionarioId: number,
+    dataInicio: string,
+    dataFim: string,
+    valorMeta: number,
+  ) {
+    const { error } = await supabase.from('metas_periodos' as any).insert({
+      funcionario_id: funcionarioId,
+      data_inicio: dataInicio,
+      data_fim: dataFim,
+      valor_meta: valorMeta,
+    })
+
+    if (error) throw error
+  },
+
+  async deleteMetaPeriodo(id: number) {
+    const { error } = await supabase
+      .from('metas_periodos' as any)
+      .delete()
+      .eq('id', id)
 
     if (error) throw error
   },

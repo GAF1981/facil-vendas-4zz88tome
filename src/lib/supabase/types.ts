@@ -1787,23 +1787,37 @@ export type Database = {
       meta_excecoes: {
         Row: {
           created_at: string
-          data: string
+          data_fim: string
+          data_inicio: string
           descricao: string
+          funcionario_id: number | null
           id: number
         }
         Insert: {
           created_at?: string
-          data: string
+          data_fim: string
+          data_inicio: string
           descricao: string
+          funcionario_id?: number | null
           id?: number
         }
         Update: {
           created_at?: string
-          data?: string
+          data_fim?: string
+          data_inicio?: string
           descricao?: string
+          funcionario_id?: number | null
           id?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "meta_excecoes_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "FUNCIONARIOS"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       metas_funcionarios: {
         Row: {
@@ -3041,6 +3055,7 @@ export const Constants = {
 // Table: kits
 //   PRIMARY KEY kits_pkey: PRIMARY KEY (id)
 // Table: meta_excecoes
+//   FOREIGN KEY meta_excecoes_funcionario_id_fkey: FOREIGN KEY (funcionario_id) REFERENCES "FUNCIONARIOS"(id) ON DELETE CASCADE
 //   PRIMARY KEY meta_excecoes_pkey: PRIMARY KEY (id)
 // Table: metas_funcionarios
 //   FOREIGN KEY metas_funcionarios_funcionario_id_fkey: FOREIGN KEY (funcionario_id) REFERENCES "FUNCIONARIOS"(id) ON DELETE CASCADE
