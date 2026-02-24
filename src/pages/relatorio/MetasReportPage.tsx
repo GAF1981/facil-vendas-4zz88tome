@@ -15,6 +15,8 @@ import {
   eachDayOfInterval,
   format,
   isWeekend,
+  startOfDay,
+  isAfter,
 } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import {
@@ -51,6 +53,7 @@ import {
   Search,
   Plus,
   Loader2,
+  PieChart,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { Label } from '@/components/ui/label'
@@ -213,16 +216,24 @@ const MetasReportPage = () => {
     let totalMetas = 0
     let totalApuracao = 0
 
+    const today = startOfDay(new Date())
+
     reportData.forEach((row) => {
-      totalAcertos += row.acertos
-      totalMetas += row.metaForDay
-      totalApuracao += row.apuracao
+      // Only aggregate data up to today for summary accuracy
+      if (!isAfter(row.date, today)) {
+        totalAcertos += row.acertos
+        totalMetas += row.metaForDay
+        totalApuracao += row.apuracao
+      }
     })
+
+    const atingimento = totalMetas > 0 ? (totalAcertos / totalMetas) * 100 : 0
 
     return {
       totalAcertos,
       totalMetas: parseFloat(totalMetas.toFixed(2)),
       totalApuracao: parseFloat(totalApuracao.toFixed(2)),
+      atingimento: parseFloat(atingimento.toFixed(2)),
     }
   }, [reportData])
 
@@ -355,12 +366,12 @@ const MetasReportPage = () => {
 
       {reportData.length > 0 && (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center">
                   <Target className="w-4 h-4 mr-2 text-indigo-500" />
-                  Quantidade de Metas de Acertos
+                  Total Metas
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -371,7 +382,7 @@ const MetasReportPage = () => {
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center">
                   <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
-                  Quantidade de Acertos
+                  Total Acertos
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -382,7 +393,7 @@ const MetasReportPage = () => {
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center">
                   <TrendingUp className="w-4 h-4 mr-2 text-blue-500" />
-                  Quantidade de Apuração de Metas
+                  Apuração de Metas
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -394,11 +405,26 @@ const MetasReportPage = () => {
                 </div>
               </CardContent>
             </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center">
+                  <PieChart className="w-4 h-4 mr-2 text-purple-500" />
+                  Atingimento
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{summary.atingimento}%</div>
+              </CardContent>
+            </Card>
           </div>
 
           <Card>
             <CardHeader>
               <CardTitle>Detalhamento Diário</CardTitle>
+              <CardDescription>
+                Exibe as metas e acertos planejados e alcançados em cada dia do
+                período selecionado.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
@@ -432,6 +458,11 @@ const MetasReportPage = () => {
                         {row.isWeekend && !row.isException && (
                           <span className="ml-2 text-xs text-muted-foreground">
                             (Fim de Semana)
+                          </span>
+                        )}
+                        {isAfter(row.date, startOfDay(new Date())) && (
+                          <span className="ml-2 text-xs text-blue-500 font-medium">
+                            (Futuro)
                           </span>
                         )}
                       </TableCell>
