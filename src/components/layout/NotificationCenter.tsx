@@ -25,114 +25,122 @@ export function NotificationCenter() {
     if (!employee || !employee.id) return
 
     const checkNotifications = async () => {
-      // Pendência Alert
       try {
-        const { data: pendenciaData, error: pendenciaError } = await supabase
-          .from('PENDENCIAS')
-          .select('id')
-          .eq('resolvida', false)
-          .eq('responsavel_id', employee.id)
-          .limit(1)
-
-        if (!pendenciaError) {
-          setHasPendencia((pendenciaData?.length || 0) > 0)
-        }
-      } catch (error) {
-        // Silently fail on network/fetch errors
-        console.warn(
-          'Network or fetch error checking pendencia notifications:',
-          error,
-        )
-      }
-
-      // Caixa Alert - globally checks all open routes for the logged-in user
-      try {
-        const { data: caixaData, error: caixaError } = await supabase
-          .from('fechamento_caixa')
-          .select('id')
-          .in('status', ['ABERTO', 'Aberto']) // Case-sensitive exact match for ABERTO (and legacy Aberto)
-          .eq('funcionario_id', employee.id)
-          .limit(1)
-
-        if (!caixaError) {
-          setHasCaixaAberto((caixaData?.length || 0) > 0)
-        }
-      } catch (error) {
-        console.warn(
-          'Network or fetch error checking caixa notifications:',
-          error,
-        )
-      }
-
-      if (isFinanceiroOuAdmin) {
-        // Nota Fiscal Alert - strictly exact 'Pendente' logic sync
+        // Pendência Alert
         try {
-          const { data: nfData1, error: nfError1 } = await supabase
-            .from('BANCO_DE_DADOS')
-            .select('"NÚMERO DO PEDIDO"')
-            .not('"NÚMERO DO PEDIDO"', 'is', null)
-            .or(
-              'nota_fiscal_cadastro.eq.SIM,nota_fiscal_venda.eq.SIM,solicitacao_nf.eq.SIM',
-            )
-            .or('nota_fiscal_emitida.neq.Emitida,nota_fiscal_emitida.is.null')
+          const { data: pendenciaData, error: pendenciaError } = await supabase
+            .from('PENDENCIAS')
+            .select('id')
+            .eq('resolvida', false)
+            .eq('responsavel_id', employee.id)
             .limit(1)
 
-          if (!nfError1) {
-            setHasNotaFiscal((nfData1?.length || 0) > 0)
+          if (!pendenciaError) {
+            setHasPendencia((pendenciaData?.length || 0) > 0)
+          } else {
+            console.warn('Supabase error checking pendencias:', pendenciaError)
           }
         } catch (error) {
+          // Silently fail on network/fetch errors
           console.warn(
-            'Network or fetch error checking nota fiscal notifications:',
+            'Network or fetch error checking pendencia notifications:',
             error,
           )
         }
 
-        // Pix Alert
+        // Caixa Alert - globally checks all open routes for the logged-in user
         try {
-          const { data: pixData1, error: pixError1 } = await supabase
+          const { data: caixaData, error: caixaError } = await supabase
             .from('fechamento_caixa')
             .select('id')
-            .gt('valor_pix', 0)
-            .is('pix_aprovado', null)
+            .in('status', ['ABERTO', 'Aberto']) // Case-sensitive exact match for ABERTO (and legacy Aberto)
+            .eq('funcionario_id', employee.id)
             .limit(1)
 
-          const { data: pixData2, error: pixError2 } = await supabase
-            .from('fechamento_caixa')
-            .select('id')
-            .gt('valor_pix', 0)
-            .eq('pix_aprovado', false)
-            .limit(1)
+          if (!caixaError) {
+            setHasCaixaAberto((caixaData?.length || 0) > 0)
+          } else {
+            console.warn('Supabase error checking caixa:', caixaError)
+          }
+        } catch (error) {
+          console.warn(
+            'Network or fetch error checking caixa notifications:',
+            error,
+          )
+        }
 
-          if (!pixError1 && !pixError2) {
-            setHasPix(
-              (pixData1?.length || 0) > 0 || (pixData2?.length || 0) > 0,
+        if (isFinanceiroOuAdmin) {
+          // Nota Fiscal Alert - strictly exact 'Pendente' logic sync
+          try {
+            const { data: nfData1, error: nfError1 } = await supabase
+              .from('BANCO_DE_DADOS')
+              .select('"NÚMERO DO PEDIDO"')
+              .not('"NÚMERO DO PEDIDO"', 'is', null)
+              .or(
+                'nota_fiscal_cadastro.eq.SIM,nota_fiscal_venda.eq.SIM,solicitacao_nf.eq.SIM',
+              )
+              .or('nota_fiscal_emitida.neq.Emitida,nota_fiscal_emitida.is.null')
+              .limit(1)
+
+            if (!nfError1) {
+              setHasNotaFiscal((nfData1?.length || 0) > 0)
+            }
+          } catch (error) {
+            console.warn(
+              'Network or fetch error checking nota fiscal notifications:',
+              error,
             )
           }
-        } catch (error) {
-          console.warn(
-            'Network or fetch error checking pix notifications:',
-            error,
-          )
-        }
 
-        // Recolhido Alert
-        try {
-          const { data: recData, error: recError } = await supabase
-            .from('fechamento_caixa')
-            .select('id')
-            .in('status', ['Fechado', 'FECHADO'])
-            .is('recolhido_por_id', null)
-            .limit(1)
+          // Pix Alert
+          try {
+            const { data: pixData1, error: pixError1 } = await supabase
+              .from('fechamento_caixa')
+              .select('id')
+              .gt('valor_pix', 0)
+              .is('pix_aprovado', null)
+              .limit(1)
 
-          if (!recError) {
-            setHasRecolhido((recData?.length || 0) > 0)
+            const { data: pixData2, error: pixError2 } = await supabase
+              .from('fechamento_caixa')
+              .select('id')
+              .gt('valor_pix', 0)
+              .eq('pix_aprovado', false)
+              .limit(1)
+
+            if (!pixError1 && !pixError2) {
+              setHasPix(
+                (pixData1?.length || 0) > 0 || (pixData2?.length || 0) > 0,
+              )
+            }
+          } catch (error) {
+            console.warn(
+              'Network or fetch error checking pix notifications:',
+              error,
+            )
           }
-        } catch (error) {
-          console.warn(
-            'Network or fetch error checking recolhido notifications:',
-            error,
-          )
+
+          // Recolhido Alert
+          try {
+            const { data: recData, error: recError } = await supabase
+              .from('fechamento_caixa')
+              .select('id')
+              .in('status', ['Fechado', 'FECHADO'])
+              .is('recolhido_por_id', null)
+              .limit(1)
+
+            if (!recError) {
+              setHasRecolhido((recData?.length || 0) > 0)
+            }
+          } catch (error) {
+            console.warn(
+              'Network or fetch error checking recolhido notifications:',
+              error,
+            )
+          }
         }
+      } catch (e) {
+        console.error('Unexpected error in checkNotifications:', e)
       }
     }
 
