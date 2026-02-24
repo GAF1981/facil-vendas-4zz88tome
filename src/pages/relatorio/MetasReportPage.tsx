@@ -66,13 +66,14 @@ const MetasReportPage = () => {
   })
   const [employees, setEmployees] = useState<Employee[]>([])
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('')
+  const [summaryFilter, setSummaryFilter] = useState<string>('rota')
 
   const [isLoading, setIsLoading] = useState(false)
   const [dailyAcertos, setDailyAcertos] = useState<Map<string, number>>(
     new Map(),
   )
   const [currentMetaDiaria, setCurrentMetaDiaria] = useState<number>(0)
-  const [exceptionDates, setExceptionDates] = useState<string[]>([])
+  const [exceptionDates, setExceptionDates] = useState<any[]>([])
 
   // Dialog State
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -85,7 +86,7 @@ const MetasReportPage = () => {
   const fetchExceptions = useCallback(async () => {
     try {
       const data = await metasService.getExceptionDays()
-      setExceptionDates(data.map((d: any) => d.data))
+      setExceptionDates(data)
     } catch (e) {
       console.error('Failed to load exceptions', e)
     }
@@ -175,9 +176,15 @@ const MetasReportPage = () => {
   }
 
   const checkIsException = useCallback(
-    (date: Date) => {
+    (date: Date, empId: string) => {
       const dateStr = format(date, 'yyyy-MM-dd')
-      if (exceptionDates.includes(dateStr)) return true
+      for (const exc of exceptionDates) {
+        if (dateStr >= exc.data_inicio && dateStr <= exc.data_fim) {
+          if (!exc.funcionario_id || exc.funcionario_id.toString() === empId) {
+            return true
+          }
+        }
+      }
       return false
     },
     [exceptionDates],
@@ -189,7 +196,7 @@ const MetasReportPage = () => {
     const days = eachDayOfInterval({ start: dateRange.from, end: dateRange.to })
     return days.map((day) => {
       const dateStr = format(day, 'yyyy-MM-dd')
-      const isException = checkIsException(day)
+      const isException = checkIsException(day, selectedEmployeeId)
       const isWknd = isWeekend(day)
       const isNonWorkingDay = isException || isWknd
 
@@ -209,7 +216,13 @@ const MetasReportPage = () => {
         isWeekend: isWknd,
       }
     })
-  }, [dateRange, dailyAcertos, currentMetaDiaria, checkIsException])
+  }, [
+    dateRange,
+    dailyAcertos,
+    currentMetaDiaria,
+    checkIsException,
+    selectedEmployeeId,
+  ])
 
   const summary = useMemo(() => {
     let totalAcertos = 0
@@ -322,6 +335,19 @@ const MetasReportPage = () => {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col md:flex-row gap-4 items-end">
+            <div className="space-y-2 w-full md:w-auto flex-1">
+              <Label>Filtro de Resumo</Label>
+              <Select value={summaryFilter} onValueChange={setSummaryFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="rota">Por Rota</SelectItem>
+                  <SelectItem value="funcionario">Por Funcionário</SelectItem>
+                  <SelectItem value="geral">Geral</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-2 w-full md:w-auto flex-1">
               <Label>Período</Label>
               <DateRangePicker

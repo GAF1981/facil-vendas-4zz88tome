@@ -63,16 +63,25 @@ export const metasService = {
   async getExceptionDays() {
     const { data, error } = await supabase
       .from('meta_excecoes' as any)
-      .select('*')
-      .order('data')
+      .select('*, FUNCIONARIOS(nome_completo)')
+      .order('data_inicio')
     if (error) throw error
     return data || []
   },
 
-  async addExceptionDay(data: string, descricao: string) {
+  async addExceptionDay(
+    data_inicio: string,
+    data_fim: string,
+    descricao: string,
+    funcionario_id?: number | null,
+  ) {
+    const payload: any = { data_inicio, data_fim, descricao }
+    if (funcionario_id) {
+      payload.funcionario_id = funcionario_id
+    }
     const { error } = await supabase
       .from('meta_excecoes' as any)
-      .insert({ data, descricao })
+      .insert(payload)
     if (error) throw error
   },
 
