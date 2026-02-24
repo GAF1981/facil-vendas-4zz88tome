@@ -13,11 +13,11 @@ export const metasService = {
     return data as MetaFuncionario | null
   },
 
-  async upsertMeta(funcionarioId: number, metaMensal: number) {
+  async upsertMeta(funcionarioId: number, metaDiaria: number) {
     const { error } = await supabase
       .from('metas_funcionarios' as any)
       .upsert(
-        { funcionario_id: funcionarioId, meta_mensal: metaMensal },
+        { funcionario_id: funcionarioId, meta_diaria: metaDiaria },
         { onConflict: 'funcionario_id' },
       )
 

@@ -14,9 +14,7 @@ import {
   endOfMonth,
   eachDayOfInterval,
   format,
-  getDaysInMonth,
-  isSameMonth,
-  parseISO,
+  isWeekend,
 } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import {
@@ -70,7 +68,7 @@ const MetasReportPage = () => {
   const [dailyAcertos, setDailyAcertos] = useState<Map<string, number>>(
     new Map(),
   )
-  const [currentMetaMensal, setCurrentMetaMensal] = useState<number>(0)
+  const [currentMetaDiaria, setCurrentMetaDiaria] = useState<number>(0)
   const [exceptionDates, setExceptionDates] = useState<string[]>([])
 
   // Dialog State
@@ -120,7 +118,7 @@ const MetasReportPage = () => {
       const endStr = format(dateRange.to, 'yyyy-MM-dd')
 
       const metaInfo = await metasService.getMeta(funcId)
-      setCurrentMetaMensal(metaInfo?.meta_mensal || 0)
+      setCurrentMetaDiaria(metaInfo?.meta_diaria || 0)
 
       const acertos = await metasService.getAcertos(funcId, startStr, endStr)
       setDailyAcertos(acertos)
@@ -185,25 +183,16 @@ const MetasReportPage = () => {
   const reportData = useMemo(() => {
     if (!dateRange?.from || !dateRange?.to) return []
 
-    const currentMonth = dateRange.from
-    const daysInMonth = getDaysInMonth(currentMonth)
-
-    let exceptionsInMonth = 0
-    exceptionDates.forEach((d) => {
-      const ed = parseISO(d)
-      if (isSameMonth(ed, currentMonth)) {
-        exceptionsInMonth++
-      }
-    })
-
-    const workingDays = Math.max(1, daysInMonth - exceptionsInMonth)
-    const dailyMeta = currentMetaMensal / workingDays
-
     const days = eachDayOfInterval({ start: dateRange.from, end: dateRange.to })
     return days.map((day) => {
       const dateStr = format(day, 'yyyy-MM-dd')
       const isException = checkIsException(day)
-      const metaForDay = isException ? 0 : parseFloat(dailyMeta.toFixed(2))
+      const isWknd = isWeekend(day)
+      const isNonWorkingDay = isException || isWknd
+
+      const metaForDay = isNonWorkingDay
+        ? 0
+        : parseFloat(currentMetaDiaria.toFixed(2))
       const acertos = dailyAcertos.get(dateStr) || 0
       const apuracao = acertos - metaForDay
 
@@ -214,15 +203,10 @@ const MetasReportPage = () => {
         metaForDay,
         apuracao,
         isException,
+        isWeekend: isWknd,
       }
     })
-  }, [
-    dateRange,
-    dailyAcertos,
-    currentMetaMensal,
-    checkIsException,
-    exceptionDates,
-  ])
+  }, [dateRange, dailyAcertos, currentMetaDiaria, checkIsException])
 
   const summary = useMemo(() => {
     let totalAcertos = 0
@@ -272,7 +256,7 @@ const MetasReportPage = () => {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Configurar Meta Mensal</DialogTitle>
+                <DialogTitle>Configurar Meta Diária</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
@@ -294,14 +278,14 @@ const MetasReportPage = () => {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Meta Mensal (Quantidade de Acertos)</Label>
+                  <Label>Meta Diária (Quantidade de Acertos)</Label>
                   <Input
                     type="number"
                     min="0"
                     step="0.01"
                     value={dialogMetaValue}
                     onChange={(e) => setDialogMetaValue(e.target.value)}
-                    placeholder="Ex: 300"
+                    placeholder="Ex: 15"
                   />
                 </div>
               </div>
@@ -434,13 +418,20 @@ const MetasReportPage = () => {
                   {reportData.map((row, idx) => (
                     <TableRow
                       key={idx}
-                      className={row.isException ? 'bg-muted/50' : ''}
+                      className={
+                        row.isException || row.isWeekend ? 'bg-muted/50' : ''
+                      }
                     >
                       <TableCell>
                         {format(row.date, 'dd/MM/yyyy', { locale: ptBR })}
                         {row.isException && (
                           <span className="ml-2 text-xs text-muted-foreground">
                             (Exceção/Feriado)
+                          </span>
+                        )}
+                        {row.isWeekend && !row.isException && (
+                          <span className="ml-2 text-xs text-muted-foreground">
+                            (Fim de Semana)
                           </span>
                         )}
                       </TableCell>
