@@ -194,17 +194,20 @@ const MetasReportPage = () => {
     if (!dateRange?.from || !dateRange?.to) return []
 
     const days = eachDayOfInterval({ start: dateRange.from, end: dateRange.to })
+    const today = startOfDay(new Date())
+
     return days.map((day) => {
       const dateStr = format(day, 'yyyy-MM-dd')
       const isException = checkIsException(day, selectedEmployeeId)
       const isWknd = isWeekend(day)
       const isNonWorkingDay = isException || isWknd
+      const isFutureDate = isAfter(day, today)
 
       const metaForDay = isNonWorkingDay
         ? 0
         : parseFloat(currentMetaDiaria.toFixed(2))
       const acertos = dailyAcertos.get(dateStr) || 0
-      const apuracao = acertos - metaForDay
+      const apuracao = isFutureDate ? 0 : acertos - metaForDay
 
       return {
         date: day,
@@ -214,6 +217,7 @@ const MetasReportPage = () => {
         apuracao,
         isException,
         isWeekend: isWknd,
+        isFutureDate,
       }
     })
   }, [
@@ -486,7 +490,7 @@ const MetasReportPage = () => {
                             (Fim de Semana)
                           </span>
                         )}
-                        {isAfter(row.date, startOfDay(new Date())) && (
+                        {row.isFutureDate && (
                           <span className="ml-2 text-xs text-blue-500 font-medium">
                             (Futuro)
                           </span>
