@@ -54,7 +54,16 @@ const calculateThermalHeight = (body: any) => {
     reportType === 'employee-cash-summary'
   ) {
     let h = 650
-    const expenses = body.expenses || []
+    // Consider only valid cash expenses for height
+    const allExpenses = body.expenses || []
+    const expenses = allExpenses.filter((exp: any) =>
+      exp.saiuDoCaixa !== undefined
+        ? exp.saiuDoCaixa
+        : exp.saiu_do_caixa !== undefined
+          ? exp.saiu_do_caixa
+          : true,
+    )
+
     if (expenses.length > 0) {
       h += 40 + expenses.length * 15
     }
@@ -474,15 +483,39 @@ Deno.serve(async (req) => {
       const rotaId = closingData.rota_id || periodo?.rotaId || '-'
       const reportDate = closingData.created_at || date
 
-      const saldoAcerto = closingData.saldo_acerto || body.saldoDeAcerto || 0
       const vDinheiro = closingData.valor_dinheiro || 0
       const vPix = closingData.valor_pix || 0
       const vCheque = closingData.valor_cheque || 0
       const vBoleto = closingData.valor_boleto || 0
       const totalEntrada = vDinheiro + vPix + vCheque + vBoleto
-      const vDespesas = closingData.valor_despesas || 0
       const vendaTotal = closingData.venda_total || 0
       const descontoTotal = closingData.desconto_total || 0
+
+      // Only subtract expenses that actually saiu do caixa
+      const allExpensesPayload = body.expenses || []
+      const expenses = allExpensesPayload.filter((exp: any) => {
+        return exp.saiuDoCaixa !== undefined
+          ? exp.saiuDoCaixa
+          : exp.saiu_do_caixa !== undefined
+            ? exp.saiu_do_caixa
+            : true
+      })
+
+      // Calculate vDespesas independently based strictly on the passed payload + flag
+      const vDespesas = expenses.reduce(
+        (acc: number, exp: any) => acc + (Number(exp.valor) || 0),
+        0,
+      )
+
+      // Calculate saldoAcerto directly corresponding to UI Logic
+      // (Dinheiro + Cheque - Despesas que sairam do caixa)
+      let saldoAcerto =
+        closingData.saldo_acerto !== undefined
+          ? closingData.saldo_acerto
+          : body.saldoDeAcerto
+      if (saldoAcerto === undefined) {
+        saldoAcerto = vDinheiro + vCheque - vDespesas
+      }
 
       const settlements = body.settlements || []
 
@@ -583,7 +616,6 @@ Deno.serve(async (req) => {
         })
         y -= 25
 
-        const expenses = body.expenses || []
         if (expenses.length > 0) {
           drawText('Descrição', margins.left, y, { size: 9, font: fontBold })
           drawText('Valor', width - margins.right, y, {
@@ -611,7 +643,7 @@ Deno.serve(async (req) => {
           y -= 15
         }
 
-        drawText('TOTAL SAIDA (DESPESAS):', margins.left, y, {
+        drawText('TOTAL SAIDA (CAIXA):', margins.left, y, {
           size: 10,
           font: fontBold,
         })
@@ -819,7 +851,6 @@ Deno.serve(async (req) => {
         })
         y -= 15
 
-        const expenses = body.expenses || []
         if (expenses.length > 0) {
           drawText('Descrição', margins.left, y, { size: 8, font: fontBold })
           drawText('Valor', width - margins.right, y, {
@@ -847,7 +878,7 @@ Deno.serve(async (req) => {
           y -= 10
         }
 
-        drawText('TOTAL SAIDA (DESPESAS):', margins.left, y, {
+        drawText('TOTAL SAIDA (CAIXA):', margins.left, y, {
           size: 9,
           font: fontBold,
         })

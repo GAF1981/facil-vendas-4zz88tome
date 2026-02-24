@@ -67,8 +67,13 @@ export const fechamentoService = {
     const valorBoleto = boletoReceipts.reduce((acc, r) => acc + r.valor, 0)
 
     // 3. Calculate Expense Totals
-    const expenses = await caixaService.getEmployeeExpenses(funcionarioId, rota)
-    const valorDespesas = expenses.reduce((acc, e) => acc + e.valor, 0)
+    const allExpenses = await caixaService.getEmployeeExpenses(
+      funcionarioId,
+      rota,
+    )
+    const valorDespesas = allExpenses
+      .filter((e) => e.saiuDoCaixa)
+      .reduce((acc, e) => acc + e.valor, 0)
 
     // 4. Calculate Saldo do Acerto
     // Saldo = (Dinheiro + Cheque) - Despesas. Pix is usually separate or considered already "in bank"
@@ -196,10 +201,11 @@ export const fechamentoService = {
     )
 
     // 3. Fetch Expenses (Detailed)
-    const expenses = await caixaService.getEmployeeExpenses(
+    const allExpenses = await caixaService.getEmployeeExpenses(
       fechamento.funcionario_id,
       rota,
     )
+    const expenses = allExpenses.filter((e) => e.saiuDoCaixa)
 
     // 4. Fetch Settlements (Detailed Table Data)
     const allSettlements = await resumoAcertosService.getSettlements({ rota })

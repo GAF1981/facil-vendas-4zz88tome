@@ -1851,6 +1851,41 @@ export type Database = {
           },
         ]
       }
+      metas_periodos: {
+        Row: {
+          created_at: string
+          data_fim: string
+          data_inicio: string
+          funcionario_id: number
+          id: number
+          valor_meta: number
+        }
+        Insert: {
+          created_at?: string
+          data_fim: string
+          data_inicio: string
+          funcionario_id: number
+          id?: number
+          valor_meta: number
+        }
+        Update: {
+          created_at?: string
+          data_fim?: string
+          data_inicio?: string
+          funcionario_id?: number
+          id?: number
+          valor_meta?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "metas_periodos_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "FUNCIONARIOS"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       NOTA_FISCAL: {
         Row: {
           cliente_id: number
@@ -3061,6 +3096,9 @@ export const Constants = {
 //   FOREIGN KEY metas_funcionarios_funcionario_id_fkey: FOREIGN KEY (funcionario_id) REFERENCES "FUNCIONARIOS"(id) ON DELETE CASCADE
 //   UNIQUE metas_funcionarios_funcionario_id_key: UNIQUE (funcionario_id)
 //   PRIMARY KEY metas_funcionarios_pkey: PRIMARY KEY (id)
+// Table: metas_periodos
+//   FOREIGN KEY metas_periodos_funcionario_id_fkey: FOREIGN KEY (funcionario_id) REFERENCES "FUNCIONARIOS"(id) ON DELETE CASCADE
+//   PRIMARY KEY metas_periodos_pkey: PRIMARY KEY (id)
 // Table: notas_fiscais_emitidas
 //   PRIMARY KEY notas_fiscais_emitidas_pkey: PRIMARY KEY (id)
 // Table: permissoes
@@ -3166,6 +3204,10 @@ export const Constants = {
 //   Policy "Allow read access for authenticated users" (SELECT, PERMISSIVE) roles={authenticated}
 //     USING: true
 // Table: metas_funcionarios
+//   Policy "Enable all access for authenticated users" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: true
+//     WITH CHECK: true
+// Table: metas_periodos
 //   Policy "Enable all access for authenticated users" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: true
 //     WITH CHECK: true

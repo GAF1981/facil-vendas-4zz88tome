@@ -331,8 +331,10 @@ export default function CaixaPage() {
         : allReceipts
 
       const expensesToPass = targetId
-        ? allExpenses.filter((e) => e.funcionarioId === targetId)
-        : allExpenses
+        ? allExpenses.filter(
+            (e) => e.funcionarioId === targetId && e.saiuDoCaixa,
+          )
+        : allExpenses.filter((e) => e.saiuDoCaixa)
 
       let finalTotalRecebido = totalRecebido
       let finalTotalDespesas = totalDespesas
