@@ -64,12 +64,18 @@ export function PixConferenceDialog({
     },
   })
 
+  // Dynamically calculate the difference to show discount tolerance
+  const valorInput = form.watch('valor')
+  const enteredValue = parseCurrency(valorInput)
+  const receiptValue = receipt?.valor_pago || 0
+  const absDiff = Math.abs(receiptValue - enteredValue)
+  const isToleranceActive = absDiff > 0.05 && absDiff < 0.99
+
   useEffect(() => {
     if (open && receipt) {
       // Do NOT pre-fill nome_no_pix as per User Story requirements
-      // Only pre-fill non-sensitive defaults or structural data
       form.reset({
-        nome_no_pix: '', // Explicitly empty
+        nome_no_pix: '',
         banco_pix: receipt.banco_pix || 'BS2',
         data_pix_realizado: receipt.data_pix_realizado
           ? format(new Date(receipt.data_pix_realizado), 'yyyy-MM-dd')
@@ -83,14 +89,15 @@ export function PixConferenceDialog({
     if (!receipt || !employee) return
 
     // Validation: Check if entered value matches the receipt value
-    const enteredValue = parseCurrency(data.valor)
-    const receiptValue = receipt.valor_pago || 0
+    const finalEnteredValue = parseCurrency(data.valor)
+    const expectedValue = receipt.valor_pago || 0
+    const difference = Math.abs(finalEnteredValue - expectedValue)
 
-    // Allow small margin for floating point errors
-    if (Math.abs(enteredValue - receiptValue) > 0.05) {
+    // Verify tolerance threshold (strictly less than R$ 0.99 difference)
+    if (difference >= 0.99) {
       form.setError('valor', {
         type: 'manual',
-        message: `Valor incorreto. O valor esperado é R$ ${formatCurrency(receiptValue)}.`,
+        message: `Diferença maior que o permitido. O valor esperado é R$ ${formatCurrency(expectedValue)}.`,
       })
       return
     }
@@ -144,6 +151,11 @@ export function PixConferenceDialog({
                 <strong>Valor Esperado:</strong> R${' '}
                 {formatCurrency(receipt?.valor_pago || 0)}
               </p>
+              {isToleranceActive && (
+                <p className="text-amber-600 font-medium mt-1">
+                  <strong>Desconto:</strong> R$ {formatCurrency(absDiff)}
+                </p>
+              )}
             </div>
 
             <FormField
