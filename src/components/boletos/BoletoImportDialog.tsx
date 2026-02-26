@@ -35,6 +35,7 @@ export function BoletoImportDialog({ onSuccess }: BoletoImportDialogProps) {
   const [resultStats, setResultStats] = useState<{
     count: number
     errors: number
+    message?: string
   } | null>(null)
 
   const { toast } = useToast()
@@ -93,15 +94,28 @@ export function BoletoImportDialog({ onSuccess }: BoletoImportDialogProps) {
     setLoading(true)
     try {
       const result = await boletoService.importBoletos(parsedData)
+
+      if (!result.success && result.count === 0 && result.message) {
+        toast({
+          title: 'Falha na Validação',
+          description: result.message,
+          variant: 'destructive',
+        })
+        setLoading(false)
+        setStep('upload')
+        return
+      }
+
       setResultStats({
         count: result.count,
         errors: result.errors,
+        message: result.message,
       })
       setStep('result')
 
-      if (result.success) {
+      if (result.success || result.count > 0) {
         toast({
-          title: 'Importação concluída',
+          title: 'Importação finalizada',
           description: `${result.count} boletos processados com sucesso.`,
           className: 'bg-green-600 text-white',
         })
@@ -109,7 +123,7 @@ export function BoletoImportDialog({ onSuccess }: BoletoImportDialogProps) {
       } else {
         toast({
           title: 'Importação com erros',
-          description: `Ocorreram erros em ${result.errors} registros.`,
+          description: result.message || 'Ocorreram erros na importação.',
           variant: 'destructive',
         })
       }
@@ -149,7 +163,8 @@ export function BoletoImportDialog({ onSuccess }: BoletoImportDialogProps) {
         <DialogHeader>
           <DialogTitle>Importar Boletos</DialogTitle>
           <DialogDescription>
-            Faça upload de um arquivo CSV contendo os boletos.
+            Faça upload de um arquivo CSV contendo os boletos. O sistema é
+            flexível na leitura dos nomes das colunas.
           </DialogDescription>
         </DialogHeader>
 
@@ -165,8 +180,9 @@ export function BoletoImportDialog({ onSuccess }: BoletoImportDialogProps) {
                 disabled={analyzing}
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Colunas esperadas: cliente, código do cliente, status,
-                vencimento, valor
+                Exemplos de colunas aceitas: Código do cliente (ou ID Cliente,
+                Número), Nome do Cliente, Status (ou Situação), Vencimento (ou
+                Data), Valor (ou Preço).
               </p>
               {analyzing && (
                 <div className="flex items-center justify-center py-4 text-muted-foreground">
@@ -205,11 +221,32 @@ export function BoletoImportDialog({ onSuccess }: BoletoImportDialogProps) {
 
           {step === 'result' && resultStats && (
             <div className="space-y-4 animate-fade-in">
-              <div className="flex flex-col items-center justify-center p-6 bg-green-50 rounded-lg border border-green-200">
-                <CheckCircle className="h-10 w-10 text-green-600 mb-2" />
-                <h3 className="font-bold text-lg text-green-800">
-                  Importação Finalizada
+              <div
+                className={`flex flex-col items-center justify-center p-6 rounded-lg border ${
+                  resultStats.count > 0
+                    ? 'bg-green-50 border-green-200'
+                    : 'bg-amber-50 border-amber-200'
+                }`}
+              >
+                <CheckCircle
+                  className={`h-10 w-10 mb-2 ${
+                    resultStats.count > 0 ? 'text-green-600' : 'text-amber-600'
+                  }`}
+                />
+                <h3
+                  className={`font-bold text-lg text-center ${
+                    resultStats.count > 0 ? 'text-green-800' : 'text-amber-800'
+                  }`}
+                >
+                  {resultStats.count > 0
+                    ? 'Importação Finalizada'
+                    : 'Atenção na Importação'}
                 </h3>
+                {resultStats.message && (
+                  <p className="text-sm text-center mt-2 text-muted-foreground">
+                    {resultStats.message}
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -220,7 +257,7 @@ export function BoletoImportDialog({ onSuccess }: BoletoImportDialogProps) {
                   </div>
                 </div>
                 <div className="p-3 bg-muted rounded border text-center">
-                  <div className="text-sm text-muted-foreground">Erros</div>
+                  <div className="text-sm text-muted-foreground">Falhas</div>
                   <div className="text-2xl font-bold text-red-600">
                     {resultStats.errors}
                   </div>

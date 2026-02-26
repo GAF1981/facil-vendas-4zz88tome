@@ -1,7 +1,12 @@
 import { supabase } from '@/lib/supabase/client'
-import { Boleto, BoletoInsert, BoletoUpdate } from '@/types/boleto'
+import {
+  Boleto,
+  BoletoInsert,
+  BoletoUpdate,
+  BoletoWithConferido,
+} from '@/types/boleto'
 import { parseCurrency } from '@/lib/formatters'
-import { parseDateSafe, getBrazilDateString } from '@/lib/dateUtils'
+import { parseDateSafe } from '@/lib/dateUtils'
 import { format } from 'date-fns'
 
 export const boletoService = {
@@ -96,44 +101,107 @@ export const boletoService = {
     })
   },
 
-  async importBoletos(parsedData: any[]) {
-    const findKey = (row: any, options: string[]) => {
-      const keys = Object.keys(row)
+  async importBoletos(
+    parsedData: any[],
+  ): Promise<{
+    success: boolean
+    count: number
+    errors: number
+    message?: string
+  }> {
+    if (!parsedData || parsedData.length === 0) {
+      return { success: false, count: 0, errors: 0, message: 'Arquivo vazio.' }
+    }
+
+    const findKey = (keys: string[], options: string[]) => {
       for (const opt of options) {
-        const found = keys.find((k) => k === opt || k.includes(opt))
+        const found = keys.find((k) => k === opt)
+        if (found) return found
+      }
+      for (const opt of options) {
+        const found = keys.find((k) => k.includes(opt))
         if (found) return found
       }
       return null
     }
 
-    const mappedBoletos: BoletoInsert[] = []
+    const firstRowKeys = Object.keys(parsedData[0])
 
-    for (const row of parsedData) {
-      const clientNameKey = findKey(row, ['cliente', 'nome'])
-      const clientCodeKey = findKey(row, ['código do cliente', 'codigo'])
-      const statusKey = findKey(row, ['status'])
-      const vencimentoKey = findKey(row, ['vencimento', 'data'])
-      const valorKey = findKey(row, ['valor'])
+    const clientNameKey = findKey(firstRowKeys, [
+      'cliente',
+      'nome cliente',
+      'nome',
+      'razão social',
+      'razao social',
+    ])
+    const clientCodeKey = findKey(firstRowKeys, [
+      'código do cliente',
+      'codigo do cliente',
+      'código',
+      'codigo',
+      'número cliente',
+      'numero cliente',
+      'número',
+      'numero',
+      'cod cliente',
+      'id cliente',
+    ])
+    const statusKey = findKey(firstRowKeys, ['status', 'situação', 'situacao'])
+    const vencimentoKey = findKey(firstRowKeys, [
+      'data vencimento',
+      'vencimento',
+      'data',
+    ])
+    const valorKey = findKey(firstRowKeys, ['valor', 'preço', 'preco', 'total'])
 
-      if (clientNameKey && clientCodeKey && vencimentoKey && valorKey) {
-        const codigo = parseInt(row[clientCodeKey])
-        if (isNaN(codigo)) continue
+    const missingCols = []
+    if (!clientCodeKey) missingCols.push('Código do Cliente')
+    if (!clientNameKey) missingCols.push('Nome do Cliente')
+    if (!vencimentoKey) missingCols.push('Vencimento')
+    if (!valorKey) missingCols.push('Valor')
 
-        const dateObj = parseDateSafe(row[vencimentoKey])
-        if (!dateObj) continue
-
-        mappedBoletos.push({
-          cliente_nome: row[clientNameKey],
-          cliente_codigo: codigo,
-          status: row[statusKey] || 'A Receber',
-          vencimento: format(dateObj, 'yyyy-MM-dd'),
-          valor: parseCurrency(row[valorKey]),
-        })
+    if (missingCols.length > 0) {
+      return {
+        success: false,
+        count: 0,
+        errors: 0,
+        message: `Colunas obrigatórias não encontradas: ${missingCols.join(', ')}`,
       }
     }
 
+    const mappedBoletos: BoletoInsert[] = []
+
+    for (const row of parsedData) {
+      const codeStr = row[clientCodeKey!]
+      const nameStr = row[clientNameKey!]
+      const dateStr = row[vencimentoKey!]
+      const valStr = row[valorKey!]
+      const statusStr = statusKey ? row[statusKey] : 'A Receber'
+
+      if (!codeStr && !nameStr && !dateStr && !valStr) continue
+
+      const codigo = parseInt(String(codeStr).trim(), 10)
+      if (isNaN(codigo)) continue
+
+      const dateObj = parseDateSafe(dateStr)
+      if (!dateObj) continue
+
+      mappedBoletos.push({
+        cliente_nome: String(nameStr).trim() || 'Cliente Não Identificado',
+        cliente_codigo: codigo,
+        status: statusStr ? String(statusStr).trim() : 'A Receber',
+        vencimento: format(dateObj, 'yyyy-MM-dd'),
+        valor: parseCurrency(valStr),
+      })
+    }
+
     if (mappedBoletos.length === 0) {
-      return { success: false, count: 0, errors: 0 }
+      return {
+        success: false,
+        count: 0,
+        errors: 0,
+        message: 'Nenhum registro com dados válidos encontrado no arquivo.',
+      }
     }
 
     let successCount = 0
@@ -156,6 +224,10 @@ export const boletoService = {
       success: errorCount === 0,
       count: successCount,
       errors: errorCount,
+      message:
+        errorCount > 0
+          ? `Ocorreram erros em ${errorCount} registros. (Certifique-se que o código do cliente existe)`
+          : 'Importação concluída com sucesso.',
     }
   },
 
