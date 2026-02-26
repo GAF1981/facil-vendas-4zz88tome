@@ -212,7 +212,7 @@ const ProjectionsPage = () => {
                     </TableRow>
                   ) : (
                     filteredData.map((row) => (
-                      <TableRow key={row.orderId} className="hover:bg-muted/30">
+                      <TableRow key={row.id} className="hover:bg-muted/30">
                         <TableCell className="font-mono text-xs">
                           {row.clientCode}
                         </TableCell>

@@ -4,6 +4,7 @@ import { differenceInDays, startOfDay } from 'date-fns'
 import { parseDateSafe } from '@/lib/dateUtils'
 
 export interface ProjectionReportRow {
+  id: string
   orderId: number
   clientCode: number
   clientName: string
@@ -100,6 +101,7 @@ export const reportsService = {
 
       if (!ordersMap.has(uniqueId)) {
         ordersMap.set(uniqueId, {
+          id: uniqueId,
           orderId: orderId,
           clientCode: row['CÓDIGO DO CLIENTE'] || 0,
           clientName: row['CLIENTE'] || 'N/D',
@@ -128,6 +130,7 @@ export const reportsService = {
 
       if (!ordersMap.has(uniqueId)) {
         ordersMap.set(uniqueId, {
+          id: uniqueId,
           orderId: orderId,
           clientCode: row.cliente_id,
           clientName: row.cliente_nome || 'Cliente Importado',
