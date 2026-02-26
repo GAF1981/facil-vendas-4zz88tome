@@ -1023,7 +1023,8 @@ export default function AcertoPage() {
                 <SelectItem key={e.id} value={e.id.toString()}>
                   {e.nome_completo}
                 </SelectItem>
-              </SelectContent>
+              ))}
+            </SelectContent>
           </Select>
         </div>
       </div>
