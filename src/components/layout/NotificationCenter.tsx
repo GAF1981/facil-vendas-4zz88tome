@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { ClipboardList, FileText, QrCode, Wallet, Banknote } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useUserStore } from '@/stores/useUserStore'
@@ -13,12 +13,17 @@ export function NotificationCenter() {
   const [hasCaixaAberto, setHasCaixaAberto] = useState(false)
   const [hasRecolhido, setHasRecolhido] = useState(false)
 
-  const isFinanceiroOuAdmin =
-    employee?.setor?.some(
+  const isFinanceiroOuAdmin = useMemo(() => {
+    if (!employee?.setor) return false
+    const sectors = Array.isArray(employee.setor)
+      ? employee.setor
+      : [employee.setor]
+    return sectors.some(
       (s) =>
         typeof s === 'string' &&
         ['financeiro', 'administrador', 'gerente'].includes(s.toLowerCase()),
-    ) || false
+    )
+  }, [employee])
 
   useEffect(() => {
     // Session validation: only proceed if employee and valid ID are present
@@ -41,7 +46,6 @@ export function NotificationCenter() {
             console.warn('Supabase error checking pendencias:', pendenciaError)
           }
         } catch (error) {
-          // Silently fail on network/fetch errors
           console.warn(
             'Network or fetch error checking pendencia notifications:',
             error,
@@ -70,7 +74,7 @@ export function NotificationCenter() {
         }
 
         if (isFinanceiroOuAdmin) {
-          // Nota Fiscal Alert - strictly exact 'Pendente' logic sync
+          // Nota Fiscal Alert
           try {
             const { data: nfData1, error: nfError1 } = await supabase
               .from('BANCO_DE_DADOS')
@@ -84,6 +88,11 @@ export function NotificationCenter() {
 
             if (!nfError1) {
               setHasNotaFiscal((nfData1?.length || 0) > 0)
+            } else {
+              console.warn(
+                'Supabase error checking nota fiscal notifications:',
+                nfError1,
+              )
             }
           } catch (error) {
             console.warn(
@@ -112,6 +121,11 @@ export function NotificationCenter() {
               setHasPix(
                 (pixData1?.length || 0) > 0 || (pixData2?.length || 0) > 0,
               )
+            } else {
+              console.warn(
+                'Supabase error checking pix notifications:',
+                pixError1 || pixError2,
+              )
             }
           } catch (error) {
             console.warn(
@@ -131,6 +145,11 @@ export function NotificationCenter() {
 
             if (!recError) {
               setHasRecolhido((recData?.length || 0) > 0)
+            } else {
+              console.warn(
+                'Supabase error checking recolhido notifications:',
+                recError,
+              )
             }
           } catch (error) {
             console.warn(
