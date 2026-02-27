@@ -81,7 +81,7 @@ const calculateThermalHeight = (body: any) => {
   h += 15
 
   const items = body.items || []
-  h += items.length * 60 // Adjusted height per item for new concise format
+  h += items.length * 70 // Adjusted height per item for new concise format
 
   h += 59
   h += 102
@@ -1075,7 +1075,7 @@ Deno.serve(async (req) => {
         y -= 10
 
         for (const item of sortedItems) {
-          checkPageBreak(60)
+          checkPageBreak(70)
 
           let rawName = item.produtoNome || item.produto || ''
           const priceStr = `R$ ${formatCurrency(item.precoUnitario || item.preco)}`
@@ -1083,6 +1083,14 @@ Deno.serve(async (req) => {
           if (!rawName.includes('R$')) {
             prodName = `${rawName} ${priceStr}`
           }
+
+          // Top Row: Item Name and Unit Price
+          drawText(prodName, margins.left, y, {
+            size: 8,
+            font: fontBold,
+            maxWidth: width - margins.left - margins.right,
+          })
+          y -= 12
 
           // Header Row 1
           drawText('Saldo', 35, y, { size: 7, font: fontBold, align: 'center' })
@@ -1137,22 +1145,9 @@ Deno.serve(async (req) => {
           })
           y -= 14
 
-          // Product and Total
-          const totalStr = `Total: R$ ${formatCurrency(item.valorVendido)}`
-          const totalWidth = fontBold.widthOfTextAtSize(totalStr, 8)
-          drawText(totalStr, width - margins.right, y, {
-            size: 8,
-            font: fontBold,
-            align: 'right',
-          })
-
-          const maxProdWidth =
-            width - margins.left - margins.right - totalWidth - 5
-          drawText(prodName, margins.left, y, {
-            size: 8,
-            font: fontBold,
-            maxWidth: maxProdWidth,
-          })
+          // Bottom Row: Total Venda
+          const totalStr = `Total Venda: R$ ${formatCurrency(item.valorVendido)}`
+          drawText(totalStr, margins.left, y, { size: 8, font: fontBold })
 
           y -= 8
           drawLine(y, 0.5)
