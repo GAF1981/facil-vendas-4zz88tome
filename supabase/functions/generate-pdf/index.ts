@@ -81,7 +81,7 @@ const calculateThermalHeight = (body: any) => {
   h += 15
 
   const items = body.items || []
-  h += items.length * 85 // Adjusted height per item for new concise format
+  h += items.length * 60 // Adjusted height per item for new concise format
 
   h += 59
   h += 102
@@ -127,7 +127,8 @@ Deno.serve(async (req) => {
     const body = await req.json()
     const { reportType, format, signature } = body
     const isThermal = format === '80mm'
-    const isDetailedOrder = reportType === 'detailed-order'
+    const isDetailedOrder =
+      reportType === 'detailed-order' || (reportType === 'acerto' && !isThermal)
 
     const pdfDoc = await PDFDocument.create()
     const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica)
@@ -1070,8 +1071,11 @@ Deno.serve(async (req) => {
       )
 
       if (sortedItems.length > 0) {
+        drawLine(y, 0.5)
+        y -= 10
+
         for (const item of sortedItems) {
-          checkPageBreak(85)
+          checkPageBreak(60)
 
           let rawName = item.produtoNome || item.produto || ''
           const priceStr = `R$ ${formatCurrency(item.precoUnitario || item.preco)}`
@@ -1080,38 +1084,79 @@ Deno.serve(async (req) => {
             prodName = `${rawName} ${priceStr}`
           }
 
-          drawText(prodName, margins.left, y, {
-            size: 9,
+          // Header Row 1
+          drawText('Saldo', 35, y, { size: 7, font: fontBold, align: 'center' })
+          drawText('Qtd.', 87, y, { size: 7, font: fontBold, align: 'center' })
+          drawText('Qtd.', 138, y, { size: 7, font: fontBold, align: 'center' })
+          drawText('Saldo', 190, y, {
+            size: 7,
             font: fontBold,
-            maxWidth: width - 20,
+            align: 'center',
+          })
+          y -= 9
+
+          // Header Row 2
+          drawText('Inicial', 35, y, {
+            size: 7,
+            font: fontBold,
+            align: 'center',
+          })
+          drawText('Contagem', 87, y, {
+            size: 7,
+            font: fontBold,
+            align: 'center',
+          })
+          drawText('Vendida', 138, y, {
+            size: 7,
+            font: fontBold,
+            align: 'center',
+          })
+          drawText('Final', 190, y, {
+            size: 7,
+            font: fontBold,
+            align: 'center',
           })
           y -= 12
 
-          const stats = [
-            { label: 'Saldo Inicial:', val: String(item.saldoInicial || 0) },
-            { label: 'Contagem:', val: String(item.contagem || 0) },
-            { label: 'Qtd. Vendida:', val: String(item.quantVendida || 0) },
-            { label: 'Saldo Final:', val: String(item.saldoFinal || 0) },
-            {
-              label: 'Total:',
-              val: `R$ ${formatCurrency(item.valorVendido)}`,
-              bold: true,
-            },
-          ]
+          // Values
+          drawText(String(item.saldoInicial || 0), 35, y, {
+            size: 8,
+            align: 'center',
+          })
+          drawText(String(item.contagem || 0), 87, y, {
+            size: 8,
+            align: 'center',
+          })
+          drawText(String(item.quantVendida || 0), 138, y, {
+            size: 8,
+            align: 'center',
+          })
+          drawText(String(item.saldoFinal || 0), 190, y, {
+            size: 8,
+            align: 'center',
+          })
+          y -= 14
 
-          stats.forEach((stat) => {
-            drawText(stat.label, margins.left, y, { size: 9 })
-            drawText(stat.val, margins.left + 75, y, {
-              size: 9,
-              align: 'left',
-              font: stat.bold ? fontBold : fontRegular,
-            })
-            y -= 12
+          // Product and Total
+          const totalStr = `Total: R$ ${formatCurrency(item.valorVendido)}`
+          const totalWidth = fontBold.widthOfTextAtSize(totalStr, 8)
+          drawText(totalStr, width - margins.right, y, {
+            size: 8,
+            font: fontBold,
+            align: 'right',
           })
 
-          y -= 2
+          const maxProdWidth =
+            width - margins.left - margins.right - totalWidth - 5
+          drawText(prodName, margins.left, y, {
+            size: 8,
+            font: fontBold,
+            maxWidth: maxProdWidth,
+          })
+
+          y -= 8
           drawLine(y, 0.5)
-          y -= 12
+          y -= 10
         }
       }
 
