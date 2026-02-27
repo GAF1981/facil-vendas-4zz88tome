@@ -101,9 +101,7 @@ export const boletoService = {
     })
   },
 
-  async importBoletos(
-    parsedData: any[],
-  ): Promise<{
+  async importBoletos(parsedData: any[]): Promise<{
     success: boolean
     count: number
     errors: number
