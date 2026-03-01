@@ -42,6 +42,8 @@ interface AcertoTableProps {
   clientName?: string
   orderNumber?: number | null
   isCaptacao?: boolean
+  hideContagem?: boolean
+  hideSaldoFinal?: boolean
 }
 
 const VerticalHeader = ({
@@ -127,6 +129,8 @@ export function AcertoTable({
   clientId,
   clientName,
   isCaptacao = false,
+  hideContagem = false,
+  hideSaldoFinal = false,
 }: AcertoTableProps) {
   const { employee } = useUserStore()
   const { toast } = useToast()
@@ -240,14 +244,18 @@ export function AcertoTable({
                 PRODUTO
               </VerticalHeader>
               <VerticalHeader>SALDO INICIAL</VerticalHeader>
-              <VerticalHeader className="bg-blue-50/50 font-bold text-blue-700">
-                CONTAGEM
-              </VerticalHeader>
+              {!hideContagem && (
+                <VerticalHeader className="bg-blue-50/50 font-bold text-blue-700">
+                  CONTAGEM
+                </VerticalHeader>
+              )}
               <VerticalHeader>QUANT. VENDIDA</VerticalHeader>
               <VerticalHeader>VALOR VENDIDO</VerticalHeader>
-              <VerticalHeader className="bg-primary/5 font-bold text-primary">
-                SALDO FINAL
-              </VerticalHeader>
+              {!hideSaldoFinal && (
+                <VerticalHeader className="bg-primary/5 font-bold text-primary">
+                  SALDO FINAL
+                </VerticalHeader>
+              )}
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -255,7 +263,9 @@ export function AcertoTable({
             {items.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={10}
+                  colSpan={
+                    10 - (hideContagem ? 1 : 0) - (hideSaldoFinal ? 1 : 0)
+                  }
                   className="h-24 text-center text-muted-foreground"
                 >
                   Nenhum produto adicionado. Clique em "Inserir Produto" para
@@ -300,25 +310,31 @@ export function AcertoTable({
                         </Button>
                       </div>
                     </TableCell>
-                    <TableCell className="p-2 bg-blue-50/30">
-                      <NumberInputControl
-                        value={item.contagem}
-                        onChange={(val) => safeUpdateContagem(item.uid, val)}
-                        disabled={isContagemDisabled}
-                      />
-                    </TableCell>
+                    {!hideContagem && (
+                      <TableCell className="p-2 bg-blue-50/30">
+                        <NumberInputControl
+                          value={item.contagem}
+                          onChange={(val) => safeUpdateContagem(item.uid, val)}
+                          disabled={isContagemDisabled}
+                        />
+                      </TableCell>
+                    )}
                     <TableCell className="text-center font-bold">
                       {item.quantVendida}
                     </TableCell>
                     <TableCell className="text-center font-mono text-green-600">
                       R$ {item.valorVendido.toFixed(2).replace('.', ',')}
                     </TableCell>
-                    <TableCell className="p-2 bg-primary/5">
-                      <NumberInputControl
-                        value={item.saldoFinal}
-                        onChange={(val) => safeUpdateSaldoFinal(item.uid, val)}
-                      />
-                    </TableCell>
+                    {!hideSaldoFinal && (
+                      <TableCell className="p-2 bg-primary/5">
+                        <NumberInputControl
+                          value={item.saldoFinal}
+                          onChange={(val) =>
+                            safeUpdateSaldoFinal(item.uid, val)
+                          }
+                        />
+                      </TableCell>
+                    )}
                     <TableCell>
                       <TooltipProvider>
                         <Tooltip>

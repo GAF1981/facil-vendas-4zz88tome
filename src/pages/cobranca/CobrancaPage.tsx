@@ -45,8 +45,9 @@ export default function CobrancaPage() {
   const [clientFilter, setClientFilter] = useState('')
   const [orderFilter, setOrderFilter] = useState('')
 
-  // New Filter state for Tipo de Cliente, defaulting to ATIVO
   const [clientTypeFilter, setClientTypeFilter] = useState<string>('ATIVO')
+  const [formaPagamentoFilter, setFormaPagamentoFilter] =
+    useState<string>('todos')
 
   const [statusFilter, setStatusFilter] = useState<string[]>([
     'VENCIDO',
@@ -339,6 +340,7 @@ export default function CobrancaPage() {
     setCityFilter('todos')
     setMotoqueiroFilter('todos')
     setClientTypeFilter('ATIVO')
+    setFormaPagamentoFilter('todos')
   }
 
   return (
@@ -439,8 +441,7 @@ export default function CobrancaPage() {
               </div>
             </div>
 
-            {/* New Client Type Filter */}
-            <div className="w-full md:w-[180px]">
+            <div className="w-full md:w-[150px]">
               <Select
                 value={clientTypeFilter}
                 onValueChange={setClientTypeFilter}
@@ -461,7 +462,30 @@ export default function CobrancaPage() {
               </Select>
             </div>
 
-            <div className="w-full md:w-[250px]">
+            <div className="w-full md:w-[180px]">
+              <Select
+                value={formaPagamentoFilter}
+                onValueChange={setFormaPagamentoFilter}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="F. Pagamento" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos Pagamentos</SelectItem>
+                  <SelectItem value="boleto conferido">
+                    Boleto Conferido
+                  </SelectItem>
+                  <SelectItem value="boleto conferir">
+                    Boleto Conferir
+                  </SelectItem>
+                  <SelectItem value="pix">Pix</SelectItem>
+                  <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                  <SelectItem value="cheque">Cheque</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="w-full md:w-[200px]">
               <MultiSelect
                 options={statusOptions}
                 selected={statusFilter}
@@ -581,6 +605,7 @@ export default function CobrancaPage() {
                 motoqueiroFilter={motoqueiroFilter}
                 orderFilter={orderFilter}
                 showOnlySelected={false}
+                formaPagamentoFilter={formaPagamentoFilter}
               />
             </TabsContent>
 
@@ -618,6 +643,7 @@ export default function CobrancaPage() {
                 motoqueiroFilter={motoqueiroFilter}
                 orderFilter={orderFilter}
                 showOnlySelected={true}
+                formaPagamentoFilter={formaPagamentoFilter}
               />
             </TabsContent>
           </Tabs>

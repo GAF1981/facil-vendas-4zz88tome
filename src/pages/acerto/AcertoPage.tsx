@@ -37,6 +37,7 @@ import {
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Switch } from '@/components/ui/switch'
 import {
   Save,
   Printer,
@@ -74,6 +75,10 @@ export default function AcertoPage() {
   const [isCaptacao, setIsCaptacao] = useState(false)
   const [collectionDialogOpen, setCollectionDialogOpen] = useState(false)
   const [isVendaMercadoria, setIsVendaMercadoria] = useState(false)
+
+  // Visibility Controls State
+  const [hideContagem, setHideContagem] = useState(false)
+  const [hideSaldoFinal, setHideSaldoFinal] = useState(false)
 
   // Edit Mode States
   const [isEditMode, setIsEditMode] = useState(false)
@@ -623,6 +628,10 @@ export default function AcertoPage() {
   }
 
   const handlePreSaveValidation = async () => {
+    // Reset visibility logic to protect report generation as per acceptance criteria
+    setHideContagem(false)
+    setHideSaldoFinal(false)
+
     if (!client) return
 
     if (client['TIPO DE CLIENTE'] !== 'ATIVO') {
@@ -1061,54 +1070,79 @@ export default function AcertoPage() {
             loading={loadingAcerto}
           />
 
-          <div className="flex justify-end gap-2 flex-wrap">
-            <Button
-              variant={isVendaMercadoria ? 'default' : 'outline'}
-              onClick={() => setIsVendaMercadoria(!isVendaMercadoria)}
-              className={cn(
-                isVendaMercadoria &&
-                  'bg-amber-600 hover:bg-amber-700 text-white border-amber-600',
-              )}
-              title="Venda de todo o estoque"
-            >
-              <Package className="mr-2 h-4 w-4" />
-              Venda de Mercadoria
-            </Button>
-            <Button
-              variant="outline"
-              onClick={handleRepeatInitialToCount}
-              title="Copiar Saldo Inicial para Contagem em todos os itens"
-            >
-              <ArrowRight className="mr-2 h-4 w-4" />
-              Repetir Saldo Inicial na Contagem
-            </Button>
-            <Button
-              variant="outline"
-              onClick={handleRepeatInitialToFinal}
-              title="Copiar Saldo Inicial para Saldo Final em todos os itens"
-            >
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Repetir Saldo Inicial no Saldo Final
-            </Button>
-            <Button
-              variant="outline"
-              onClick={handleRepeatCount}
-              title="Copiar Contagem para Saldo Final em todos os itens"
-            >
-              <Copy className="mr-2 h-4 w-4" />
-              Repetir Contagem
-            </Button>
-            <KitSelectorDialog onSelect={handleAddKit} />
-            <ProductSelector onSelect={handleAddProducts} />
-            <Button
-              variant="outline"
-              className="border-blue-200 text-blue-700 hover:bg-blue-50"
-              onClick={() => setCollectionDialogOpen(true)}
-              title="Registrar Ação de Cobrança para este cliente"
-            >
-              <Banknote className="mr-2 h-4 w-4" />
-              Registrar Ação de Cobrança
-            </Button>
+          <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 border p-2 rounded-md bg-card w-full xl:w-auto">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="hide-contagem"
+                  checked={hideContagem}
+                  onCheckedChange={setHideContagem}
+                />
+                <Label htmlFor="hide-contagem" className="cursor-pointer">
+                  ocultar contagem
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="hide-saldo-final"
+                  checked={hideSaldoFinal}
+                  onCheckedChange={setHideSaldoFinal}
+                />
+                <Label htmlFor="hide-saldo-final" className="cursor-pointer">
+                  ocultar saldo final
+                </Label>
+              </div>
+            </div>
+
+            <div className="flex justify-start xl:justify-end gap-2 flex-wrap flex-1 w-full">
+              <Button
+                variant={isVendaMercadoria ? 'default' : 'outline'}
+                onClick={() => setIsVendaMercadoria(!isVendaMercadoria)}
+                className={cn(
+                  isVendaMercadoria &&
+                    'bg-amber-600 hover:bg-amber-700 text-white border-amber-600',
+                )}
+                title="Venda de todo o estoque"
+              >
+                <Package className="mr-2 h-4 w-4" />
+                Venda de Mercadoria
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleRepeatInitialToCount}
+                title="Copiar Saldo Inicial para Contagem em todos os itens"
+              >
+                <ArrowRight className="mr-2 h-4 w-4" />
+                Repetir Saldo Inicial na Contagem
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleRepeatInitialToFinal}
+                title="Copiar Saldo Inicial para Saldo Final em todos os itens"
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Repetir Saldo Inicial no Saldo Final
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleRepeatCount}
+                title="Copiar Contagem para Saldo Final em todos os itens"
+              >
+                <Copy className="mr-2 h-4 w-4" />
+                Repetir Contagem
+              </Button>
+              <KitSelectorDialog onSelect={handleAddKit} />
+              <ProductSelector onSelect={handleAddProducts} />
+              <Button
+                variant="outline"
+                className="border-blue-200 text-blue-700 hover:bg-blue-50"
+                onClick={() => setCollectionDialogOpen(true)}
+                title="Registrar Ação de Cobrança para este cliente"
+              >
+                <Banknote className="mr-2 h-4 w-4" />
+                Registrar Ação de Cobrança
+              </Button>
+            </div>
           </div>
 
           {isVendaMercadoria && (
@@ -1138,6 +1172,8 @@ export default function AcertoPage() {
             clientName={client['NOME CLIENTE'] || 'Desconhecido'}
             orderNumber={nextOrderNumber}
             isCaptacao={isCaptacao}
+            hideContagem={hideContagem}
+            hideSaldoFinal={hideSaldoFinal}
           />
 
           <div className="space-y-6">

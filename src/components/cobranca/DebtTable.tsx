@@ -58,6 +58,7 @@ interface DebtTableProps {
   motoqueiroFilter?: string
   orderFilter?: string
   showOnlySelected?: boolean
+  formaPagamentoFilter?: string
 }
 
 interface FlatRow {
@@ -112,6 +113,7 @@ export function DebtTable({
   motoqueiroFilter = 'todos',
   orderFilter = '',
   showOnlySelected = false,
+  formaPagamentoFilter = 'todos',
 }: DebtTableProps) {
   const [selectedClient, setSelectedClient] = useState<ClientDebt | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -300,6 +302,19 @@ export function DebtTable({
       filtered = filtered.filter((r) => selectedItems.has(r.uniqueId))
     }
 
+    if (formaPagamentoFilter && formaPagamentoFilter !== 'todos') {
+      filtered = filtered.filter((r) => {
+        if (formaPagamentoFilter === 'boleto conferido') return r.isConferido
+        if (formaPagamentoFilter === 'boleto conferir') return r.needsConferir
+        const lower = r.formaPagamento?.toLowerCase() || ''
+        if (formaPagamentoFilter === 'pix') return lower.includes('pix')
+        if (formaPagamentoFilter === 'dinheiro')
+          return lower.includes('dinheiro')
+        if (formaPagamentoFilter === 'cheque') return lower.includes('cheque')
+        return true
+      })
+    }
+
     if (sortConfig) {
       filtered.sort((a, b) => {
         const aValue = a[sortConfig.key] ?? ''
@@ -326,6 +341,7 @@ export function DebtTable({
     orderFilter,
     showOnlySelected,
     selectedItems,
+    formaPagamentoFilter,
   ])
 
   const requestSort = (key: keyof FlatRow) => {
