@@ -78,43 +78,61 @@ export const reportsService = {
       }),
     )
 
-    // 2. Fetch Sales Data with robust date fallback logic
-    let salesQuery = supabase
-      .from('BANCO_DE_DADOS')
-      .select(
-        '"NÚMERO DO PEDIDO", "CÓDIGO DO CLIENTE", "CLIENTE", "DATA DO ACERTO", "DATA E HORA", "VALOR VENDIDO", "HORA DO ACERTO"',
-      )
-      .not('NÚMERO DO PEDIDO', 'is', null)
+    // Helper to bypass 1000 row limits
+    const fetchBatchedData = async (
+      table: string,
+      select: string,
+      modifiers: (q: any) => any,
+    ) => {
+      let allRows: any[] = []
+      const batchSize = 1000
+      const limit = 100000 // Ensure we grab full order history to include orders like 608, 747, etc.
 
-    // Ensure full history without arbitrary limits if specific clients are requested
-    if (clientIds && clientIds.length > 0) {
-      salesQuery = salesQuery.in('"CÓDIGO DO CLIENTE"', clientIds)
-    } else {
-      salesQuery = salesQuery.limit(100000)
+      for (let i = 0; i < limit / batchSize; i++) {
+        const from = i * batchSize
+        const to = from + batchSize - 1
+        let query = supabase.from(table as any).select(select)
+        query = modifiers(query)
+        const { data, error } = await query.range(from, to)
+
+        if (error) throw error
+        if (!data || data.length === 0) break
+        allRows = allRows.concat(data)
+        if (data.length < batchSize) break
+      }
+      return allRows
     }
 
-    const { data: salesData, error: salesError } = await salesQuery
-    if (salesError) throw salesError
+    // 2. Fetch Sales Data batched
+    const salesData = await fetchBatchedData(
+      'BANCO_DE_DADOS',
+      '"NÚMERO DO PEDIDO", "CÓDIGO DO CLIENTE", "CLIENTE", "DATA DO ACERTO", "DATA E HORA", "VALOR VENDIDO", "HORA DO ACERTO"',
+      (q) => {
+        let query = q.not('NÚMERO DO PEDIDO', 'is', null)
+        if (clientIds && clientIds.length > 0) {
+          query = query.in('"CÓDIGO DO CLIENTE"', clientIds)
+        }
+        return query.order('NÚMERO DO PEDIDO', { ascending: false })
+      },
+    )
 
-    // 3. Fetch Initial Balance / Adjustment Data for complete timeline
-    let adjQuery = supabase
-      .from('AJUSTE_SALDO_INICIAL')
-      .select(
-        'cliente_id, cliente_nome, data_acerto, numero_pedido, saldo_novo, id',
-      )
-      .not('data_acerto', 'is', null)
-
-    if (clientIds && clientIds.length > 0) {
-      adjQuery = adjQuery.in('cliente_id', clientIds)
-    }
-
-    const { data: adjData, error: adjError } = await adjQuery
-    if (adjError) throw adjError
+    // 3. Fetch Adjustment Data batched
+    const adjData = await fetchBatchedData(
+      'AJUSTE_SALDO_INICIAL',
+      'cliente_id, cliente_nome, data_acerto, numero_pedido, saldo_novo, id',
+      (q) => {
+        let query = q.not('data_acerto', 'is', null)
+        if (clientIds && clientIds.length > 0) {
+          query = query.in('cliente_id', clientIds)
+        }
+        return query.order('id', { ascending: false })
+      },
+    )
 
     const ordersMap = new Map<string, ProjectionReportRow>()
 
     // Process Sales Data
-    salesData?.forEach((row) => {
+    salesData?.forEach((row: any) => {
       const orderId = row['NÚMERO DO PEDIDO']
       if (!orderId) return
 
@@ -142,10 +160,10 @@ export const reportsService = {
           orderDate: dateObj.toISOString(),
           totalValue: 0,
           daysBetweenOrders: null,
-          indexDays: rpcMap.get(cid)?.dias || null,
+          indexDays: null,
           monthlyAverage: null,
           daysSinceLastOrder: null,
-          projection: rpcMap.get(cid)?.projecao || null,
+          projection: null,
         })
       }
 
@@ -154,7 +172,7 @@ export const reportsService = {
     })
 
     // Process Adjustment Data
-    adjData?.forEach((row) => {
+    adjData?.forEach((row: any) => {
       const dateObj = parseDateSafe(row.data_acerto)
       if (!dateObj) return
 
@@ -171,10 +189,10 @@ export const reportsService = {
           orderDate: dateObj.toISOString(),
           totalValue: 0,
           daysBetweenOrders: null,
-          indexDays: rpcMap.get(cid)?.dias || null,
+          indexDays: null,
           monthlyAverage: null,
           daysSinceLastOrder: null,
-          projection: rpcMap.get(cid)?.projecao || null,
+          projection: null,
         })
       }
     })
@@ -208,8 +226,6 @@ export const reportsService = {
         : 0
 
       orders.forEach((currentOrder, index) => {
-        currentOrder.daysSinceLastOrder = daysSinceLastForClient
-
         // Calculate intervals between chronological orders
         if (index < orders.length - 1) {
           const prevOrder = orders[index + 1]
@@ -219,8 +235,28 @@ export const reportsService = {
               new Date(prevOrder.orderDate),
             ),
           )
+
+          if (currentOrder.daysBetweenOrders > 0) {
+            currentOrder.indexDays = currentOrder.daysBetweenOrders / 30
+            currentOrder.monthlyAverage =
+              currentOrder.totalValue / currentOrder.indexDays
+          } else {
+            currentOrder.indexDays = 0
+            currentOrder.monthlyAverage = currentOrder.totalValue
+          }
         } else {
           currentOrder.daysBetweenOrders = null
+          currentOrder.indexDays = null
+          currentOrder.monthlyAverage = null
+        }
+
+        if (index === 0) {
+          currentOrder.daysSinceLastOrder = daysSinceLastForClient
+          currentOrder.projection =
+            rpcMap.get(currentOrder.clientCode)?.projecao || null
+        } else {
+          currentOrder.daysSinceLastOrder = null
+          currentOrder.projection = null
         }
 
         result.push(currentOrder)

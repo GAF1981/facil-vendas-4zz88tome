@@ -4028,51 +4028,60 @@ export const Constants = {
 //   
 // FUNCTION get_client_projections()
 //   CREATE OR REPLACE FUNCTION public.get_client_projections()
-//    RETURNS TABLE(client_id integer, projecao numeric, dias_entre_acertos integer)
+//    RETURNS TABLE(client_id bigint, projecao numeric, dias_entre_acertos integer)
 //    LANGUAGE plpgsql
 //   AS $function$
 //   BEGIN
 //     RETURN QUERY
 //     WITH 
+//     -- 1. Standard Sales Data
 //     sales_data AS (
 //         SELECT
 //             "CÓDIGO DO CLIENTE" as cid,
 //             "NÚMERO DO PEDIDO" as oid,
-//             COALESCE(NULLIF(TRIM("DATA DO ACERTO"::text), ''), to_char("DATA E HORA", 'YYYY-MM-DD')) as date_str,
-//             "VALOR VENDIDO" as val_str
+//             "DATA DO ACERTO"::text as date_str,
+//             "VALOR VENDIDO"::text as val_str
 //         FROM "BANCO_DE_DADOS"
-//         WHERE (NULLIF(TRIM("DATA DO ACERTO"::text), '') IS NOT NULL OR "DATA E HORA" IS NOT NULL)
+//         WHERE "DATA DO ACERTO" IS NOT NULL 
+//           AND "DATA DO ACERTO"::text != ''
 //           AND "CÓDIGO DO CLIENTE" IS NOT NULL
 //           AND "NÚMERO DO PEDIDO" IS NOT NULL
 //     ),
+//     -- 2. Initial Balance / Adjustment Data
 //     adj_data AS (
 //         SELECT
 //             cliente_id as cid,
 //             numero_pedido as oid,
-//             to_char(data_acerto, 'YYYY-MM-DD') as date_str,
-//             '0' as val_str
+//             data_acerto::text as date_str,
+//             '0' as val_str -- Value is 0 for projection calc purposes (timeline anchor)
 //         FROM "AJUSTE_SALDO_INICIAL"
 //         WHERE data_acerto IS NOT NULL 
 //           AND cliente_id IS NOT NULL
 //     ),
+//     -- 3. Combine Data Sources
 //     combined_raw AS (
 //         SELECT * FROM sales_data
 //         UNION ALL
 //         SELECT * FROM adj_data
 //     ),
+//     -- 4. Parse Dates and Values
 //     parsed_data AS (
 //         SELECT
 //           cid,
 //           oid,
 //           val_str,
 //           CASE
+//               -- Try to match DD/MM/YYYY (BR Format)
 //               WHEN date_str ~ '^\d{2}/\d{2}/\d{4}' THEN 
 //                   to_date(substring(date_str from 1 for 10), 'DD/MM/YYYY')
+//               -- Try to match DD/MM/YY (BR Short Format) - assume 2000s
 //               WHEN date_str ~ '^\d{2}/\d{2}/\d{2}
  THEN 
 //                    to_date(date_str, 'DD/MM/YY')
+//               -- Try to match YYYY-MM-DD (ISO Format)
 //               WHEN date_str ~ '^\d{4}-\d{2}-\d{2}' THEN 
 //                   to_date(substring(date_str from 1 for 10), 'YYYY-MM-DD')
+//               -- Try to match YYYY-MM-DD (ISO Format with T)
 //               WHEN date_str LIKE '%T%' THEN
 //                   to_date(substring(date_str from 1 for 10), 'YYYY-MM-DD')
 //               ELSE NULL
@@ -4089,47 +4098,47 @@ export const Constants = {
  THEN CAST(REPLACE(REPLACE(val_str, '.', ''), ',', '.') AS NUMERIC)
 //                WHEN val_str ~ '^[0-9,]+
  THEN CAST(REPLACE(val_str, ',', '.') AS NUMERIC)
-//                ELSE CAST(COALESCE(NULLIF(val_str, ''), '0') AS NUMERIC)
+//                ELSE CAST(NULLIF(val_str, '') AS NUMERIC)
 //           END as val
 //         FROM parsed_data
 //         WHERE dt IS NOT NULL
 //     ),
-//     grouped_orders AS (
+//     -- 5. Rank Orders per Client (Latest first)
+//     ranked_orders AS (
 //         SELECT
 //             cid,
 //             oid,
 //             dt,
-//             SUM(val) as total_val
+//             val,
+//             ROW_NUMBER() OVER (PARTITION BY cid ORDER BY dt DESC, oid DESC) as rn
 //         FROM parsed_values
-//         GROUP BY cid, oid, dt
 //     ),
-//     client_stats AS (
-//         SELECT
-//             cid,
-//             MAX(dt) as max_dt,
-//             MIN(dt) as min_dt,
-//             COUNT(DISTINCT dt) as count_orders,
-//             SUM(total_val) as sum_val
-//         FROM grouped_orders
-//         GROUP BY cid
+//     -- 6. Get Latest and Previous
+//     latest AS (
+//         SELECT cid, dt, val FROM ranked_orders WHERE rn = 1
 //     ),
+//     previous AS (
+//         SELECT cid, dt FROM ranked_orders WHERE rn = 2
+//     ),
+//     -- 7. Calculate Projection
 //     base_calc AS (
 //         SELECT
-//             cid,
-//             max_dt,
-//             (max_dt - min_dt) as days_span,
-//             count_orders,
-//             sum_val,
+//             l.cid,
+//             (l.dt - p.dt) as days_diff,
 //             CASE
-//                 WHEN count_orders > 1 AND (max_dt - min_dt) > 0 THEN (max_dt - min_dt) / (count_orders - 1)
-//                 ELSE 0
-//             END as avg_days,
-//             CASE
-//                 WHEN count_orders > 1 AND (max_dt - min_dt) > 0 THEN
-//                      (sum_val / (max_dt - min_dt)::numeric) * GREATEST((CURRENT_DATE - max_dt)::numeric, 1.0)
-//                 ELSE 100.00
+//                 -- If no previous data (p.dt is null), or dates are same/invalid
+//                 WHEN p.dt IS NULL OR (l.dt - p.dt) <= 0 THEN 100.00
+//                 
+//                 -- Standard Calculation
+//                 -- Monthly Avg = Val / ((DateDiff)/30)
+//                 -- Projection = (DaysSinceLast/30) * Monthly Avg
+//                 -- Projection = (DaysSinceLast * Val) / DateDiff
+//                 ELSE
+//                      ((CURRENT_DATE - l.dt)::numeric / 30.0) *
+//                      (l.val / ((l.dt - p.dt)::numeric / 30.0))
 //             END as calc_proj
-//         FROM client_stats
+//         FROM latest l
+//         LEFT JOIN previous p ON l.cid = p.cid
 //     )
 //     SELECT
 //         cid as client_id,
@@ -4137,7 +4146,7 @@ export const Constants = {
 //           WHEN calc_proj IS NULL OR calc_proj = 0 THEN 100.00 
 //           ELSE ROUND(calc_proj, 2) 
 //         END as projecao,
-//         COALESCE(avg_days, 0)::integer as dias_entre_acertos
+//         COALESCE(days_diff, 0)::integer as dias_entre_acertos
 //     FROM base_calc;
 //   END;
 //   $function$
@@ -4521,8 +4530,8 @@ export const Constants = {
 //   END;
 //   $function$
 //   
-// FUNCTION parse_currency_sql(character varying)
-//   CREATE OR REPLACE FUNCTION public.parse_currency_sql(val_str character varying)
+// FUNCTION parse_currency_sql(text)
+//   CREATE OR REPLACE FUNCTION public.parse_currency_sql(val_str text)
 //    RETURNS numeric
 //    LANGUAGE plpgsql
 //   AS $function$
@@ -4550,8 +4559,8 @@ export const Constants = {
 //   END;
 //   $function$
 //   
-// FUNCTION parse_currency_sql(text)
-//   CREATE OR REPLACE FUNCTION public.parse_currency_sql(val_str text)
+// FUNCTION parse_currency_sql(character varying)
+//   CREATE OR REPLACE FUNCTION public.parse_currency_sql(val_str character varying)
 //    RETURNS numeric
 //    LANGUAGE plpgsql
 //   AS $function$
