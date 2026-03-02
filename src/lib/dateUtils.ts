@@ -102,12 +102,22 @@ export const parseDateSafe = (
     }
   }
 
+  // Try YYYY/MM/DD
+  if (!d && str.match(/^\d{4}\/\d{2}\/\d{2}/)) {
+    const cleaned = str.replace(/\//g, '-')
+    const isoDate = parseISO(cleaned)
+    if (isValid(isoDate)) d = isoDate
+  }
+
   if (!d) {
     // Try BR formats, including 2-digit years
     const formats = [
       'dd/MM/yyyy HH:mm:ss',
       'dd/MM/yyyy HH:mm',
       'dd/MM/yyyy',
+      'dd-MM-yyyy HH:mm:ss',
+      'dd-MM-yyyy HH:mm',
+      'dd-MM-yyyy',
       'dd/MM/yy HH:mm:ss',
       'dd/MM/yy HH:mm',
       'dd/MM/yy',

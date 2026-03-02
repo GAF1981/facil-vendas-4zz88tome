@@ -3882,6 +3882,9 @@ export const Constants = {
 //   Policy "Allow read access for authenticated users" (SELECT, PERMISSIVE) roles={authenticated}
 //     USING: true
 // Table: fechamento_caixa
+//   Policy "Enable all access for all users" (ALL, PERMISSIVE) roles={public}
+//     USING: true
+//     WITH CHECK: true
 //   Policy "Enable all access for authenticated users" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: true
 //     WITH CHECK: true

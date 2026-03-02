@@ -61,7 +61,7 @@ export interface DebitoReportRow {
 
 export const reportsService = {
   async getProjectionsReport(): Promise<ProjectionReportRow[]> {
-    // 1. Fetch Sales Data
+    // 1. Fetch Sales Data - increased limit to ensure older orders like 607 are caught if needed
     const { data: salesData, error: salesError } = await supabase
       .from('BANCO_DE_DADOS')
       .select(
@@ -71,7 +71,7 @@ export const reportsService = {
       .not('DATA DO ACERTO', 'is', null)
       .order('DATA DO ACERTO', { ascending: false })
       .order('HORA DO ACERTO', { ascending: false })
-      .limit(10000)
+      .limit(50000)
 
     if (salesError) throw salesError
 
@@ -157,10 +157,13 @@ export const reportsService = {
     const today = startOfDay(new Date())
 
     clientOrdersMap.forEach((orders) => {
-      // Sort using date timestamps
+      // Sort using date timestamps AND orderId to match SQL row ranking accurately
       orders.sort((a, b) => {
         const dateA = new Date(a.orderDate).getTime()
         const dateB = new Date(b.orderDate).getTime()
+        if (dateB === dateA) {
+          return b.orderId - a.orderId
+        }
         return dateB - dateA
       })
 
@@ -234,6 +237,9 @@ export const reportsService = {
     return result.sort((a, b) => {
       const dateA = new Date(a.orderDate).getTime()
       const dateB = new Date(b.orderDate).getTime()
+      if (dateB === dateA) {
+        return b.orderId - a.orderId
+      }
       return dateB - dateA
     })
   },
