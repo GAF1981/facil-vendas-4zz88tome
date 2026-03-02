@@ -60,29 +60,42 @@ export interface DebitoReportRow {
 }
 
 export const reportsService = {
-  async getProjectionsReport(): Promise<ProjectionReportRow[]> {
-    // 1. Fetch Sales Data - increased limit to ensure older orders like 607 are caught if needed
-    const { data: salesData, error: salesError } = await supabase
+  async getProjectionsReport(
+    clientIds?: number[],
+  ): Promise<ProjectionReportRow[]> {
+    // 1. Fetch Sales Data with a higher limit to ensure full history
+    let salesQuery = supabase
       .from('BANCO_DE_DADOS')
       .select(
-        '"NÚMERO DO PEDIDO", "CÓDIGO DO CLIENTE", "CLIENTE", "DATA DO ACERTO", "VALOR VENDIDO", "HORA DO ACERTO"',
+        '"NÚMERO DO PEDIDO", "CÓDIGO DO CLIENTE", "CLIENTE", "DATA DO ACERTO", "DATA E HORA", "VALOR VENDIDO", "HORA DO ACERTO"',
       )
       .not('NÚMERO DO PEDIDO', 'is', null)
-      .not('DATA DO ACERTO', 'is', null)
       .order('DATA DO ACERTO', { ascending: false })
       .order('HORA DO ACERTO', { ascending: false })
-      .limit(50000)
+      .limit(100000)
+
+    if (clientIds && clientIds.length > 0) {
+      salesQuery = salesQuery.in('"CÓDIGO DO CLIENTE"', clientIds)
+    }
+
+    const { data: salesData, error: salesError } = await salesQuery
 
     if (salesError) throw salesError
 
-    // 2. Fetch Initial Balance / Adjustment Data to be included as settlements
-    const { data: adjData, error: adjError } = await supabase
+    // 2. Fetch Initial Balance / Adjustment Data to be included as timeline anchors
+    let adjQuery = supabase
       .from('AJUSTE_SALDO_INICIAL')
       .select(
         'cliente_id, cliente_nome, data_acerto, numero_pedido, saldo_novo, id',
       )
       .not('data_acerto', 'is', null)
       .order('data_acerto', { ascending: false })
+
+    if (clientIds && clientIds.length > 0) {
+      adjQuery = adjQuery.in('cliente_id', clientIds)
+    }
+
+    const { data: adjData, error: adjError } = await adjQuery
 
     if (adjError) throw adjError
 
@@ -93,7 +106,13 @@ export const reportsService = {
       const orderId = row['NÚMERO DO PEDIDO']
       if (!orderId) return
 
-      const dateObj = parseDateSafe(row['DATA DO ACERTO'])
+      let dateStr = row['DATA DO ACERTO']
+      if (!dateStr && row['DATA E HORA']) {
+        dateStr = row['DATA E HORA'].split('T')[0]
+      }
+      if (!dateStr) return
+
+      const dateObj = parseDateSafe(dateStr)
       if (!dateObj) return
 
       const val = parseCurrency(row['VALOR VENDIDO'])
@@ -105,7 +124,7 @@ export const reportsService = {
           orderId: orderId,
           clientCode: row['CÓDIGO DO CLIENTE'] || 0,
           clientName: row['CLIENTE'] || 'N/D',
-          orderDate: dateObj.toISOString(), // Use ISO string for reliable parsing
+          orderDate: dateObj.toISOString(),
           totalValue: 0,
           daysBetweenOrders: null,
           indexDays: null,
@@ -124,7 +143,6 @@ export const reportsService = {
       const dateObj = parseDateSafe(row.data_acerto)
       if (!dateObj) return
 
-      // Use numero_pedido if available, otherwise use a placeholder ID derived from row ID
       const orderId = row.numero_pedido || -row.id
       const uniqueId = `adj-${orderId}-${row.id}`
 
@@ -134,8 +152,8 @@ export const reportsService = {
           orderId: orderId,
           clientCode: row.cliente_id,
           clientName: row.cliente_nome || 'Cliente Importado',
-          orderDate: dateObj.toISOString(), // Use ISO string for reliable parsing
-          totalValue: 0, // Initial balances count as 0 for revenue calc in this context, but valid for timeline
+          orderDate: dateObj.toISOString(),
+          totalValue: 0,
           daysBetweenOrders: null,
           indexDays: null,
           monthlyAverage: null,
@@ -169,65 +187,54 @@ export const reportsService = {
 
       const latestOrderDate =
         orders.length > 0 ? new Date(orders[0].orderDate) : null
+      const oldestOrderDate =
+        orders.length > 0 ? new Date(orders[orders.length - 1].orderDate) : null
+
       const daysSinceLastForClient = latestOrderDate
         ? differenceInDays(today, latestOrderDate)
         : 0
+      const totalSpanDays =
+        latestOrderDate && oldestOrderDate
+          ? Math.abs(differenceInDays(latestOrderDate, oldestOrderDate))
+          : 0
+      const totalOrdersCount = orders.length
+
+      const sumVal = orders.reduce((acc, o) => acc + o.totalValue, 0)
+
+      let avgDaysBetween = 0
+      if (totalOrdersCount > 1 && totalSpanDays > 0) {
+        avgDaysBetween = totalSpanDays / (totalOrdersCount - 1)
+      }
+
+      let dailyAvg = 0
+      if (totalSpanDays > 0) {
+        dailyAvg = sumVal / totalSpanDays
+      }
 
       orders.forEach((currentOrder, index) => {
         currentOrder.daysSinceLastOrder = daysSinceLastForClient
-        let calculated = false
 
         if (index < orders.length - 1) {
           const prevOrder = orders[index + 1]
-
-          const currDate = new Date(currentOrder.orderDate)
-          const prevDate = new Date(prevOrder.orderDate)
-
-          const diffDays = differenceInDays(currDate, prevDate)
-          currentOrder.daysBetweenOrders = Math.abs(diffDays) // Ensure positive difference
-
-          // Fallback if dates are same or weirdly close
-          if (currentOrder.daysBetweenOrders === 0) {
-            currentOrder.indexDays = 0
-            currentOrder.monthlyAverage = currentOrder.totalValue // Treat as 1 month if 0 days diff to avoid Infinity
-          } else {
-            const indexD = currentOrder.daysBetweenOrders / 30
-            currentOrder.indexDays = indexD
-            if (indexD > 0) {
-              currentOrder.monthlyAverage = currentOrder.totalValue / indexD
-            } else {
-              currentOrder.monthlyAverage = 0
-            }
-          }
-
-          const daysSinceLastMonths = Math.max(1, daysSinceLastForClient) / 30
-
-          if (
-            currentOrder.monthlyAverage !== null &&
-            currentOrder.monthlyAverage > 0
-          ) {
-            // Projection Logic: Monthly Avg * Months Since Last Order
-            // Or projection = (val / interval_days) * days_since
-            currentOrder.projection =
-              daysSinceLastMonths * currentOrder.monthlyAverage
-            calculated = true
-          } else {
-            currentOrder.projection = 0
-          }
+          currentOrder.daysBetweenOrders = Math.abs(
+            differenceInDays(
+              new Date(currentOrder.orderDate),
+              new Date(prevOrder.orderDate),
+            ),
+          )
         } else {
           currentOrder.daysBetweenOrders = null
-          currentOrder.indexDays = null
-          currentOrder.monthlyAverage = null
-          currentOrder.projection = null
         }
 
-        // Fallback Rule: If projection cannot be calculated or is 0, default to 14.99
-        if (
-          !calculated ||
-          currentOrder.projection === 0 ||
-          currentOrder.projection === null
-        ) {
-          currentOrder.projection = 14.99
+        currentOrder.indexDays = avgDaysBetween > 0 ? avgDaysBetween : null
+
+        if (totalOrdersCount > 1 && totalSpanDays > 0) {
+          currentOrder.monthlyAverage = dailyAvg * 30
+          currentOrder.projection =
+            dailyAvg * Math.max(daysSinceLastForClient, 1)
+        } else {
+          currentOrder.monthlyAverage = 0
+          currentOrder.projection = 100.0
         }
 
         result.push(currentOrder)

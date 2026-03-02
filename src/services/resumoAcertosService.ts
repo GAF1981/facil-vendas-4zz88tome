@@ -175,16 +175,20 @@ export const resumoAcertosService = {
     rota?: Rota
     startDate?: string
     endDate?: string
+    clientId?: number
   }) {
     let query = supabase
       .from('BANCO_DE_DADOS')
       .select('*')
       .not('"NÚMERO DO PEDIDO"', 'is', null)
+      .limit(100000)
 
     let routeStart: Date | null = null
     let routeEnd: Date | null = null
 
-    if (options.rota) {
+    if (options.clientId) {
+      query = query.eq('"CÓDIGO DO CLIENTE"', options.clientId)
+    } else if (options.rota) {
       routeStart = parseISO(options.rota.data_inicio)
       routeEnd = options.rota.data_fim
         ? parseISO(options.rota.data_fim)
@@ -212,11 +216,18 @@ export const resumoAcertosService = {
     const ordersMap = new Map<number, SettlementSummary>()
 
     dbData?.forEach((row: any) => {
-      const dateStr = row['DATA DO ACERTO']
-      const timeStr = row['HORA DO ACERTO'] || '00:00:00'
+      let dateStr = row['DATA DO ACERTO']
+      let timeStr = row['HORA DO ACERTO'] || '00:00:00'
+
+      // Safe fallback to DATA E HORA if DATA DO ACERTO is somehow missing still
+      if (!dateStr && row['DATA E HORA']) {
+        const iso = row['DATA E HORA'].split('T')
+        dateStr = iso[0]
+        if (iso[1]) timeStr = iso[1].substring(0, 8)
+      }
       if (!dateStr) return
 
-      if (options.rota) {
+      if (options.rota && !options.clientId) {
         const rowDateTimeStr = `${dateStr}T${timeStr}`
         let rowDateTime: Date
         try {
@@ -284,25 +295,29 @@ export const resumoAcertosService = {
     const orderIds = Array.from(ordersMap.keys())
 
     if (orderIds.length > 0) {
-      const { data: payData, error: payError } = await supabase
-        .from('RECEBIMENTOS')
-        .select('venda_id, forma_pagamento, valor_pago')
-        .in('venda_id', orderIds)
+      const chunkSize = 1000
+      for (let i = 0; i < orderIds.length; i += chunkSize) {
+        const chunk = orderIds.slice(i, i + chunkSize)
+        const { data: payData, error: payError } = await supabase
+          .from('RECEBIMENTOS')
+          .select('venda_id, forma_pagamento, valor_pago')
+          .in('venda_id', chunk)
 
-      if (payError) throw payError
+        if (payError) throw payError
 
-      payData?.forEach((p: any) => {
-        const order = ordersMap.get(p.venda_id)
-        if (order) {
-          if (p.valor_pago > 0) {
-            order.payments.push({
-              method: p.forma_pagamento,
-              value: p.valor_pago,
-            })
-            order.totalPaid += p.valor_pago
+        payData?.forEach((p: any) => {
+          const order = ordersMap.get(p.venda_id)
+          if (order) {
+            if (p.valor_pago > 0) {
+              order.payments.push({
+                method: p.forma_pagamento,
+                value: p.valor_pago,
+              })
+              order.totalPaid += p.valor_pago
+            }
           }
-        }
-      })
+        })
+      }
     }
 
     ordersMap.forEach((order) => {
