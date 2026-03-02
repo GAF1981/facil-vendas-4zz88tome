@@ -184,7 +184,9 @@ export function Header() {
                 </span>
                 {employee?.setor && (
                   <span className="text-xs text-muted-foreground uppercase font-semibold">
-                    {employee.setor.join(', ')}
+                    {Array.isArray(employee.setor)
+                      ? employee.setor.join(', ')
+                      : String(employee.setor)}
                   </span>
                 )}
               </div>
@@ -211,7 +213,9 @@ export function Header() {
                 </p>
                 {employee?.setor && (
                   <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold transition-colors border-transparent bg-secondary text-secondary-foreground w-fit mt-1">
-                    {employee.setor.join(', ')}
+                    {Array.isArray(employee.setor)
+                      ? employee.setor.join(', ')
+                      : String(employee.setor)}
                   </span>
                 )}
               </div>
