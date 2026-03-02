@@ -49,5 +49,6 @@ export interface FechamentoInsert {
   valor_boleto: number // Added
   valor_despesas: number
   saldo_acerto: number
-  status: 'Aberto'
+  status: 'Aberto' | 'Fechado'
+  responsavel_id?: number | null
 }

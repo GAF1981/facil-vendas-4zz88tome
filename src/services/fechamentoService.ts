@@ -23,7 +23,11 @@ export const fechamentoService = {
     return data as FechamentoCaixa[]
   },
 
-  async createClosing(rota: Rota, funcionarioId: number) {
+  async createClosing(
+    rota: Rota,
+    funcionarioId: number,
+    responsavelId?: number,
+  ) {
     // 1. Calculate Financial Totals
     const settlements = await resumoAcertosService.getSettlements({ rota })
 
@@ -95,12 +99,13 @@ export const fechamentoService = {
       valor_boleto: valorBoleto,
       valor_despesas: valorDespesas,
       saldo_acerto: saldoAcerto,
-      status: 'Aberto',
+      status: 'Fechado',
+      responsavel_id: responsavelId || null,
     }
 
     const { data, error } = await supabase
       .from('fechamento_caixa')
-      .insert(payload)
+      .upsert(payload, { onConflict: 'rota_id, funcionario_id' })
       .select(`*, funcionario:FUNCIONARIOS!funcionario_id ( nome_completo )`) // Fetch joined data for PDF
       .single()
 

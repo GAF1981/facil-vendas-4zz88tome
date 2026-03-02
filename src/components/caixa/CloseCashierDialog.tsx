@@ -79,7 +79,12 @@ export function CloseCashierDialog({
   }, [open, loggedInUser, targetEmployeeId])
 
   useEffect(() => {
-    if (open && selectedEmployeeId && currentRoute) {
+    if (
+      open &&
+      selectedEmployeeId &&
+      selectedEmployeeId !== 'all' &&
+      currentRoute
+    ) {
       setDataLoading(true)
       const empId = parseInt(selectedEmployeeId)
       Promise.all([
@@ -118,10 +123,10 @@ export function CloseCashierDialog({
       return
     }
 
-    if (!selectedEmployeeId) {
+    if (!selectedEmployeeId || selectedEmployeeId === 'all') {
       toast({
         title: 'Atenção',
-        description: 'Funcionário não identificado.',
+        description: 'Selecione um funcionário específico para fechar o caixa.',
         variant: 'destructive',
       })
       return
@@ -132,30 +137,32 @@ export function CloseCashierDialog({
       const empId = parseInt(selectedEmployeeId)
 
       // Check if already closed
-      const exists = await fechamentoService.checkExistingClosing(
+      const closureStatus = await fechamentoService.getClosureStatus(
         currentRoute.id,
         empId,
       )
-      if (exists) {
+
+      if (closureStatus === 'Fechado') {
         toast({
-          title: 'Já Iniciado',
+          title: 'Já Fechado',
           description:
-            'Já existe um fechamento de caixa para este funcionário nesta rota.',
+            'O caixa para este funcionário já foi fechado nesta rota.',
           variant: 'warning',
         })
         onOpenChange(false)
         return
       }
 
-      // Create Closing Record
+      // Create Closing Record - Status will be 'Fechado'
       const fechamento = await fechamentoService.createClosing(
         currentRoute,
         empId,
+        loggedInUser?.id || empId,
       )
 
       toast({
-        title: 'Fechamento Iniciado',
-        description: 'Gerando relatórios PDF...',
+        title: 'Caixa Fechado',
+        description: 'Caixa fechado com sucesso. Gerando relatório PDF...',
         className: 'bg-green-600 text-white',
       })
 
@@ -166,7 +173,7 @@ export function CloseCashierDialog({
         toast({
           title: 'Aviso',
           description:
-            'Fechamento criado, mas houve erro ao gerar um dos PDFs.',
+            'Caixa fechado, mas houve erro ao gerar o PDF de resumo.',
           variant: 'warning',
         })
       }
@@ -177,7 +184,8 @@ export function CloseCashierDialog({
       console.error(error)
       toast({
         title: 'Erro',
-        description: 'Falha ao iniciar fechamento de caixa.',
+        description:
+          'Falha ao fechar caixa. Verifique sua conexão e tente novamente.',
         variant: 'destructive',
       })
     } finally {
@@ -186,7 +194,10 @@ export function CloseCashierDialog({
   }
 
   const totalReceipts = receipts.reduce((acc, r) => acc + r.valor, 0)
-  const totalExpenses = expenses.reduce((acc, e) => acc + e.valor, 0)
+  const totalExpenses = expenses.reduce(
+    (acc, e) => (e.saiuDoCaixa ? acc + e.valor : acc),
+    0,
+  )
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -208,9 +219,12 @@ export function CloseCashierDialog({
               disabled={!canChangeEmployee}
             >
               <SelectTrigger className="bg-background font-medium w-full sm:w-1/2">
-                <SelectValue placeholder="Selecione..." />
+                <SelectValue placeholder="Selecione um funcionário..." />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="all" disabled>
+                  Selecione um funcionário
+                </SelectItem>
                 {employees.map((emp) => (
                   <SelectItem key={emp.id} value={emp.id.toString()}>
                     {emp.nome_completo}
@@ -220,8 +234,12 @@ export function CloseCashierDialog({
             </Select>
           </div>
 
-          {dataLoading ? (
-            <div className="h-40 flex items-center justify-center">
+          {selectedEmployeeId === 'all' || !selectedEmployeeId ? (
+            <div className="h-40 flex flex-col items-center justify-center text-muted-foreground bg-muted/20 rounded-md border border-dashed">
+              <Label>Selecione um funcionário para visualizar os dados.</Label>
+            </div>
+          ) : dataLoading ? (
+            <div className="h-40 flex items-center justify-center bg-muted/20 rounded-md">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : (
@@ -231,7 +249,7 @@ export function CloseCashierDialog({
                   Recebimentos ({receipts.length})
                 </TabsTrigger>
                 <TabsTrigger value="expenses">
-                  Despesas ({expenses.length})
+                  Despesas ({expenses.filter((e) => e.saiuDoCaixa).length})
                 </TabsTrigger>
               </TabsList>
               <TabsContent value="receipts" className="mt-2">
@@ -293,44 +311,51 @@ export function CloseCashierDialog({
                         <TableHead>Data</TableHead>
                         <TableHead>Grupo</TableHead>
                         <TableHead>Detalhes</TableHead>
-                        <TableHead className="text-right">Valor</TableHead>
+                        <TableHead className="text-right">
+                          Valor (Dinheiro)
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {expenses.length === 0 ? (
+                      {expenses.filter((e) => e.saiuDoCaixa).length === 0 ? (
                         <TableRow>
                           <TableCell
                             colSpan={5}
                             className="text-center h-24 text-muted-foreground"
                           >
-                            Nenhuma despesa encontrada.
+                            Nenhuma despesa no caixa encontrada.
                           </TableCell>
                         </TableRow>
                       ) : (
-                        expenses.map((e) => (
-                          <TableRow key={e.id}>
-                            <TableCell className="font-mono text-xs">
-                              {e.id}
-                            </TableCell>
-                            <TableCell className="text-xs">
-                              {safeFormatDate(e.data, 'dd/MM HH:mm')}
-                            </TableCell>
-                            <TableCell className="text-xs">{e.grupo}</TableCell>
-                            <TableCell className="text-xs truncate max-w-[150px]">
-                              {e.detalhamento}
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-xs font-medium text-red-600">
-                              {formatCurrency(e.valor)}
-                            </TableCell>
-                          </TableRow>
-                        ))
+                        expenses
+                          .filter((e) => e.saiuDoCaixa)
+                          .map((e) => (
+                            <TableRow key={e.id}>
+                              <TableCell className="font-mono text-xs">
+                                {e.id}
+                              </TableCell>
+                              <TableCell className="text-xs">
+                                {safeFormatDate(e.data, 'dd/MM HH:mm')}
+                              </TableCell>
+                              <TableCell className="text-xs">
+                                {e.grupo}
+                              </TableCell>
+                              <TableCell className="text-xs truncate max-w-[150px]">
+                                {e.detalhamento}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-xs font-medium text-red-600">
+                                {formatCurrency(e.valor)}
+                              </TableCell>
+                            </TableRow>
+                          ))
                       )}
                     </TableBody>
                   </Table>
                 </div>
                 <div className="flex justify-end mt-2">
                   <span className="font-bold text-sm text-red-600">
-                    Total Despesas: R$ {formatCurrency(totalExpenses)}
+                    Total Despesas (Dinheiro): R${' '}
+                    {formatCurrency(totalExpenses)}
                   </span>
                 </div>
               </TabsContent>
@@ -344,7 +369,9 @@ export function CloseCashierDialog({
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={loading || !selectedEmployeeId}
+            disabled={
+              loading || !selectedEmployeeId || selectedEmployeeId === 'all'
+            }
           >
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Confirmar e Fechar

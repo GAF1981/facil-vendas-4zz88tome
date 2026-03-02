@@ -475,18 +475,33 @@ export default function CaixaPage() {
         </div>
         <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           {canCloseCashier && (
-            <Button
-              onClick={() => setIsCloseCashierDialogOpen(true)}
-              className="bg-purple-600 hover:bg-purple-700 flex-1 sm:flex-none text-white"
-              disabled={
-                !selectedRoute ||
-                !selectedEmployeeId ||
-                selectedEmployeeId === 'all'
-              }
-            >
-              <Lock className="mr-2 h-4 w-4" />
-              Fechar Caixa
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0}>
+                    <Button
+                      onClick={() => setIsCloseCashierDialogOpen(true)}
+                      className="bg-purple-600 hover:bg-purple-700 flex-1 sm:flex-none text-white w-full sm:w-auto"
+                      disabled={
+                        !selectedRoute ||
+                        !selectedEmployeeId ||
+                        selectedEmployeeId === 'all'
+                      }
+                    >
+                      <Lock className="mr-2 h-4 w-4" />
+                      Fechar Caixa
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {selectedEmployeeId === 'all' && (
+                  <TooltipContent>
+                    <p>
+                      Selecione um funcionário específico para fechar o caixa.
+                    </p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
           )}
           <div className="flex flex-col sm:flex-row gap-2 border p-1 rounded-md bg-background">
             <div className="flex items-center gap-2 px-2">
