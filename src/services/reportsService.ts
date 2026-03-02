@@ -63,40 +63,51 @@ export const reportsService = {
   async getProjectionsReport(
     clientIds?: number[],
   ): Promise<ProjectionReportRow[]> {
-    // 1. Fetch Sales Data with a higher limit to ensure full history
+    // 1. Fetch RPC Data for accurate pre-calculated projections
+    const { data: rpcData, error: rpcError } = await supabase.rpc(
+      'get_client_projections',
+    )
+    if (rpcError) throw rpcError
+
+    const rpcMap = new Map<number, { projecao: number; dias: number }>()
+    rpcData?.forEach((r) =>
+      rpcMap.set(r.client_id, {
+        projecao: r.projecao,
+        dias: r.dias_entre_acertos,
+      }),
+    )
+
+    // 2. Fetch Sales Data with robust date fallback logic
     let salesQuery = supabase
       .from('BANCO_DE_DADOS')
       .select(
         '"NÚMERO DO PEDIDO", "CÓDIGO DO CLIENTE", "CLIENTE", "DATA DO ACERTO", "DATA E HORA", "VALOR VENDIDO", "HORA DO ACERTO"',
       )
       .not('NÚMERO DO PEDIDO', 'is', null)
-      .order('DATA DO ACERTO', { ascending: false })
-      .order('HORA DO ACERTO', { ascending: false })
-      .limit(100000)
 
+    // Ensure full history without arbitrary limits if specific clients are requested
     if (clientIds && clientIds.length > 0) {
       salesQuery = salesQuery.in('"CÓDIGO DO CLIENTE"', clientIds)
+    } else {
+      salesQuery = salesQuery.limit(100000)
     }
 
     const { data: salesData, error: salesError } = await salesQuery
-
     if (salesError) throw salesError
 
-    // 2. Fetch Initial Balance / Adjustment Data to be included as timeline anchors
+    // 3. Fetch Initial Balance / Adjustment Data for complete timeline
     let adjQuery = supabase
       .from('AJUSTE_SALDO_INICIAL')
       .select(
         'cliente_id, cliente_nome, data_acerto, numero_pedido, saldo_novo, id',
       )
       .not('data_acerto', 'is', null)
-      .order('data_acerto', { ascending: false })
 
     if (clientIds && clientIds.length > 0) {
       adjQuery = adjQuery.in('cliente_id', clientIds)
     }
 
     const { data: adjData, error: adjError } = await adjQuery
-
     if (adjError) throw adjError
 
     const ordersMap = new Map<string, ProjectionReportRow>()
@@ -106,11 +117,12 @@ export const reportsService = {
       const orderId = row['NÚMERO DO PEDIDO']
       if (!orderId) return
 
+      // Robust date processing: fallback to DATA E HORA if DATA DO ACERTO is missing
       let dateStr = row['DATA DO ACERTO']
-      if (!dateStr && row['DATA E HORA']) {
+      if ((!dateStr || String(dateStr).trim() === '') && row['DATA E HORA']) {
         dateStr = row['DATA E HORA'].split('T')[0]
       }
-      if (!dateStr) return
+      if (!dateStr || String(dateStr).trim() === '') return
 
       const dateObj = parseDateSafe(dateStr)
       if (!dateObj) return
@@ -118,19 +130,21 @@ export const reportsService = {
       const val = parseCurrency(row['VALOR VENDIDO'])
       const uniqueId = `sale-${orderId}`
 
+      const cid = row['CÓDIGO DO CLIENTE'] || 0
+
       if (!ordersMap.has(uniqueId)) {
         ordersMap.set(uniqueId, {
           id: uniqueId,
           orderId: orderId,
-          clientCode: row['CÓDIGO DO CLIENTE'] || 0,
+          clientCode: cid,
           clientName: row['CLIENTE'] || 'N/D',
           orderDate: dateObj.toISOString(),
           totalValue: 0,
           daysBetweenOrders: null,
-          indexDays: null,
+          indexDays: rpcMap.get(cid)?.dias || null,
           monthlyAverage: null,
           daysSinceLastOrder: null,
-          projection: null,
+          projection: rpcMap.get(cid)?.projecao || null,
         })
       }
 
@@ -155,10 +169,10 @@ export const reportsService = {
           orderDate: dateObj.toISOString(),
           totalValue: 0,
           daysBetweenOrders: null,
-          indexDays: null,
+          indexDays: rpcMap.get(row.cliente_id)?.dias || null,
           monthlyAverage: null,
           daysSinceLastOrder: null,
-          projection: null,
+          projection: rpcMap.get(row.cliente_id)?.projecao || null,
         })
       }
     })
@@ -175,7 +189,7 @@ export const reportsService = {
     const today = startOfDay(new Date())
 
     clientOrdersMap.forEach((orders) => {
-      // Sort using date timestamps AND orderId to match SQL row ranking accurately
+      // Sort using date timestamps AND orderId to maintain precise timeline order
       orders.sort((a, b) => {
         const dateA = new Date(a.orderDate).getTime()
         const dateB = new Date(b.orderDate).getTime()
@@ -187,33 +201,14 @@ export const reportsService = {
 
       const latestOrderDate =
         orders.length > 0 ? new Date(orders[0].orderDate) : null
-      const oldestOrderDate =
-        orders.length > 0 ? new Date(orders[orders.length - 1].orderDate) : null
-
       const daysSinceLastForClient = latestOrderDate
         ? differenceInDays(today, latestOrderDate)
         : 0
-      const totalSpanDays =
-        latestOrderDate && oldestOrderDate
-          ? Math.abs(differenceInDays(latestOrderDate, oldestOrderDate))
-          : 0
-      const totalOrdersCount = orders.length
-
-      const sumVal = orders.reduce((acc, o) => acc + o.totalValue, 0)
-
-      let avgDaysBetween = 0
-      if (totalOrdersCount > 1 && totalSpanDays > 0) {
-        avgDaysBetween = totalSpanDays / (totalOrdersCount - 1)
-      }
-
-      let dailyAvg = 0
-      if (totalSpanDays > 0) {
-        dailyAvg = sumVal / totalSpanDays
-      }
 
       orders.forEach((currentOrder, index) => {
         currentOrder.daysSinceLastOrder = daysSinceLastForClient
 
+        // Calculate intervals between chronological orders
         if (index < orders.length - 1) {
           const prevOrder = orders[index + 1]
           currentOrder.daysBetweenOrders = Math.abs(
@@ -224,17 +219,6 @@ export const reportsService = {
           )
         } else {
           currentOrder.daysBetweenOrders = null
-        }
-
-        currentOrder.indexDays = avgDaysBetween > 0 ? avgDaysBetween : null
-
-        if (totalOrdersCount > 1 && totalSpanDays > 0) {
-          currentOrder.monthlyAverage = dailyAvg * 30
-          currentOrder.projection =
-            dailyAvg * Math.max(daysSinceLastForClient, 1)
-        } else {
-          currentOrder.monthlyAverage = 0
-          currentOrder.projection = 100.0
         }
 
         result.push(currentOrder)
@@ -312,11 +296,11 @@ export const reportsService = {
     }
 
     if (filters?.startDate) {
-      query = query.gte('data_acerto', format(filters.startDate, 'yyyy-MM-dd'))
+      query = query.gte('data_acerto', filters.startDate.toISOString())
     }
 
     if (filters?.endDate) {
-      query = query.lte('data_acerto', format(filters.endDate, 'yyyy-MM-dd'))
+      query = query.lte('data_acerto', filters.endDate.toISOString())
     }
 
     if (!filters?.startDate && !filters?.sellerId) {

@@ -4038,11 +4038,11 @@ export const Constants = {
 //         SELECT
 //             "CÓDIGO DO CLIENTE" as cid,
 //             "NÚMERO DO PEDIDO" as oid,
-//             "DATA DO ACERTO" as date_str,
-//             "VALOR VENDIDO" as val_str
+//             "DATA DO ACERTO"::text as date_str,
+//             "VALOR VENDIDO"::text as val_str
 //         FROM "BANCO_DE_DADOS"
 //         WHERE "DATA DO ACERTO" IS NOT NULL 
-//           AND trim("DATA DO ACERTO") != ''
+//           AND trim("DATA DO ACERTO"::text) != ''
 //           AND "CÓDIGO DO CLIENTE" IS NOT NULL
 //           AND "NÚMERO DO PEDIDO" IS NOT NULL
 //     ),
@@ -4068,25 +4068,13 @@ export const Constants = {
 //           val_str,
 //           CASE
 //               WHEN trim(date_str) = '' THEN NULL
-//               -- ISO Format (YYYY-MM-DD)
-//               WHEN trim(date_str) ~ '^\d{4}-\d{2}-\d{2}' THEN 
-//                   to_date(substring(trim(date_str) from 1 for 10), 'YYYY-MM-DD')
-//               -- ISO Format (YYYY/MM/DD)
-//               WHEN trim(date_str) ~ '^\d{4}/\d{2}/\d{2}' THEN 
-//                   to_date(substring(trim(date_str) from 1 for 10), 'YYYY/MM/DD')
-//               -- BR Format (DD/MM/YYYY)
-//               WHEN trim(date_str) ~ '^\d{2}/\d{2}/\d{4}' THEN 
-//                   to_date(substring(trim(date_str) from 1 for 10), 'DD/MM/YYYY')
-//               -- BR Format with dash (DD-MM-YYYY)
-//               WHEN trim(date_str) ~ '^\d{2}-\d{2}-\d{4}' THEN 
-//                   to_date(substring(trim(date_str) from 1 for 10), 'DD-MM-YYYY')
-//               -- BR Short Format exact (DD/MM/YY)
+//               WHEN trim(date_str) ~ '^\d{4}-\d{2}-\d{2}' THEN to_date(substring(trim(date_str) from 1 for 10), 'YYYY-MM-DD')
+//               WHEN trim(date_str) ~ '^\d{4}/\d{2}/\d{2}' THEN to_date(substring(trim(date_str) from 1 for 10), 'YYYY/MM/DD')
+//               WHEN trim(date_str) ~ '^\d{2}/\d{2}/\d{4}' THEN to_date(substring(trim(date_str) from 1 for 10), 'DD/MM/YYYY')
+//               WHEN trim(date_str) ~ '^\d{2}-\d{2}-\d{4}' THEN to_date(substring(trim(date_str) from 1 for 10), 'DD-MM-YYYY')
 //               WHEN trim(date_str) ~ '^\d{2}/\d{2}/\d{2}
- THEN 
-//                    to_date(trim(date_str), 'DD/MM/YY')
-//               -- BR Short Format with Time (DD/MM/YY HH:MM...)
-//               WHEN trim(date_str) ~ '^\d{2}/\d{2}/\d{2}\s+\d{1,2}:\d{2}' THEN 
-//                    to_date(substring(trim(date_str) from 1 for 8), 'DD/MM/YY')
+ THEN to_date(trim(date_str), 'DD/MM/YY')
+//               WHEN trim(date_str) ~ '^\d{2}/\d{2}/\d{2}\s+' THEN to_date(substring(trim(date_str) from 1 for 8), 'DD/MM/YY')
 //               ELSE NULL
 //           END as raw_dt
 //         FROM combined_raw
@@ -4099,9 +4087,7 @@ export const Constants = {
 //           val_str,
 //           CASE
 //               WHEN raw_dt IS NULL THEN NULL
-//               -- Fix Year < 1900 (e.g., 0026 -> 2026)
-//               WHEN EXTRACT(YEAR FROM raw_dt) < 1900 THEN
-//                   raw_dt + (INTERVAL '2000 years')
+//               WHEN EXTRACT(YEAR FROM raw_dt) < 1900 THEN raw_dt + (INTERVAL '2000 years')
 //               ELSE raw_dt
 //           END::date as dt
 //         FROM parsed_data
@@ -4112,29 +4098,12 @@ export const Constants = {
 //           oid,
 //           dt,
 //           CASE 
-//               WHEN val_str IS NULL OR trim(val_str) = '' THEN 0
-//               ELSE
-//                   CAST(
-//                       COALESCE(
-//                           NULLIF(
-//                               regexp_replace(
-//                                   REPLACE(
-//                                       REPLACE(val_str, '.', ''), 
-//                                       ',', 
-//                                       '.'
-//                                   ), 
-//                                   '[^0-9.-]', '', 'g'
-//                               ),
-//                               ''
-//                           ),
-//                           '0'
-//                       ) AS NUMERIC
-//                   )
+//                WHEN val_str IS NULL OR trim(val_str) = '' THEN 0
+//                ELSE CAST(COALESCE(NULLIF(regexp_replace(REPLACE(REPLACE(val_str, '.', ''), ',', '.'), '[^0-9.-]', '', 'g'), ''), '0') AS NUMERIC)
 //           END as val
 //         FROM corrected_dates
 //         WHERE dt IS NOT NULL
 //     ),
-//     -- Group by client, order, and date to combine multi-item orders (like Order 607) into a single settlement event
 //     grouped_orders AS (
 //         SELECT
 //             cid,
@@ -4144,42 +4113,41 @@ export const Constants = {
 //         FROM parsed_values
 //         GROUP BY cid, oid, dt
 //     ),
-//     -- Rank aggregated orders
-//     ranked_orders AS (
+//     client_stats AS (
 //         SELECT
 //             cid,
-//             oid,
-//             dt,
-//             total_val as val,
-//             ROW_NUMBER() OVER (PARTITION BY cid ORDER BY dt DESC, oid DESC) as rn
+//             MAX(dt) as max_dt,
+//             MIN(dt) as min_dt,
+//             COUNT(DISTINCT dt) as count_orders,
+//             SUM(total_val) as sum_val
 //         FROM grouped_orders
-//     ),
-//     latest AS (
-//         SELECT cid, dt, val FROM ranked_orders WHERE rn = 1
-//     ),
-//     previous AS (
-//         SELECT cid, dt FROM ranked_orders WHERE rn = 2
+//         GROUP BY cid
 //     ),
 //     base_calc AS (
 //         SELECT
-//             l.cid,
-//             (l.dt - p.dt) as days_diff,
+//             cid,
+//             max_dt,
+//             (max_dt - min_dt) as days_span,
+//             count_orders,
+//             sum_val,
 //             CASE
-//                 WHEN p.dt IS NULL OR (l.dt - p.dt) <= 0 THEN 14.99
-//                 ELSE
-//                      ((CURRENT_DATE - l.dt)::numeric / 30.0) *
-//                      (l.val / ((l.dt - p.dt)::numeric / 30.0))
+//                 WHEN count_orders > 1 AND (max_dt - min_dt) > 0 THEN (max_dt - min_dt) / (count_orders - 1)
+//                 ELSE 0
+//             END as avg_days,
+//             CASE
+//                 WHEN count_orders > 1 AND (max_dt - min_dt) > 0 THEN
+//                      (sum_val / (max_dt - min_dt)::numeric) * GREATEST((CURRENT_DATE - max_dt)::numeric, 1.0)
+//                 ELSE 100.00
 //             END as calc_proj
-//         FROM latest l
-//         LEFT JOIN previous p ON l.cid = p.cid
+//         FROM client_stats
 //     )
 //     SELECT
 //         cid as client_id,
 //         CASE 
-//           WHEN calc_proj IS NULL OR calc_proj = 0 THEN 14.99 
+//           WHEN calc_proj IS NULL OR calc_proj = 0 THEN 100.00 
 //           ELSE ROUND(calc_proj, 2) 
 //         END as projecao,
-//         COALESCE(days_diff, 0) as dias_entre_acertos
+//         COALESCE(avg_days, 0)::integer as dias_entre_acertos
 //     FROM base_calc;
 //   END;
 //   $function$
