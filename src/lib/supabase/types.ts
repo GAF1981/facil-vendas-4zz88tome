@@ -4042,15 +4042,15 @@ export const Constants = {
 //             "VALOR VENDIDO" as val_str
 //         FROM "BANCO_DE_DADOS"
 //         WHERE "DATA DO ACERTO" IS NOT NULL 
-//           AND "DATA DO ACERTO" != ''
+//           AND trim("DATA DO ACERTO") != ''
 //           AND "CÓDIGO DO CLIENTE" IS NOT NULL
 //           AND "NÚMERO DO PEDIDO" IS NOT NULL
 //     ),
 //     adj_data AS (
 //         SELECT
 //             cliente_id as cid,
-//             numero_pedido as oid,
-//             data_acerto as date_str,
+//             COALESCE(numero_pedido, -(id)) as oid,
+//             to_char(data_acerto, 'YYYY-MM-DD') as date_str,
 //             '0' as val_str
 //         FROM "AJUSTE_SALDO_INICIAL"
 //         WHERE data_acerto IS NOT NULL 
@@ -4067,19 +4067,30 @@ export const Constants = {
 //           oid,
 //           val_str,
 //           CASE
+//               WHEN trim(date_str) = '' THEN NULL
 //               -- ISO Format (YYYY-MM-DD)
-//               WHEN date_str ~ '^\d{4}-\d{2}-\d{2}' THEN 
-//                   to_date(substring(date_str from 1 for 10), 'YYYY-MM-DD')
+//               WHEN trim(date_str) ~ '^\d{4}-\d{2}-\d{2}' THEN 
+//                   to_date(substring(trim(date_str) from 1 for 10), 'YYYY-MM-DD')
+//               -- ISO Format (YYYY/MM/DD)
+//               WHEN trim(date_str) ~ '^\d{4}/\d{2}/\d{2}' THEN 
+//                   to_date(substring(trim(date_str) from 1 for 10), 'YYYY/MM/DD')
 //               -- BR Format (DD/MM/YYYY)
-//               WHEN date_str ~ '^\d{2}/\d{2}/\d{4}' THEN 
-//                   to_date(substring(date_str from 1 for 10), 'DD/MM/YYYY')
-//               -- BR Short Format (DD/MM/YY)
-//               WHEN date_str ~ '^\d{2}/\d{2}/\d{2}
+//               WHEN trim(date_str) ~ '^\d{2}/\d{2}/\d{4}' THEN 
+//                   to_date(substring(trim(date_str) from 1 for 10), 'DD/MM/YYYY')
+//               -- BR Format with dash (DD-MM-YYYY)
+//               WHEN trim(date_str) ~ '^\d{2}-\d{2}-\d{4}' THEN 
+//                   to_date(substring(trim(date_str) from 1 for 10), 'DD-MM-YYYY')
+//               -- BR Short Format exact (DD/MM/YY)
+//               WHEN trim(date_str) ~ '^\d{2}/\d{2}/\d{2}
  THEN 
-//                    to_date(date_str, 'DD/MM/YY')
+//                    to_date(trim(date_str), 'DD/MM/YY')
+//               -- BR Short Format with Time (DD/MM/YY HH:MM...)
+//               WHEN trim(date_str) ~ '^\d{2}/\d{2}/\d{2}\s+\d{1,2}:\d{2}' THEN 
+//                    to_date(substring(trim(date_str) from 1 for 8), 'DD/MM/YY')
 //               ELSE NULL
 //           END as raw_dt
 //         FROM combined_raw
+//         WHERE date_str IS NOT NULL
 //     ),
 //     corrected_dates AS (
 //         SELECT
@@ -4101,23 +4112,47 @@ export const Constants = {
 //           oid,
 //           dt,
 //           CASE 
-//                WHEN val_str ~ '^[0-9.]+,[0-9]+
- THEN CAST(REPLACE(REPLACE(val_str, '.', ''), ',', '.') AS NUMERIC)
-//                WHEN val_str ~ '^[0-9,]+
- THEN CAST(REPLACE(val_str, ',', '.') AS NUMERIC)
-//                ELSE CAST(val_str AS NUMERIC)
+//               WHEN val_str IS NULL OR trim(val_str) = '' THEN 0
+//               ELSE
+//                   CAST(
+//                       COALESCE(
+//                           NULLIF(
+//                               regexp_replace(
+//                                   REPLACE(
+//                                       REPLACE(val_str, '.', ''), 
+//                                       ',', 
+//                                       '.'
+//                                   ), 
+//                                   '[^0-9.-]', '', 'g'
+//                               ),
+//                               ''
+//                           ),
+//                           '0'
+//                       ) AS NUMERIC
+//                   )
 //           END as val
 //         FROM corrected_dates
 //         WHERE dt IS NOT NULL
 //     ),
+//     -- Group by client, order, and date to combine multi-item orders (like Order 607) into a single settlement event
+//     grouped_orders AS (
+//         SELECT
+//             cid,
+//             oid,
+//             dt,
+//             SUM(val) as total_val
+//         FROM parsed_values
+//         GROUP BY cid, oid, dt
+//     ),
+//     -- Rank aggregated orders
 //     ranked_orders AS (
 //         SELECT
 //             cid,
 //             oid,
 //             dt,
-//             val,
+//             total_val as val,
 //             ROW_NUMBER() OVER (PARTITION BY cid ORDER BY dt DESC, oid DESC) as rn
-//         FROM parsed_values
+//         FROM grouped_orders
 //     ),
 //     latest AS (
 //         SELECT cid, dt, val FROM ranked_orders WHERE rn = 1
