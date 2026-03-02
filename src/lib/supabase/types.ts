@@ -3745,6 +3745,7 @@ export const Constants = {
 //   FOREIGN KEY fechamento_caixa_recolhido_por_id_fkey: FOREIGN KEY (recolhido_por_id) REFERENCES "FUNCIONARIOS"(id)
 //   FOREIGN KEY fechamento_caixa_responsavel_id_fkey: FOREIGN KEY (responsavel_id) REFERENCES "FUNCIONARIOS"(id)
 //   FOREIGN KEY fechamento_caixa_rota_id_fkey: FOREIGN KEY (rota_id) REFERENCES "ROTA"(id)
+//   UNIQUE fechamento_caixa_rota_id_funcionario_id_key: UNIQUE (rota_id, funcionario_id)
 // Table: inativar_clientes
 //   PRIMARY KEY inativar_clientes_pkey: PRIMARY KEY (id)
 // Table: kit_items
@@ -5353,6 +5354,7 @@ export const Constants = {
 //   CREATE INDEX idx_debitos_historico_cliente_codigo ON public.debitos_historico USING btree (cliente_codigo)
 //   CREATE UNIQUE INDEX idx_debitos_historico_pedido_id ON public.debitos_historico USING btree (pedido_id)
 // Table: fechamento_caixa
+//   CREATE UNIQUE INDEX fechamento_caixa_rota_id_funcionario_id_key ON public.fechamento_caixa USING btree (rota_id, funcionario_id)
 //   CREATE INDEX idx_fechamento_caixa_funcionario_id ON public.fechamento_caixa USING btree (funcionario_id)
 //   CREATE INDEX idx_fechamento_caixa_rota_id ON public.fechamento_caixa USING btree (rota_id)
 // Table: inativar_clientes
