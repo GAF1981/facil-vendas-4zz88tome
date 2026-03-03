@@ -257,8 +257,9 @@ const App = () => (
                   <Route path="/boletos" element={<BoletosPage />} />
                 </Route>
 
-                {/* E-mail Seguro - Assuming it's open or basic access for manager */}
-                <Route path="/email-seguro" element={<EmailSeguroPage />} />
+                <Route element={<PermissionGuard module="E-mail Seguro" />}>
+                  <Route path="/email-seguro" element={<EmailSeguroPage />} />
+                </Route>
 
                 <Route path="/complemento" element={<PlaceholderModule />} />
                 <Route path="/vendas" element={<PlaceholderModule />} />

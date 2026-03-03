@@ -31,6 +31,8 @@ const MODULES_LIST = [
   'Inativar Clientes',
   'Veículos',
   'Rota Motoqueiro',
+  'Boletos',
+  'E-mail Seguro',
 ]
 
 // Sectors authorized to finalize routes
@@ -108,7 +110,12 @@ export const permissionsService = {
     const inserts = MODULES_LIST.map((m) => ({
       setor,
       modulo: m,
-      acesso: true, // Default to true
+      acesso:
+        setor === 'Administrador'
+          ? true
+          : m === 'Boletos' || m === 'E-mail Seguro'
+            ? false
+            : true,
     }))
 
     const { error } = await supabase

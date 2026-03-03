@@ -4034,16 +4034,15 @@ export const Constants = {
 //   BEGIN
 //     RETURN QUERY
 //     WITH 
-//     -- 1. Standard Sales Data
+//     -- 1. Standard Sales Data - Using robust date fallback
 //     sales_data AS (
 //         SELECT
 //             "CÓDIGO DO CLIENTE" as cid,
 //             "NÚMERO DO PEDIDO" as oid,
-//             "DATA DO ACERTO"::text as date_str,
+//             COALESCE(NULLIF(TRIM("DATA DO ACERTO"::text), ''), to_char("DATA E HORA", 'YYYY-MM-DD')) as date_str,
 //             "VALOR VENDIDO"::text as val_str
 //         FROM "BANCO_DE_DADOS"
-//         WHERE "DATA DO ACERTO" IS NOT NULL 
-//           AND "DATA DO ACERTO"::text != ''
+//         WHERE (NULLIF(TRIM("DATA DO ACERTO"::text), '') IS NOT NULL OR "DATA E HORA" IS NOT NULL)
 //           AND "CÓDIGO DO CLIENTE" IS NOT NULL
 //           AND "NÚMERO DO PEDIDO" IS NOT NULL
 //     ),
@@ -4052,7 +4051,7 @@ export const Constants = {
 //         SELECT
 //             cliente_id as cid,
 //             numero_pedido as oid,
-//             data_acerto::text as date_str,
+//             to_char(data_acerto, 'YYYY-MM-DD') as date_str,
 //             '0' as val_str -- Value is 0 for projection calc purposes (timeline anchor)
 //         FROM "AJUSTE_SALDO_INICIAL"
 //         WHERE data_acerto IS NOT NULL 
@@ -4064,29 +4063,40 @@ export const Constants = {
 //         UNION ALL
 //         SELECT * FROM adj_data
 //     ),
-//     -- 4. Parse Dates and Values
+//     -- 4. Parse Dates and Values with mixed format support
 //     parsed_data AS (
 //         SELECT
 //           cid,
 //           oid,
 //           val_str,
 //           CASE
-//               -- Try to match DD/MM/YYYY (BR Format)
+//               -- ISO Format (YYYY-MM-DD)
+//               WHEN date_str ~ '^\d{4}-\d{2}-\d{2}' THEN 
+//                   to_date(substring(date_str from 1 for 10), 'YYYY-MM-DD')
+//               -- BR Format (DD/MM/YYYY)
 //               WHEN date_str ~ '^\d{2}/\d{2}/\d{4}' THEN 
 //                   to_date(substring(date_str from 1 for 10), 'DD/MM/YYYY')
-//               -- Try to match DD/MM/YY (BR Short Format) - assume 2000s
+//               -- BR Short Format (DD/MM/YY)
 //               WHEN date_str ~ '^\d{2}/\d{2}/\d{2}
  THEN 
 //                    to_date(date_str, 'DD/MM/YY')
-//               -- Try to match YYYY-MM-DD (ISO Format)
-//               WHEN date_str ~ '^\d{4}-\d{2}-\d{2}' THEN 
-//                   to_date(substring(date_str from 1 for 10), 'YYYY-MM-DD')
-//               -- Try to match YYYY-MM-DD (ISO Format with T)
-//               WHEN date_str LIKE '%T%' THEN
-//                   to_date(substring(date_str from 1 for 10), 'YYYY-MM-DD')
 //               ELSE NULL
-//           END as dt
+//           END as raw_dt
 //         FROM combined_raw
+//     ),
+//     corrected_dates AS (
+//         SELECT
+//           cid,
+//           oid,
+//           val_str,
+//           CASE
+//               WHEN raw_dt IS NULL THEN NULL
+//               -- Fix Year < 1900 (e.g., 0026 -> 2026)
+//               WHEN EXTRACT(YEAR FROM raw_dt) < 1900 THEN
+//                   raw_dt + (INTERVAL '2000 years')
+//               ELSE raw_dt
+//           END::date as dt
+//         FROM parsed_data
 //     ),
 //     parsed_values AS (
 //         SELECT
@@ -4100,27 +4110,37 @@ export const Constants = {
  THEN CAST(REPLACE(val_str, ',', '.') AS NUMERIC)
 //                ELSE CAST(NULLIF(val_str, '') AS NUMERIC)
 //           END as val
-//         FROM parsed_data
+//         FROM corrected_dates
 //         WHERE dt IS NOT NULL
 //     ),
-//     -- 5. Rank Orders per Client (Latest first)
+//     -- 5. Group by order to sum total value (handling multiple items per order)
+//     grouped_orders AS (
+//         SELECT
+//             cid,
+//             oid,
+//             dt,
+//             SUM(COALESCE(val, 0)) as total_val
+//         FROM parsed_values
+//         GROUP BY cid, oid, dt
+//     ),
+//     -- 6. Rank Orders per Client (Latest first)
 //     ranked_orders AS (
 //         SELECT
 //             cid,
 //             oid,
 //             dt,
-//             val,
+//             total_val,
 //             ROW_NUMBER() OVER (PARTITION BY cid ORDER BY dt DESC, oid DESC) as rn
-//         FROM parsed_values
+//         FROM grouped_orders
 //     ),
-//     -- 6. Get Latest and Previous
+//     -- 7. Get Latest and Previous
 //     latest AS (
-//         SELECT cid, dt, val FROM ranked_orders WHERE rn = 1
+//         SELECT cid, dt, total_val FROM ranked_orders WHERE rn = 1
 //     ),
 //     previous AS (
 //         SELECT cid, dt FROM ranked_orders WHERE rn = 2
 //     ),
-//     -- 7. Calculate Projection
+//     -- 8. Calculate Projection securely
 //     base_calc AS (
 //         SELECT
 //             l.cid,
@@ -4132,10 +4152,9 @@ export const Constants = {
 //                 -- Standard Calculation
 //                 -- Monthly Avg = Val / ((DateDiff)/30)
 //                 -- Projection = (DaysSinceLast/30) * Monthly Avg
-//                 -- Projection = (DaysSinceLast * Val) / DateDiff
 //                 ELSE
 //                      ((CURRENT_DATE - l.dt)::numeric / 30.0) *
-//                      (l.val / ((l.dt - p.dt)::numeric / 30.0))
+//                      (l.total_val / ((l.dt - p.dt)::numeric / 30.0))
 //             END as calc_proj
 //         FROM latest l
 //         LEFT JOIN previous p ON l.cid = p.cid
