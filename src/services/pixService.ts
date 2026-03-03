@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase/client'
 import { PixReceiptRow, PixConferenceFormData } from '@/types/pix'
-import { parseISO, isAfter, isBefore, isEqual } from 'date-fns'
+import { parseISO } from 'date-fns'
 
 export const pixService = {
   async getPixReceipts(): Promise<PixReceiptRow[]> {
@@ -22,31 +22,9 @@ export const pixService = {
 
     if (error) throw error
 
-    // 2. Fetch All Rotas to determine Route Number efficiently
-    const { data: rotas } = await supabase
-      .from('ROTA')
-      .select('*')
-      .order('id', { ascending: false })
-      .limit(50) // Assuming last 50 routes cover recent history
-
     const receipts = (data || []).map((row: any) => {
       const pix = Array.isArray(row.PIX) ? row.PIX[0] : row.PIX
       const clientName = row.CLIENTES?.['NOME CLIENTE'] || 'N/D'
-
-      // Determine Rota ID: Use db rota_id directly if available, fallback to date logic
-      let rotaId: number | undefined = row.rota_id
-      if (!rotaId && row.created_at && rotas) {
-        const created = parseISO(row.created_at)
-        const rota = rotas.find((r) => {
-          const start = parseISO(r.data_inicio)
-          const end = r.data_fim ? parseISO(r.data_fim) : new Date()
-          return (
-            (isAfter(created, start) || isEqual(created, start)) &&
-            (isBefore(created, end) || isEqual(created, end))
-          )
-        })
-        if (rota) rotaId = rota.id
-      }
 
       return {
         id: row.id,
@@ -65,11 +43,11 @@ export const pixService = {
         banco_pix: pix?.banco_pix,
         data_pix_realizado: pix?.data_pix_realizado,
         confirmado_por: pix?.confirmado_por,
-        rota_id: rotaId,
+        rota_id: row.rota_id, // Directly respect database truth for "avulso" tracking
       }
     })
 
-    // 3. Enhance with "Data do Acerto"
+    // 2. Enhance with "Data do Acerto"
     const orderIds = [...new Set(receipts.map((r) => r.venda_id))]
 
     if (orderIds.length > 0) {

@@ -73,9 +73,9 @@ export function PixConferenceDialog({
 
   useEffect(() => {
     if (open && receipt) {
-      // Do NOT pre-fill nome_no_pix as per User Story requirements
+      // Prefill with existing confirmed value if available, else keep empty so user types it
       form.reset({
-        nome_no_pix: '',
+        nome_no_pix: receipt.nome_no_pix || '',
         banco_pix: receipt.banco_pix || 'BS2',
         data_pix_realizado: receipt.data_pix_realizado
           ? format(new Date(receipt.data_pix_realizado), 'yyyy-MM-dd')

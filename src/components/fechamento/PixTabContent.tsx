@@ -125,11 +125,15 @@ export function PixTabContent() {
       }
     }
 
-    // Updated Logic for Rota Filter: Filter by `rota_id` which was added to PixReceiptRow
+    // Includes Avulso logic explicitly mapping to null/empty rota_id
     if (filters.routeId && filters.routeId !== 'todos') {
-      result = result.filter(
-        (row) => row.rota_id?.toString() === filters.routeId,
-      )
+      if (filters.routeId === 'avulso') {
+        result = result.filter((row) => !row.rota_id)
+      } else {
+        result = result.filter(
+          (row) => row.rota_id?.toString() === filters.routeId,
+        )
+      }
     }
 
     result.sort((a, b) => {
@@ -225,6 +229,7 @@ export function PixTabContent() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todas</SelectItem>
+                  <SelectItem value="avulso">Avulsos (Sem Rota)</SelectItem>
                   {routes.map((r) => (
                     <SelectItem key={r.id} value={r.id.toString()}>
                       Rota #{r.id} ({safeFormatDate(r.data_inicio, 'dd/MM')})

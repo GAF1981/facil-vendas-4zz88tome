@@ -120,7 +120,11 @@ export function PixTable({
             data.map((row) => (
               <TableRow key={row.id} className="hover:bg-muted/30">
                 <TableCell className="text-center font-mono text-xs">
-                  {row.rota_id ? `#${row.rota_id}` : '-'}
+                  {row.rota_id ? (
+                    `#${row.rota_id}`
+                  ) : (
+                    <span className="text-muted-foreground italic">Avulso</span>
+                  )}
                 </TableCell>
                 <TableCell className="font-mono font-medium text-blue-600">
                   #{row.id_da_femea || row.venda_id}
