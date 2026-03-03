@@ -4459,7 +4459,7 @@ export const Constants = {
 //       "BANCO_DE_DADOS" bd
 //     LEFT JOIN "PRODUTOS" p ON bd."COD. PRODUTO" = p."ID"
 //     WHERE
-//       bd."DATA DO ACERTO" >= start_date AND bd."DATA DO ACERTO" <= end_date
+//       bd."DATA DO ACERTO" >= start_date::date AND bd."DATA DO ACERTO" <= end_date::date
 //       AND bd."MERCADORIA" IS NOT NULL
 //       AND (p_funcionario_id IS NULL OR bd."CODIGO FUNCIONARIO" = p_funcionario_id)
 //       AND (p_grupo IS NULL OR p_grupo = '' OR p_grupo = 'todos' OR p."GRUPO" = p_grupo)
