@@ -141,8 +141,7 @@ export function PixConferenceDialog({
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="bg-muted/30 p-3 rounded-md border text-sm text-muted-foreground mb-2">
               <p>
-                <strong>Pedido:</strong> #
-                {receipt?.id_da_femea || receipt?.venda_id}
+                <strong>Pedido:</strong> #{receipt?.venda_id}
               </p>
               <p>
                 <strong>Cliente:</strong> {receipt?.cliente_nome}

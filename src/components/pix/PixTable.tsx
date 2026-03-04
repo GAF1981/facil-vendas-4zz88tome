@@ -90,7 +90,7 @@ export function PixTable({
         <TableHeader className="bg-muted/50">
           <TableRow>
             <TableHead className="w-[60px] text-center">Rota</TableHead>
-            {renderSortableHead('Número do Pedido', 'id_da_femea', 'w-[140px]')}
+            {renderSortableHead('Número do Pedido', 'venda_id', 'w-[140px]')}
             {renderSortableHead('Data Acerto', 'data_acerto')}
             {renderSortableHead('Data Pagto', 'data_pagamento')}
             <TableHead>Vendedor</TableHead>
@@ -127,7 +127,7 @@ export function PixTable({
                   )}
                 </TableCell>
                 <TableCell className="font-mono font-medium text-blue-600">
-                  #{row.id_da_femea || row.venda_id}
+                  #{row.venda_id}
                 </TableCell>
                 <TableCell className="text-sm">
                   {row.data_acerto
